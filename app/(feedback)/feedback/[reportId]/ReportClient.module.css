@@ -35,7 +35,7 @@
   background: rgba(255,255,255,0.02);
   border-left: 3px solid var(--orange); }
 .overall { font-family: var(--font-dm); font-size: 14px;
-  line-height: 1.8; color: #C8D4E0; }
+  line-height: 1.8; color: #C8D4E0; white-space: pre-line; }
 .dimension { padding: 16px 0;
   border-bottom: 1px solid rgba(255,255,255,0.04); }
 .dimension:last-child { border-bottom: none; }
