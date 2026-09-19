@@ -225,11 +225,12 @@ export interface BulkScreenJob {
 }
 
 export async function startBulkScreenAction(
-  applicationIds: string[]
+  applicationIds: string[],
+  trackOverrides?: Record<string, string>
 ): Promise<{ jobId?: string; total?: number; error?: string }> {
   const res = await fetchAgentsEngine('/api/v1/agents/hr/bulk-screen', {
     method: 'POST',
-    body: JSON.stringify({ applicationIds }),
+    body: JSON.stringify({ applicationIds, trackOverrides }),
   })
 
   // 409 means a job is already running — surface its jobId so the client can resume polling it.
