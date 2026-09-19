@@ -13,6 +13,16 @@ interface EmailSender {
 
 type RecipientSource = 'applicants' | 'team' | 'manual'
 
+const STATUS_FILTER_OPTIONS = [
+  { value: 'pending',        label: 'Pending' },
+  { value: 'reviewed',       label: 'Reviewed' },
+  { value: 'shortlisted',    label: 'Shortlisted' },
+  { value: 'accepted',       label: 'Accepted' },
+  { value: 'rejected',       label: 'Rejected' },
+  { value: 'human-reviewed', label: 'Human Reviewed' },
+  { value: 'track-review',   label: 'Needs Track Assignment' },
+]
+
 interface SendResult {
   email: string
   success: boolean
@@ -34,7 +44,8 @@ export default function EmailComposeClient({
   const [source,       setSource]       = useState<RecipientSource>('applicants')
   const [selectedIds,  setSelectedIds]  = useState<Set<string>>(new Set())
   const [manualText,   setManualText]   = useState('')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [statusFilters, setStatusFilters] = useState<string[]>([])
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false)
   const [subject,    setSubject]    = useState('')
   const [message,    setMessage]    = useState('')
   const [sending,         setSending]         = useState(false)
@@ -59,12 +70,24 @@ export default function EmailComposeClient({
     setSelectedIds(new Set())
   }
 
+  function toggleStatusFilter(value: string) {
+    setStatusFilters((prev) => prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value])
+  }
+
+  // Empty selection = no filter (show everyone). Otherwise a candidate
+  // matches if they satisfy ANY selected filter (OR, not AND) — selecting
+  // Pending + Human Reviewed shows candidates who are either, not only
+  // ones that are somehow both.
   const filteredApplicants = useMemo(() => {
-    if (statusFilter === 'all') return applicants
-    if (statusFilter === 'human-reviewed') return applicants.filter((a) => !!(a as any).last_reviewed_by_email)
-    if (statusFilter === 'track-review') return applicants.filter((a) => !!(a as any).needs_track_assignment)
-    return applicants.filter((a) => a.status === statusFilter)
-  }, [applicants, statusFilter])
+    if (statusFilters.length === 0) return applicants
+    return applicants.filter((a) =>
+      statusFilters.some((f) => {
+        if (f === 'human-reviewed') return !!(a as any).last_reviewed_by_email
+        if (f === 'track-review') return !!(a as any).needs_track_assignment
+        return a.status === f
+      })
+    )
+  }, [applicants, statusFilters])
 
   const manualRecipients = useMemo(() => {
     return manualText
@@ -155,6 +178,14 @@ export default function EmailComposeClient({
         .email-panel { background: var(--navy); border: 1px solid rgba(255,255,255,0.06); padding: 20px; }
         .email-panel-title { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--grey-mid); margin-bottom: 14px; }
         .email-select { background: var(--navy-mid); border: 1px solid rgba(255,255,255,0.08); color: var(--white); font-family: var(--font-dm); font-size: 13px; padding: 9px 12px; outline: none; width: 100%; margin-bottom: 16px; }
+        .email-filter-trigger { display: inline-flex; align-items: center; width: 100%; justify-content: space-between; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; padding: 9px 12px; cursor: pointer; border: 1px solid rgba(255,255,255,0.12); background: var(--navy-mid); color: var(--white); transition: all 0.15s ease; }
+        .email-filter-trigger:hover { border-color: rgba(255,255,255,0.25); }
+        .email-filter-backdrop { position: fixed; inset: 0; z-index: 49; }
+        .email-filter-menu { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 50; max-height: 260px; overflow-y: auto; background: var(--navy); border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 8px 24px rgba(0,0,0,0.4); padding: 6px; display: flex; flex-direction: column; }
+        .email-filter-item { display: flex; align-items: center; gap: 8px; padding: 7px 8px; font-size: 12px; color: var(--off-white); cursor: pointer; transition: background 0.15s ease; }
+        .email-filter-item:hover { background: rgba(255,255,255,0.04); }
+        .email-filter-item input { accent-color: var(--orange); cursor: pointer; }
+        .email-filter-clear { align-self: flex-end; font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--orange); background: none; border: none; cursor: pointer; padding: 4px 8px; }
         .source-tabs { display: flex; gap: 0; margin-bottom: 16px; border: 1px solid rgba(255,255,255,0.08); }
         .source-tab { flex: 1; padding: 8px; font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase; text-align: center; cursor: pointer; background: none; border: none; color: var(--grey-mid); transition: all 0.15s ease; }
         .source-tab.active { background: rgba(219,103,39,0.1); color: var(--orange); }
@@ -192,27 +223,44 @@ export default function EmailComposeClient({
           <div className="email-panel-title">Recipients</div>
           <div className="source-tabs">
             <button type="button" className={`source-tab ${source === 'applicants' ? 'active' : ''}`} onClick={() => { setSource('applicants'); clearSelection() }}>Applicants</button>
-            <button type="button" className={`source-tab ${source === 'team' ? 'active' : ''}`} onClick={() => { setSource('team'); clearSelection(); setStatusFilter('all') }}>Team</button>
-            <button type="button" className={`source-tab ${source === 'manual' ? 'active' : ''}`} onClick={() => { setSource('manual'); clearSelection(); setStatusFilter('all') }}>Manual list</button>
+            <button type="button" className={`source-tab ${source === 'team' ? 'active' : ''}`} onClick={() => { setSource('team'); clearSelection(); setStatusFilters([]) }}>Team</button>
+            <button type="button" className={`source-tab ${source === 'manual' ? 'active' : ''}`} onClick={() => { setSource('manual'); clearSelection(); setStatusFilters([]) }}>Manual list</button>
           </div>
 
           {source === 'applicants' && (
             <>
-              <select
-                className="email-select"
-                value={statusFilter}
-                onChange={(e) => { setStatusFilter(e.target.value); clearSelection() }}
-                style={{ marginBottom: '10px' }}
-              >
-                <option value="all">All statuses</option>
-                <option value="pending">Pending</option>
-                <option value="reviewed">Reviewed</option>
-                <option value="shortlisted">Shortlisted</option>
-                <option value="accepted">Accepted</option>
-                <option value="rejected">Rejected</option>
-                <option value="human-reviewed">Human Reviewed</option>
-                <option value="track-review">Needs Track Assignment</option>
-              </select>
+              <div className="email-filter-group" style={{ position: 'relative', marginBottom: '10px' }}>
+                <button
+                  type="button"
+                  className="email-filter-trigger"
+                  onClick={() => setStatusDropdownOpen((v) => !v)}
+                >
+                  {statusFilters.length === 0 ? 'All statuses' : `${statusFilters.length} status${statusFilters.length > 1 ? 'es' : ''} selected`}
+                  <span style={{ marginLeft: '6px' }}>{statusDropdownOpen ? '▲' : '▼'}</span>
+                </button>
+                {statusDropdownOpen && (
+                  <>
+                    <div className="email-filter-backdrop" onClick={() => setStatusDropdownOpen(false)} />
+                    <div className="email-filter-menu">
+                      {statusFilters.length > 0 && (
+                        <button type="button" className="email-filter-clear" onClick={(e) => { e.stopPropagation(); setStatusFilters([]); clearSelection() }}>
+                          Clear
+                        </button>
+                      )}
+                      {STATUS_FILTER_OPTIONS.map((opt) => (
+                        <label key={opt.value} className="email-filter-item">
+                          <input
+                            type="checkbox"
+                            checked={statusFilters.includes(opt.value)}
+                            onChange={() => { toggleStatusFilter(opt.value); clearSelection() }}
+                          />
+                          {opt.label}
+                        </label>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
               <div className="recipient-actions">
                 <button type="button" className="recipient-action-btn" onClick={() => selectAll(filteredApplicants.map((a) => a.id))}>Select all</button>
                 <button type="button" className="recipient-action-btn" onClick={clearSelection}>Clear</button>
