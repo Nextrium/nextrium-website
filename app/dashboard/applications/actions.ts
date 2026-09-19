@@ -66,6 +66,109 @@ export async function markApplicationReviewed(applicationId: string): Promise<{ 
   }
 }
 
+export interface ArchivedInfo {
+  archived: boolean
+  archivedAt: string | null
+  archivedReason: string | null
+  archivedByEmail: string | null
+}
+
+/**
+ * Archives an application: takes it out of the active pipeline entirely and
+ * suppresses all future contact (screening, rescreening, and every email
+ * trigger, enforced server-side in agents-engine and at the /api/email
+ * chokepoint - this action only sets the flag those checks read). Reason is
+ * optional; recorded for context but never required, since the trigger is
+ * often "a human read a reply and needs to act immediately," not a formal
+ * review process.
+ */
+export async function archiveApplication(applicationId: string, reason?: string): Promise<{ archived?: ArchivedInfo; error?: string }> {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Not signed in.' }
+
+    const serviceClient = createServiceClient()
+    const now = new Date().toISOString()
+
+    const { data: updated, error } = await (serviceClient.from('applications') as any)
+      .update({
+        archived: true,
+        archived_at: now,
+        archived_reason: reason?.trim() || null,
+        archived_by: user.id,
+        archived_by_email: user.email,
+      })
+      .eq('id', applicationId)
+      .select('archived, archived_at, archived_reason, archived_by_email')
+      .single()
+
+    if (error) throw new Error(error.message)
+
+    revalidatePath('/dashboard/applications')
+    logActivity({
+      action: 'application_archived',
+      targetType: 'application',
+      targetId: applicationId,
+      details: { reason: updated.archived_reason },
+    }).catch(() => {})
+
+    return {
+      archived: {
+        archived: updated.archived,
+        archivedAt: updated.archived_at,
+        archivedReason: updated.archived_reason,
+        archivedByEmail: updated.archived_by_email,
+      },
+    }
+  } catch (err) {
+    console.error('[archiveApplication] Error:', err)
+    return { error: err instanceof Error ? err.message : 'Failed to archive application.' }
+  }
+}
+
+export async function unarchiveApplication(applicationId: string): Promise<{ archived?: ArchivedInfo; error?: string }> {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Not signed in.' }
+
+    const serviceClient = createServiceClient()
+    const { data: updated, error } = await (serviceClient.from('applications') as any)
+      .update({
+        archived: false,
+        archived_at: null,
+        archived_reason: null,
+        archived_by: null,
+        archived_by_email: null,
+      })
+      .eq('id', applicationId)
+      .select('archived, archived_at, archived_reason, archived_by_email')
+      .single()
+
+    if (error) throw new Error(error.message)
+
+    revalidatePath('/dashboard/applications')
+    logActivity({
+      action: 'application_unarchived',
+      targetType: 'application',
+      targetId: applicationId,
+    }).catch(() => {})
+
+    return {
+      archived: {
+        archived: updated.archived,
+        archivedAt: updated.archived_at,
+        archivedReason: updated.archived_reason,
+        archivedByEmail: updated.archived_by_email,
+      },
+    }
+  } catch (err) {
+    console.error('[unarchiveApplication] Error:', err)
+    return { error: err instanceof Error ? err.message : 'Failed to unarchive application.' }
+  }
+}
+
 export async function deleteApplication(id: string): Promise<{ error?: string }> {
   try {
     const supabase = createServiceClient()

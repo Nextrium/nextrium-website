@@ -27,6 +27,7 @@ async function getApplicants(): Promise<Application[]> {
   const { data } = await supabase
     .from('applications')
     .select('*')
+    .eq('archived', false)
     .order('created_at', { ascending: false })
   return (data ?? []) as Application[]
 }
