@@ -49,6 +49,16 @@ type SortDir   = 'asc' | 'desc'
 
 const STATUS_OPTIONS: Application['status'][] = ['pending', 'reviewed', 'shortlisted', 'rejected', 'accepted']
 
+// Must match the `name` field of each track in agents-engine's EVALUATION_TRACKS
+// (src/lib/evaluationTracks.ts) — this is what gets sent as `forceTrack`.
+const EVALUATION_TRACK_OPTIONS = [
+  'Technical Engineering',
+  'Product and Design',
+  'Operations',
+  'Community and Events',
+  'Research and Strategy',
+]
+
 const STATUS_STYLES: Record<Application['status'], { bg: string; color: string }> = {
   pending:     { bg: 'rgba(219,103,39,0.1)',  color: 'var(--orange)'  },
   reviewed:    { bg: 'rgba(74,111,165,0.1)',  color: 'var(--slate)'   },
@@ -91,12 +101,13 @@ export default function ApplicationsClient({
   // ?status=, so it's real navigation (bookmarkable, back-button aware)
   // rather than in-page tab state.
   const searchParams = useSearchParams()
-  const statusTab = (searchParams.get('status') ?? 'all') as 'all' | Application['status'] | 'rebuttal' | 'human-reviewed'
+  const statusTab = (searchParams.get('status') ?? 'all') as 'all' | Application['status'] | 'rebuttal' | 'human-reviewed' | 'track-review'
   const [applications, setApplications] = useState(initial)
   const [selected,     setSelected]     = useState<Application | null>(null)
   const [updating,     setUpdating]     = useState(false)
   const [markingReviewed, setMarkingReviewed] = useState(false)
   const [markReviewedError, setMarkReviewedError] = useState<string | null>(null)
+  const [trackChoice, setTrackChoice] = useState('')
   const [deleting,      setDeleting]      = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
@@ -262,6 +273,10 @@ export default function ApplicationsClient({
     await runBulkScreenJob([appId])
   }
 
+  async function handleAssignTrackAndScreen(appId: string, track: string) {
+    await runBulkScreenJob([appId], { [appId]: track })
+  }
+
   function applyBulkOutcomesToState(outcomes: BulkScreenOutcome[], freshRecords: Record<string, AgentScreeningResult>) {
     if (Object.keys(freshRecords).length > 0) {
       setScreeningResults((prev) => ({ ...prev, ...freshRecords }))
@@ -335,7 +350,7 @@ export default function ApplicationsClient({
     setBatchTargetIds([])
   }
 
-  async function runBulkScreenJob(applicationIds: string[]) {
+  async function runBulkScreenJob(applicationIds: string[], trackOverrides?: Record<string, string>) {
     if (applicationIds.length === 0) return
 
     setBatchScreening(true)
@@ -343,7 +358,7 @@ export default function ApplicationsClient({
     setBatchProgress({ current: 0, total: applicationIds.length })
     setBatchTargetIds(applicationIds)
 
-    const { jobId, error } = await startBulkScreenAction(applicationIds)
+    const { jobId, error } = await startBulkScreenAction(applicationIds, trackOverrides)
 
     if (error && !jobId) {
       setBatchError(error)
@@ -602,6 +617,8 @@ export default function ApplicationsClient({
       if (!rebuttalStatuses[app.id]?.rebuttalSubmitted) return false
     } else if (statusTab === 'human-reviewed') {
       if (!(app as any).last_reviewed_by_email) return false
+    } else if (statusTab === 'track-review') {
+      if (!(app as any).needs_track_assignment) return false
     } else if (statusTab !== 'all') {
       if (app.status !== statusTab) return false
     }
@@ -764,6 +781,10 @@ export default function ApplicationsClient({
         .mark-reviewed-btn { margin-top: 8px; padding: 6px 12px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; border: 1px solid rgba(34,193,122,0.35); background: rgba(34,193,122,0.06); color: var(--success); transition: all 0.15s ease; }
         .mark-reviewed-btn:hover:not(:disabled) { background: rgba(34,193,122,0.15); }
         .mark-reviewed-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .track-review-banner { margin: 0 20px; padding: 14px 16px; background: rgba(212,168,67,0.08); border: 1px solid rgba(212,168,67,0.3); }
+        .track-review-banner-title { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--warning); margin-bottom: 6px; }
+        .track-review-banner-text { font-size: 12.5px; color: var(--grey-mid); line-height: 1.6; margin-bottom: 12px; }
+        .track-review-banner-row { display: flex; gap: 8px; }
         .detail-body { padding: 20px; display: flex; flex-direction: column; gap: 20px; }
         .detail-section-title { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--grey-mid); margin-bottom: 8px; }
         .detail-text { font-size: 13px; color: var(--off-white); line-height: 1.7; }
@@ -1103,6 +1124,14 @@ export default function ApplicationsClient({
                         {app.name}
                       </span>
                       <div style={{ display: 'flex', alignItems: 'center' }}>
+                        {(app as any).needs_track_assignment && (
+                          <span
+                            title="Needs a human to assign an evaluation track before screening"
+                            style={{ color: 'var(--warning)', fontSize: '12px', marginRight: '6px' }}
+                          >
+                            ⚠
+                          </span>
+                        )}
                         {(app as any).last_reviewed_by_email && (
                           <span
                             title={`Reviewed by ${(app as any).last_reviewed_by_email}`}
@@ -1289,6 +1318,35 @@ export default function ApplicationsClient({
                     </div>
                   )}
                 </div>
+                {(selected as any).needs_track_assignment && (
+                  <div className="track-review-banner">
+                    <div className="track-review-banner-title">⚠ Needs track assignment</div>
+                    <p className="track-review-banner-text">
+                      This role/title didn't confidently match any evaluation track, so screening was
+                      skipped rather than guessing — pick the correct track below to run it.
+                    </p>
+                    <div className="track-review-banner-row">
+                      <select
+                        value={trackChoice}
+                        onChange={(e) => setTrackChoice(e.target.value)}
+                        style={{ flex: 1, background: 'var(--navy-mid)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--white)', fontFamily: 'var(--font-dm)', fontSize: '13px', padding: '9px 12px', outline: 'none' }}
+                      >
+                        <option value="">Select track…</option>
+                        {EVALUATION_TRACK_OPTIONS.map((t) => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        className="ai-btn ai-btn-primary"
+                        disabled={!trackChoice || batchScreening}
+                        onClick={() => handleAssignTrackAndScreen(selected.id, trackChoice)}
+                      >
+                        {batchScreening ? 'Screening…' : 'Assign & Screen'}
+                      </button>
+                    </div>
+                  </div>
+                )}
                 <div className="detail-body">
 
                   {/* AI AGENT SCREENING SECTION */}
