@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { getAgentMetrics, type AgentMetrics } from './actions'
 import { startBulkScreenAction } from '../applications/actions'
 
@@ -158,11 +159,23 @@ export default function AIEngineClient({
         .bar-fill { height: 100%; background: var(--orange); }
         .bar-count { font-family: var(--font-mono); font-size: 11px; color: var(--white); width: 28px; text-align: right; flex-shrink: 0; }
 
-        .failed-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 12.5px; }
+        .failed-row { display: flex; flex-direction: column; gap: 6px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 12.5px; min-width: 0; }
         .failed-row:last-child { border-bottom: none; }
-        .failed-name { color: var(--white); flex-shrink: 0; width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .failed-error { color: var(--error); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .failed-row-top { display: flex; align-items: center; gap: 10px; min-width: 0; }
+        .failed-name { color: var(--white); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .failed-date { color: var(--grey-mid); font-family: var(--font-mono); font-size: 10px; flex-shrink: 0; }
+        .failed-reason-text {
+          color: var(--error); font-size: 11.5px; line-height: 1.5; padding-left: 26px;
+          overflow: hidden; text-overflow: ellipsis; display: -webkit-box;
+          -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: break-word;
+        }
+        .failed-reason-pill {
+          display: inline-flex; align-items: center; gap: 6px; margin-left: 26px; width: fit-content;
+          padding: 4px 10px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.06em;
+          text-transform: uppercase; background: rgba(212,168,67,0.1); border: 1px solid rgba(212,168,67,0.3);
+          color: var(--warning); text-decoration: none; transition: all 0.15s ease;
+        }
+        .failed-reason-pill:hover { background: rgba(212,168,67,0.2); border-color: rgba(212,168,67,0.5); }
         .retry-btn { padding: 9px 16px; font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.12em; text-transform: uppercase; cursor: pointer; border: 1px solid rgba(219,103,39,0.4); background: rgba(219,103,39,0.08); color: var(--orange); transition: all 0.15s ease; margin-top: 12px; }
         .retry-btn:hover:not(:disabled) { background: var(--orange); color: var(--white); }
         .retry-btn:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -306,15 +319,27 @@ export default function AIEngineClient({
                   <>
                     {metrics.failedList.map((f) => (
                       <div className="failed-row" key={`${f.jobId}-${f.applicationId}`}>
-                        <input
-                          type="checkbox"
-                          checked={selectedFailedIds.has(f.applicationId)}
-                          onChange={() => toggleFailedSelection(f.applicationId)}
-                          style={{ accentColor: 'var(--orange)', cursor: 'pointer', flexShrink: 0 }}
-                        />
-                        <span className="failed-name">{f.candidateName}</span>
-                        <span className="failed-error">{f.error || 'Unknown error'}</span>
-                        <span className="failed-date">{formatDate(f.occurredAt)}</span>
+                        <div className="failed-row-top">
+                          <input
+                            type="checkbox"
+                            checked={selectedFailedIds.has(f.applicationId)}
+                            onChange={() => toggleFailedSelection(f.applicationId)}
+                            disabled={f.needsTrackAssignment}
+                            title={f.needsTrackAssignment ? 'Assign a track before retrying — a plain retry will hit the same block.' : undefined}
+                            style={{ accentColor: 'var(--orange)', cursor: f.needsTrackAssignment ? 'not-allowed' : 'pointer', flexShrink: 0 }}
+                          />
+                          <span className="failed-name">{f.candidateName}</span>
+                          <span className="failed-date">{formatDate(f.occurredAt)}</span>
+                        </div>
+                        {f.needsTrackAssignment ? (
+                          <Link href="/dashboard/applications?status=track-review" className="failed-reason-pill">
+                            ⚠ Needs track assignment — assign one to screen
+                          </Link>
+                        ) : (
+                          <div className="failed-reason-text" title={f.error || 'Unknown error'}>
+                            {f.error || 'Unknown error'}
+                          </div>
+                        )}
                       </div>
                     ))}
                     <button
