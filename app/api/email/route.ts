@@ -1,8 +1,41 @@
 import { NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import crypto from 'crypto'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
+
+// This route sends real email through Brevo using Nextrium's own sender
+// identity. It has two legitimate callers: agents-engine's automatic
+// dispatch (server-to-server, no browser session — authenticates with the
+// shared AGENTS_ENGINE_API_KEY it already sends on every call) and the
+// dashboard's manual composer (a signed-in recruiter's browser session).
+// Without checking either, this was reachable by anyone who found the URL,
+// who could then send arbitrary content to arbitrary addresses from our
+// sender identity at our Brevo cost — an open relay.
+async function isAuthorized(request: Request): Promise<boolean> {
+  const authHeader = request.headers.get('Authorization') || ''
+  const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : null
+  const configuredKey = process.env.AGENTS_ENGINE_API_KEY
+
+  if (configuredKey && bearerToken) {
+    try {
+      const a = Buffer.from(bearerToken, 'utf8')
+      const b = Buffer.from(configuredKey, 'utf8')
+      if (a.length === b.length && crypto.timingSafeEqual(a, b)) return true
+    } catch {
+      // fall through to session check
+    }
+  }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  return !!user
+}
 
 export async function POST(request: Request) {
   try {
+    if (!(await isAuthorized(request))) {
+      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+
     const body = await request.json()
     const { subject, message, recipients, sender_id, fileAttachments } = body
 
