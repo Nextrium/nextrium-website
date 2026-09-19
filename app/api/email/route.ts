@@ -47,7 +47,31 @@ export async function POST(request: Request) {
 
     const results: { email: string; success: boolean; error?: string }[] = []
 
-    for (const recipient of recipients) {
+    // True backstop for the archive/do-not-contact feature: every email
+    // trigger in this system (manual composer, bulk dispatch, automatic
+    // post-screening sends, rebuttal-resolution sends) ultimately calls this
+    // route, so this is the one place that guarantees no archived candidate
+    // is ever emailed regardless of which path tried to reach them. Matched
+    // by email address rather than application ID (this route never
+    // receives one) - a candidate who applied to multiple roles is
+    // suppressed everywhere once any of their application rows is archived.
+    const { data: archivedRows } = await supabase.from('applications').select('email').eq('archived', true)
+    const archivedEmails = new Set(
+      (archivedRows ?? [])
+        .map((r: any) => (r.email || '').trim().toLowerCase())
+        .filter(Boolean)
+    )
+
+    const sendableRecipients = recipients.filter((r: any) => {
+      const email = (r.email || '').trim().toLowerCase()
+      if (email && archivedEmails.has(email)) {
+        results.push({ email: r.email, success: false, error: 'Recipient is archived — this address must not be contacted.' })
+        return false
+      }
+      return true
+    })
+
+    for (const recipient of sendableRecipients) {
       const firstName = recipient.name?.trim().split(' ')[0] ?? 'there'
       const personalised = message
         .replace(/{{name}}/g, firstName)
@@ -106,10 +130,11 @@ export async function POST(request: Request) {
     const anySent      = results.some((r) => r.success)
 
     if (anySent) {
+      const successfulEmails = new Set(results.filter((r) => r.success).map((r) => r.email))
       const { error: logError } = await (supabase.from('email_logs') as any).insert({
         subject,
         body:         message,
-        recipients:   recipients.filter((_: unknown, i: number) => results[i].success),
+        recipients:   recipients.filter((r: any) => successfulEmails.has(r.email)),
         sent_by:      'dashboard',
         status:       allSucceeded ? 'sent' : 'partial',
         sender_name:  senderName,
