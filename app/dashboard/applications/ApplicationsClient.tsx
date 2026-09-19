@@ -281,12 +281,23 @@ export default function ApplicationsClient({
     if (Object.keys(freshRecords).length > 0) {
       setScreeningResults((prev) => ({ ...prev, ...freshRecords }))
     }
-    setApplications((prev) =>
-      prev.map((a) => {
-        const outcome = outcomes.find((o) => o.applicationId === a.id && o.statusUpdated)
-        return outcome ? { ...a, status: outcome.statusUpdated as Application['status'] } : a
-      })
-    )
+
+    // A successful screen always clears needs_track_assignment server-side
+    // (setNeedsTrackAssignment(id, false) runs on every successful persist);
+    // an outcome that explicitly reports needsTrackAssignment sets it. Any
+    // other failure (transient provider error, etc.) leaves the flag as-is.
+    const patchApp = (a: Application): Application => {
+      const outcome = outcomes.find((o) => o.applicationId === a.id)
+      if (!outcome) return a
+      const patch: Record<string, any> = {}
+      if (outcome.statusUpdated) patch.status = outcome.statusUpdated
+      if (outcome.success) patch.needs_track_assignment = false
+      else if (outcome.needsTrackAssignment) patch.needs_track_assignment = true
+      return Object.keys(patch).length > 0 ? { ...a, ...patch } : a
+    }
+
+    setApplications((prev) => prev.map(patchApp))
+    setSelected((prev) => (prev ? patchApp(prev) : prev))
   }
 
   async function pollBulkScreenJob(jobId: string) {
@@ -322,14 +333,20 @@ export default function ApplicationsClient({
       const newlySucceeded = job.results.filter(
         (r) => r.success && !mergedApplicationIds.has(r.applicationId)
       )
-      if (newlySucceeded.length > 0) {
+      const newlyFailed = job.results.filter((r) => !r.success && !mergedApplicationIds.has(r.applicationId))
+
+      if (newlySucceeded.length > 0 || newlyFailed.length > 0) {
         newlySucceeded.forEach((r) => mergedApplicationIds.add(r.applicationId))
-        const freshRecords = await getScreeningResultsForApplications(newlySucceeded.map((r) => r.applicationId))
+        newlyFailed.forEach((r) => mergedApplicationIds.add(r.applicationId))
+        const freshRecords = newlySucceeded.length > 0
+          ? await getScreeningResultsForApplications(newlySucceeded.map((r) => r.applicationId))
+          : {}
+        // Passing job.results (not just the newly-observed subset) is fine —
+        // applyBulkOutcomesToState only touches applications whose id it
+        // finds an outcome for, and re-applying an already-merged outcome
+        // is a harmless no-op.
         applyBulkOutcomesToState(job.results, freshRecords)
       }
-
-      const newlyFailed = job.results.filter((r) => !r.success && !mergedApplicationIds.has(r.applicationId))
-      newlyFailed.forEach((r) => mergedApplicationIds.add(r.applicationId))
 
       if (job.status !== 'running') {
         if (job.status === 'failed') setBatchError(job.error || 'Bulk screening job failed.')

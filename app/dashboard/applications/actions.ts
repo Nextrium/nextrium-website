@@ -210,6 +210,7 @@ export interface BulkScreenOutcome {
   evaluationTrack?: string
   statusUpdated?: string | null
   reportId?: string
+  needsTrackAssignment?: boolean
 }
 
 export interface BulkScreenJob {
