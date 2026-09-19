@@ -61,6 +61,8 @@ export default function EmailComposeClient({
 
   const filteredApplicants = useMemo(() => {
     if (statusFilter === 'all') return applicants
+    if (statusFilter === 'human-reviewed') return applicants.filter((a) => !!(a as any).last_reviewed_by_email)
+    if (statusFilter === 'track-review') return applicants.filter((a) => !!(a as any).needs_track_assignment)
     return applicants.filter((a) => a.status === statusFilter)
   }, [applicants, statusFilter])
 
@@ -208,6 +210,8 @@ export default function EmailComposeClient({
                 <option value="shortlisted">Shortlisted</option>
                 <option value="accepted">Accepted</option>
                 <option value="rejected">Rejected</option>
+                <option value="human-reviewed">Human Reviewed</option>
+                <option value="track-review">Needs Track Assignment</option>
               </select>
               <div className="recipient-actions">
                 <button type="button" className="recipient-action-btn" onClick={() => selectAll(filteredApplicants.map((a) => a.id))}>Select all</button>
