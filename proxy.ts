@@ -1,39 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { updateSession } from '@/lib/supabase/proxy'
 import { createClient } from '@supabase/supabase-js'
-
-const BLOCKED_PATHS: Record<string, string[]> = {
-  admin: [],
-  content: [
-    '/dashboard/applications',
-    '/dashboard/contact',
-    '/dashboard/email',
-    '/dashboard/roles',
-    '/dashboard/team',
-    '/dashboard/settings',
-  ],
-  community: [
-    '/dashboard/applications',
-    '/dashboard/contact',
-    '/dashboard/email',
-    '/dashboard/roles',
-    '/dashboard/team',
-    '/dashboard/settings',
-    '/dashboard/posts',
-    '/dashboard/products',
-  ],
-  // Full access except the two pages that would let a moderator change
-  // their own (or anyone's) access level, or see internal processing logs.
-  moderator: [
-    '/dashboard/settings/team',
-    '/dashboard/logs',
-  ],
-}
-
-function isRestricted(pathname: string, role: string): boolean {
-  const blocked = BLOCKED_PATHS[role] ?? BLOCKED_PATHS['community']
-  return blocked.some((path) => pathname.startsWith(path))
-}
+import { isRestricted } from '@/lib/dashboard/accessControl'
 
 const ROLE_COOKIE = 'nextrium-role'
 // 30s: short enough that a role change (e.g. promoting/demoting someone in

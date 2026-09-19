@@ -1,15 +1,21 @@
 import { NextResponse } from 'next/server'
 import crypto from 'crypto'
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
+import { getDashboardRole } from '@/lib/dashboard/getRole'
+import { isRestricted } from '@/lib/dashboard/accessControl'
 
 // This route sends real email through Brevo using Nextrium's own sender
 // identity. It has two legitimate callers: agents-engine's automatic
 // dispatch (server-to-server, no browser session — authenticates with the
 // shared AGENTS_ENGINE_API_KEY it already sends on every call) and the
-// dashboard's manual composer (a signed-in recruiter's browser session).
-// Without checking either, this was reachable by anyone who found the URL,
-// who could then send arbitrary content to arbitrary addresses from our
-// sender identity at our Brevo cost — an open relay.
+// dashboard's manual composer (a signed-in recruiter whose role is allowed
+// onto the /dashboard/email page in the first place). Without checking
+// either, this was reachable by anyone who found the URL, who could then
+// send arbitrary content to arbitrary addresses from our sender identity
+// at our Brevo cost — an open relay. Role check reuses the exact same
+// BLOCKED_PATHS list the /dashboard/email page itself is gated by
+// (lib/dashboard/accessControl.ts), so a role blocked from that page in
+// the UI can't reach the same capability by calling this route directly.
 async function isAuthorized(request: Request): Promise<boolean> {
   const authHeader = request.headers.get('Authorization') || ''
   const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : null
@@ -25,9 +31,12 @@ async function isAuthorized(request: Request): Promise<boolean> {
     }
   }
 
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  return !!user
+  // getDashboardRole() defaults to 'community' when there's no session at
+  // all, and 'community' is itself blocked from /dashboard/email — so an
+  // unauthenticated caller is correctly denied here too, with no separate
+  // "is there a user" check needed.
+  const role = await getDashboardRole()
+  return !isRestricted('/dashboard/email', role)
 }
 
 export async function POST(request: Request) {
