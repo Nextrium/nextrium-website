@@ -10,13 +10,15 @@ interface DashboardUserRow {
   role: string
   created_at: string
   email: string
+  archived: boolean
+  archived_at: string | null
 }
 
 async function getDashboardUsers(): Promise<DashboardUserRow[]> {
   const supabase = createServiceClient()
 
   const { data: dashboardUsers } = await (supabase.from('dashboard_users') as any)
-    .select('user_id, role, created_at')
+    .select('user_id, role, created_at, archived, archived_at')
     .order('created_at', { ascending: true })
 
   if (!dashboardUsers || dashboardUsers.length === 0) return []
@@ -35,10 +37,12 @@ async function getDashboardUsers(): Promise<DashboardUserRow[]> {
   }
 
   return dashboardUsers.map((u: any) => ({
-    user_id:    u.user_id,
-    role:       u.role,
-    created_at: u.created_at,
-    email:      emailMap[u.user_id] ?? 'Unknown',
+    user_id:     u.user_id,
+    role:        u.role,
+    created_at:  u.created_at,
+    email:       emailMap[u.user_id] ?? 'Unknown',
+    archived:    u.archived,
+    archived_at: u.archived_at,
   }))
 }
 

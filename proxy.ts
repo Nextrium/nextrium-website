@@ -20,16 +20,18 @@ async function fetchUserRole(userId: string): Promise<string> {
 
   const queryPromise = supabase
     .from('dashboard_users')
-    .select('role')
+    .select('role, archived')
     .eq('user_id', userId)
-    .maybeSingle() as unknown as Promise<{ data: { role: string } | null; error: unknown }>
+    .maybeSingle() as unknown as Promise<{ data: { role: string; archived: boolean } | null; error: unknown }>
 
   const timeoutPromise = new Promise<{ data: null; error: 'timeout' }>((resolve) =>
     setTimeout(() => resolve({ data: null, error: 'timeout' }), ROLE_QUERY_TIMEOUT_MS)
   )
 
   const { data } = await Promise.race([queryPromise, timeoutPromise])
-  return data?.role ?? 'community'
+  if (!data) return 'community'
+  if (data.archived) return 'archived'
+  return data.role;
 }
 
 /**
@@ -80,6 +82,14 @@ export async function proxy(request: NextRequest) {
   }
 
   const role = await getUserRole(request, response, user.id)
+
+  // Archived blocks the entire /dashboard tree (including /dashboard
+  // itself), so redirecting there like every other restriction does would
+  // loop forever — send them out to /login instead, same as a signed-out
+  // visitor, with a message explaining why.
+  if (role === 'archived') {
+    return NextResponse.redirect(new URL('/login?error=' + encodeURIComponent('Your dashboard access has been revoked. Contact an administrator.'), request.url))
+  }
 
   if (isRestricted(pathname, role)) {
     return NextResponse.redirect(new URL('/dashboard', request.url))

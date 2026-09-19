@@ -28,6 +28,10 @@ export const BLOCKED_PATHS: Record<string, string[]> = {
     '/dashboard/settings/team',
     '/dashboard/logs',
   ],
+  // Pseudo-role for a staff member whose dashboard_users row has been
+  // archived (see Sprint 4 of the archive feature) — blocks the entire
+  // /dashboard tree, not just specific pages.
+  archived: ['/dashboard'],
 }
 
 export function isRestricted(pathname: string, role: string): boolean {
