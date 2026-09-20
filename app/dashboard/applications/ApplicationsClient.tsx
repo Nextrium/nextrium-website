@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { normalizeUrl } from '@/lib/normalizeUrl'
+import { alreadyEmailedThisResult } from '@/lib/feedbackRecommendation'
 import type { Application, AgentScreeningResult } from '@/lib/types/database'
 import { useDashboardSearch } from '@/lib/dashboard/useDashboardSearch'
 import DashboardSearchBox from '@/components/dashboard/DashboardSearchBox'
@@ -18,8 +19,11 @@ import {
   getScreeningResultsForApplications,
   getFreshFeedbackLetter,
   markApplicationReviewed,
+  archiveApplication,
+  unarchiveApplication,
   type BulkScreenOutcome,
   type ReviewedInfo,
+  type ArchivedInfo,
 } from './actions'
 
 const BULK_SCREEN_JOB_STORAGE_KEY = 'nextrium-active-bulk-screen-job'
@@ -101,7 +105,7 @@ export default function ApplicationsClient({
   // ?status=, so it's real navigation (bookmarkable, back-button aware)
   // rather than in-page tab state.
   const searchParams = useSearchParams()
-  const statusTab = (searchParams.get('status') ?? 'all') as 'all' | Application['status'] | 'rebuttal' | 'human-reviewed' | 'track-review'
+  const statusTab = (searchParams.get('status') ?? 'all') as 'all' | Application['status'] | 'rebuttal' | 'human-reviewed' | 'track-review' | 'archived'
   const [applications, setApplications] = useState(initial)
   const [selected,     setSelected]     = useState<Application | null>(null)
   const [updating,     setUpdating]     = useState(false)
@@ -110,6 +114,10 @@ export default function ApplicationsClient({
   const [trackChoice, setTrackChoice] = useState('')
   const [deleting,      setDeleting]      = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [archiving,        setArchiving]        = useState(false)
+  const [archiveError,     setArchiveError]      = useState<string | null>(null)
+  const [archiveReasonBox, setArchiveReasonBox]  = useState(false)
+  const [archiveReason,    setArchiveReason]     = useState('')
 
   // Table view state
   const [viewMode,        setViewMode]        = useState<'list' | 'table'>('list')
@@ -176,6 +184,17 @@ export default function ApplicationsClient({
     setSelected((prev) => (prev && prev.id === id ? { ...prev, ...patch } : prev))
   }
 
+  function applyArchivedInfo(id: string, archived: ArchivedInfo) {
+    const patch = {
+      archived: archived.archived,
+      archived_at: archived.archivedAt,
+      archived_reason: archived.archivedReason,
+      archived_by_email: archived.archivedByEmail,
+    }
+    setApplications((prev) => prev.map((a) => a.id === id ? { ...a, ...patch } : a))
+    setSelected((prev) => (prev && prev.id === id ? { ...prev, ...patch } : prev))
+  }
+
   async function updateStatus(id: string, status: Application['status']) {
     setUpdating(true)
     const supabase = createClient()
@@ -221,6 +240,36 @@ export default function ApplicationsClient({
       setMarkReviewedError(error)
     }
     setMarkingReviewed(false)
+  }
+
+  async function handleArchive(id: string) {
+    if (!archiveReasonBox) {
+      setArchiveReasonBox(true)
+      return
+    }
+    setArchiving(true)
+    setArchiveError(null)
+    const { archived, error } = await archiveApplication(id, archiveReason)
+    if (archived) {
+      applyArchivedInfo(id, archived)
+      setArchiveReasonBox(false)
+      setArchiveReason('')
+    } else if (error) {
+      setArchiveError(error)
+    }
+    setArchiving(false)
+  }
+
+  async function handleUnarchive(id: string) {
+    setArchiving(true)
+    setArchiveError(null)
+    const { archived, error } = await unarchiveApplication(id)
+    if (archived) {
+      applyArchivedInfo(id, archived)
+    } else if (error) {
+      setArchiveError(error)
+    }
+    setArchiving(false)
   }
 
   async function handleDelete(id: string) {
@@ -281,12 +330,23 @@ export default function ApplicationsClient({
     if (Object.keys(freshRecords).length > 0) {
       setScreeningResults((prev) => ({ ...prev, ...freshRecords }))
     }
-    setApplications((prev) =>
-      prev.map((a) => {
-        const outcome = outcomes.find((o) => o.applicationId === a.id && o.statusUpdated)
-        return outcome ? { ...a, status: outcome.statusUpdated as Application['status'] } : a
-      })
-    )
+
+    // A successful screen always clears needs_track_assignment server-side
+    // (setNeedsTrackAssignment(id, false) runs on every successful persist);
+    // an outcome that explicitly reports needsTrackAssignment sets it. Any
+    // other failure (transient provider error, etc.) leaves the flag as-is.
+    const patchApp = (a: Application): Application => {
+      const outcome = outcomes.find((o) => o.applicationId === a.id)
+      if (!outcome) return a
+      const patch: Record<string, any> = {}
+      if (outcome.statusUpdated) patch.status = outcome.statusUpdated
+      if (outcome.success) patch.needs_track_assignment = false
+      else if (outcome.needsTrackAssignment) patch.needs_track_assignment = true
+      return Object.keys(patch).length > 0 ? { ...a, ...patch } : a
+    }
+
+    setApplications((prev) => prev.map(patchApp))
+    setSelected((prev) => (prev ? patchApp(prev) : prev))
   }
 
   async function pollBulkScreenJob(jobId: string) {
@@ -322,14 +382,20 @@ export default function ApplicationsClient({
       const newlySucceeded = job.results.filter(
         (r) => r.success && !mergedApplicationIds.has(r.applicationId)
       )
-      if (newlySucceeded.length > 0) {
+      const newlyFailed = job.results.filter((r) => !r.success && !mergedApplicationIds.has(r.applicationId))
+
+      if (newlySucceeded.length > 0 || newlyFailed.length > 0) {
         newlySucceeded.forEach((r) => mergedApplicationIds.add(r.applicationId))
-        const freshRecords = await getScreeningResultsForApplications(newlySucceeded.map((r) => r.applicationId))
+        newlyFailed.forEach((r) => mergedApplicationIds.add(r.applicationId))
+        const freshRecords = newlySucceeded.length > 0
+          ? await getScreeningResultsForApplications(newlySucceeded.map((r) => r.applicationId))
+          : {}
+        // Passing job.results (not just the newly-observed subset) is fine —
+        // applyBulkOutcomesToState only touches applications whose id it
+        // finds an outcome for, and re-applying an already-merged outcome
+        // is a harmless no-op.
         applyBulkOutcomesToState(job.results, freshRecords)
       }
-
-      const newlyFailed = job.results.filter((r) => !r.success && !mergedApplicationIds.has(r.applicationId))
-      newlyFailed.forEach((r) => mergedApplicationIds.add(r.applicationId))
 
       if (job.status !== 'running') {
         if (job.status === 'failed') setBatchError(job.error || 'Bulk screening job failed.')
@@ -554,7 +620,7 @@ export default function ApplicationsClient({
   }, {} as Record<Application['status'], number>)
 
   const unscannedCount = applications.filter((a) => !screeningResults[a.id]).length
-  const pendingEmailCount = applications.filter((a) => screeningResults[a.id] && !screeningResults[a.id].email_sent).length
+  const pendingEmailCount = applications.filter((a) => screeningResults[a.id] && !alreadyEmailedThisResult(screeningResults[a.id])).length
   const selectedScreening = selected ? screeningResults[selected.id] : null
   const selectedConsensus = selectedScreening ? ((selectedScreening.full_result as any)?.consensus || selectedScreening.full_result) : null
   const selectedLayer2    = selectedConsensus?.layer2ArtifactScorecard ?? null
@@ -613,7 +679,14 @@ export default function ApplicationsClient({
   // server's natural newest-first order instead of being pushed to the
   // bottom by a screened_at sort they don't have a value for yet.
   const filteredApplications = searchedApplications.filter((app) => {
-    if (statusTab === 'rebuttal') {
+    // Archived is a closed-out, out-of-pipeline state — hidden from every
+    // other view (including "All") so it doesn't clutter active work, and
+    // only ever visible in its own dedicated tab.
+    if (statusTab === 'archived') {
+      if (!(app as any).archived) return false
+    } else if ((app as any).archived) {
+      return false
+    } else if (statusTab === 'rebuttal') {
       if (!rebuttalStatuses[app.id]?.rebuttalSubmitted) return false
     } else if (statusTab === 'human-reviewed') {
       if (!(app as any).last_reviewed_by_email) return false
@@ -680,6 +753,9 @@ export default function ApplicationsClient({
     }
     setSelected(app)
     setConfirmDelete(false)
+    setArchiveReasonBox(false)
+    setArchiveReason('')
+    setArchiveError(null)
     setEmailOpen(false)
     setEmailResult(null)
     setEmailAttachFiles([])
@@ -1140,6 +1216,14 @@ export default function ApplicationsClient({
                             ✓
                           </span>
                         )}
+                        {alreadyEmailedThisResult(screening) && (
+                          <span
+                            title="Already sent this result — resending would be identical content"
+                            style={{ color: 'var(--success)', fontSize: '11px', marginRight: '6px' }}
+                          >
+                            ✉
+                          </span>
+                        )}
                         <span className="dash-badge" style={{ background: ss.bg, color: ss.color, border: `1px solid ${ss.color}33` }}>
                           {app.status}
                         </span>
@@ -1258,6 +1342,14 @@ export default function ApplicationsClient({
                                   style={{ color: 'var(--success)', fontSize: '12px', marginRight: '6px' }}
                                 >
                                   ✓
+                                </span>
+                              )}
+                              {alreadyEmailedThisResult(screening) && (
+                                <span
+                                  title="Already sent this result — resending would be identical content"
+                                  style={{ color: 'var(--success)', fontSize: '11px', marginRight: '6px' }}
+                                >
+                                  ✉
                                 </span>
                               )}
                               <span className="dash-badge" style={{ background: ss.bg, color: ss.color, border: `1px solid ${ss.color}33` }}>
@@ -1749,15 +1841,24 @@ export default function ApplicationsClient({
                         {/* Quick AI Action: Load AI Feedback into Email */}
                         {selectedConsensus.applicantFeedbackLetter && (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {alreadyEmailedThisResult(selectedScreening) && (
+                              <div style={{ fontSize: '11px', color: 'var(--success)' }}>
+                                ✉ Already sent this result — resending is disabled since the recommendation hasn't changed since the last send.
+                              </div>
+                            )}
                             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                               <button
                                 type="button"
                                 onClick={() => handleSendFeedbackToSelected(selected.id)}
-                                disabled={perCandidateEmailSending}
+                                disabled={perCandidateEmailSending || alreadyEmailedThisResult(selectedScreening)}
                                 className="ai-btn ai-btn-primary"
                                 style={{ flex: 1 }}
                               >
-                                {perCandidateEmailSending ? 'Sending...' : '📧 Send AI Feedback Email'}
+                                {perCandidateEmailSending
+                                  ? 'Sending...'
+                                  : alreadyEmailedThisResult(selectedScreening)
+                                  ? '✉ Already Sent'
+                                  : '📧 Send AI Feedback Email'}
                               </button>
                               <button
                                 type="button"
@@ -2011,6 +2112,69 @@ export default function ApplicationsClient({
                         >
                           {emailSending ? 'Sending...' : `Send to ${selected.email}`}
                         </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ borderTop: '1px solid rgba(212,168,67,0.15)', paddingTop: '16px' }}>
+                    {(selected as any).archived ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div style={{ fontSize: '12px', color: 'var(--warning)', lineHeight: '1.6' }}>
+                          Archived{(selected as any).archived_by_email ? ` by ${(selected as any).archived_by_email}` : ''}
+                          {(selected as any).archived_at ? ` on ${new Date((selected as any).archived_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}.
+                          Screening, rescreening, and all email are blocked for this candidate.
+                          {(selected as any).archived_reason && (
+                            <div style={{ marginTop: '6px', color: 'var(--grey-mid)' }}>Reason: {(selected as any).archived_reason}</div>
+                          )}
+                        </div>
+                        {archiveError && <div style={{ fontSize: '11.5px', color: 'var(--error)' }}>{archiveError}</div>}
+                        <button
+                          type="button"
+                          onClick={() => handleUnarchive(selected.id)}
+                          disabled={archiving}
+                          style={{ padding: '9px 14px', fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.12em', textTransform: 'uppercase', cursor: 'pointer', border: '1px solid rgba(212,168,67,0.35)', background: 'rgba(212,168,67,0.06)', color: 'var(--warning)', transition: 'all 0.15s ease', opacity: archiving ? 0.6 : 1 }}
+                        >
+                          {archiving ? 'Unarchiving…' : 'Unarchive'}
+                        </button>
+                      </div>
+                    ) : !archiveReasonBox ? (
+                      <button
+                        type="button"
+                        onClick={() => setArchiveReasonBox(true)}
+                        style={{ width: '100%', padding: '9px 14px', fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.12em', textTransform: 'uppercase', cursor: 'pointer', border: '1px solid rgba(212,168,67,0.3)', background: 'none', color: 'var(--warning)', transition: 'all 0.15s ease', textAlign: 'left' }}
+                      >
+                        Archive & stop contacting
+                      </button>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div style={{ fontSize: '12px', color: 'var(--warning)', lineHeight: '1.5' }}>
+                          Blocks all future screening, rescreening, and email to this candidate. Reversible via Unarchive.
+                        </div>
+                        <textarea
+                          value={archiveReason}
+                          onChange={(e) => setArchiveReason(e.target.value)}
+                          placeholder="Reason (optional) — e.g. declined via email, cited lack of incentives"
+                          style={{ width: '100%', minHeight: '56px', background: 'var(--navy-mid)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--white)', fontFamily: 'var(--font-dm)', fontSize: '12.5px', padding: '8px 10px', outline: 'none', resize: 'vertical' }}
+                        />
+                        {archiveError && <div style={{ fontSize: '11.5px', color: 'var(--error)' }}>{archiveError}</div>}
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button
+                            type="button"
+                            onClick={() => { setArchiveReasonBox(false); setArchiveReason(''); setArchiveError(null) }}
+                            disabled={archiving}
+                            style={{ flex: 1, padding: '9px 14px', fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.12em', textTransform: 'uppercase', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.15)', background: 'none', color: 'var(--grey-mid)', transition: 'all 0.15s ease' }}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleArchive(selected.id)}
+                            disabled={archiving}
+                            style={{ flex: 1, padding: '9px 14px', fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.12em', textTransform: 'uppercase', cursor: 'pointer', border: '1px solid var(--warning)', background: 'var(--warning)', color: 'var(--navy-deep)', transition: 'all 0.15s ease', opacity: archiving ? 0.6 : 1 }}
+                          >
+                            {archiving ? 'Archiving…' : 'Confirm archive'}
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>

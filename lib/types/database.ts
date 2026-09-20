@@ -261,6 +261,11 @@ export type Database = {
           last_reviewed_at: string | null
           needs_track_assignment: boolean
           track_assignment_flagged_at: string | null
+          archived: boolean
+          archived_at: string | null
+          archived_reason: string | null
+          archived_by: string | null
+          archived_by_email: string | null
         }
         Insert: {
           id?: string
@@ -515,6 +520,8 @@ export type Database = {
           screened_at: string
           email_sent: boolean
           webhook_sent: boolean
+          last_emailed_recommendation: string | null
+          last_emailed_at: string | null
           created_at?: string
         }
         Insert: {

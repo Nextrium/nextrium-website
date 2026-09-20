@@ -1,13 +1,15 @@
 'use client'
 
 import { useState } from 'react'
-import { inviteUser, updateRole, removeUser } from './actions'
+import { inviteUser, updateRole, removeUser, archiveUser, unarchiveUser } from './actions'
 
 interface DashboardUserRow {
   user_id: string
   role: string
   created_at: string
   email: string
+  archived: boolean
+  archived_at: string | null
 }
 
 const ROLE_OPTIONS = [
@@ -16,13 +18,6 @@ const ROLE_OPTIONS = [
   { value: 'content',   label: 'Content' },
   { value: 'community', label: 'Community' },
 ]
-
-const ROLE_STYLES: Record<string, { bg: string; color: string }> = {
-  admin:     { bg: 'rgba(219,103,39,0.1)',  color: 'var(--orange)'  },
-  moderator: { bg: 'rgba(212,168,67,0.1)',  color: 'var(--gold)'    },
-  content:   { bg: 'rgba(74,111,165,0.1)',  color: 'var(--slate)'   },
-  community: { bg: 'rgba(34,193,122,0.1)',  color: 'var(--success)' },
-}
 
 export default function TeamAccessClient({ users: initial }: { users: DashboardUserRow[] }) {
   const [users,          setUsers]          = useState(initial)
@@ -34,6 +29,9 @@ export default function TeamAccessClient({ users: initial }: { users: DashboardU
   const [updatingId,     setUpdatingId]     = useState<string | null>(null)
   const [removingId,     setRemovingId]     = useState<string | null>(null)
   const [confirmRemove,  setConfirmRemove]  = useState<string | null>(null)
+  const [archivingId,    setArchivingId]    = useState<string | null>(null)
+  const [confirmArchive, setConfirmArchive] = useState<string | null>(null)
+  const [archiveError,   setArchiveError]   = useState<string | null>(null)
 
   async function handleInvite() {
     if (!inviteEmail.trim()) return
@@ -75,6 +73,36 @@ export default function TeamAccessClient({ users: initial }: { users: DashboardU
     setRemovingId(null)
   }
 
+  async function handleArchive(userId: string) {
+    if (confirmArchive !== userId) {
+      setConfirmArchive(userId)
+      setArchiveError(null)
+      return
+    }
+    setArchivingId(userId)
+    setArchiveError(null)
+    const { error } = await archiveUser(userId)
+    if (!error) {
+      setUsers((prev) => prev.map((u) => u.user_id === userId ? { ...u, archived: true, archived_at: new Date().toISOString() } : u))
+      setConfirmArchive(null)
+    } else {
+      setArchiveError(error)
+    }
+    setArchivingId(null)
+  }
+
+  async function handleUnarchive(userId: string) {
+    setArchivingId(userId)
+    setArchiveError(null)
+    const { error } = await unarchiveUser(userId)
+    if (!error) {
+      setUsers((prev) => prev.map((u) => u.user_id === userId ? { ...u, archived: false, archived_at: null } : u))
+    } else {
+      setArchiveError(error)
+    }
+    setArchivingId(null)
+  }
+
   return (
     <>
       <style>{`
@@ -90,6 +118,7 @@ export default function TeamAccessClient({ users: initial }: { users: DashboardU
         .team-remove-btn { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase; padding: 6px 10px; background: none; border: 1px solid rgba(232,69,69,0.3); color: var(--error); cursor: pointer; transition: all 0.15s ease; white-space: nowrap; }
         .team-remove-btn.confirm { background: rgba(232,69,69,0.1); border-color: var(--error); }
         .team-remove-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .team-archived-badge { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; padding: 6px 10px; background: rgba(212,168,67,0.08); border: 1px solid rgba(212,168,67,0.3); color: var(--warning); white-space: nowrap; }
         .invite-panel { display: flex; flex-direction: column; gap: 14px; padding: 20px; }
         .invite-input { background: var(--navy-mid); border: 1px solid rgba(255,255,255,0.08); color: var(--white); font-family: var(--font-dm); font-size: 13px; padding: 10px 12px; outline: none; width: 100%; }
         .invite-input:focus { border-color: var(--orange); }
@@ -110,7 +139,6 @@ export default function TeamAccessClient({ users: initial }: { users: DashboardU
             <div className="team-empty">No dashboard users yet.</div>
           ) : (
             users.map((user) => {
-              const rs = ROLE_STYLES[user.role] ?? ROLE_STYLES['community']
               return (
                 <div key={user.user_id} className="team-user-row">
                   <div>
@@ -118,29 +146,63 @@ export default function TeamAccessClient({ users: initial }: { users: DashboardU
                     <div className="team-user-date">
                       Added {new Date(user.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                     </div>
+                    {archiveError && (archivingId === user.user_id || confirmArchive === user.user_id) && (
+                      <div style={{ fontSize: '11px', color: 'var(--error)', marginTop: '4px' }}>{archiveError}</div>
+                    )}
                   </div>
-                  <select
-                    className="team-role-select"
-                    value={user.role}
-                    disabled={updatingId === user.user_id}
-                    onChange={(e) => handleRoleChange(user.user_id, e.target.value)}
-                  >
-                    {ROLE_OPTIONS.map((r) => (
-                      <option key={r.value} value={r.value}>{r.label}</option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    className={`team-remove-btn ${confirmRemove === user.user_id ? 'confirm' : ''}`}
-                    disabled={removingId === user.user_id}
-                    onClick={() => handleRemove(user.user_id)}
-                  >
-                    {removingId === user.user_id
-                      ? 'Removing...'
-                      : confirmRemove === user.user_id
-                      ? 'Confirm'
-                      : 'Remove'}
-                  </button>
+                  {user.archived ? (
+                    <div className="team-archived-badge" title={user.archived_at ? `Archived ${new Date(user.archived_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : undefined}>
+                      Archived
+                    </div>
+                  ) : (
+                    <select
+                      className="team-role-select"
+                      value={user.role}
+                      disabled={updatingId === user.user_id}
+                      onChange={(e) => handleRoleChange(user.user_id, e.target.value)}
+                    >
+                      {ROLE_OPTIONS.map((r) => (
+                        <option key={r.value} value={r.value}>{r.label}</option>
+                      ))}
+                    </select>
+                  )}
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    {user.archived ? (
+                      <button
+                        type="button"
+                        className="team-remove-btn"
+                        disabled={archivingId === user.user_id}
+                        onClick={() => handleUnarchive(user.user_id)}
+                      >
+                        {archivingId === user.user_id ? 'Unarchiving...' : 'Unarchive'}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className={`team-remove-btn ${confirmArchive === user.user_id ? 'confirm' : ''}`}
+                        disabled={archivingId === user.user_id}
+                        onClick={() => handleArchive(user.user_id)}
+                      >
+                        {archivingId === user.user_id
+                          ? 'Archiving...'
+                          : confirmArchive === user.user_id
+                          ? 'Confirm'
+                          : 'Archive'}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className={`team-remove-btn ${confirmRemove === user.user_id ? 'confirm' : ''}`}
+                      disabled={removingId === user.user_id}
+                      onClick={() => handleRemove(user.user_id)}
+                    >
+                      {removingId === user.user_id
+                        ? 'Removing...'
+                        : confirmRemove === user.user_id
+                        ? 'Confirm'
+                        : 'Remove'}
+                    </button>
+                  </div>
                 </div>
               )
             })

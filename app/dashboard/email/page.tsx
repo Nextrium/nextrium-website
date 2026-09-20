@@ -27,8 +27,38 @@ async function getApplicants(): Promise<Application[]> {
   const { data } = await supabase
     .from('applications')
     .select('*')
+    .eq('archived', false)
     .order('created_at', { ascending: false })
   return (data ?? []) as Application[]
+}
+
+export interface ScreeningSendInfo {
+  email_sent: boolean
+  recommendation: string | null
+  last_emailed_recommendation: string | null
+}
+
+// Keyed by application_id — lets the composer show "already sent this
+// result" without re-deriving screening state itself, and without pulling
+// the full agent_screening_results row (full_result alone can be large).
+async function getScreeningSendInfo(): Promise<Record<string, ScreeningSendInfo>> {
+  const supabase = createServiceClient()
+  const { data } = await supabase
+    .from('agent_screening_results')
+    .select('application_id, email_sent, recommendation, last_emailed_recommendation')
+    .order('screened_at', { ascending: false })
+
+  const map: Record<string, ScreeningSendInfo> = {}
+  data?.forEach((row: any) => {
+    if (!map[row.application_id]) {
+      map[row.application_id] = {
+        email_sent: row.email_sent,
+        recommendation: row.recommendation,
+        last_emailed_recommendation: row.last_emailed_recommendation,
+      }
+    }
+  })
+  return map
 }
 
 async function getTeamMembers(): Promise<TeamMember[]> {
@@ -41,17 +71,18 @@ async function getTeamMembers(): Promise<TeamMember[]> {
 }
 
 export default async function EmailPage() {
-  const [senders, applicants, teamMembers] = await Promise.all([
+  const [senders, applicants, teamMembers, screeningSendInfo] = await Promise.all([
     getSenders(),
     getApplicants(),
     getTeamMembers(),
+    getScreeningSendInfo(),
   ])
 
   return (
     <>
       <Header title="Send Email" description="Compose and send branded emails to applicants, team members, or a manual list" />
       <div className="dash-content">
-        <EmailComposeClient senders={senders} applicants={applicants} teamMembers={teamMembers} />
+        <EmailComposeClient senders={senders} applicants={applicants} teamMembers={teamMembers} screeningSendInfo={screeningSendInfo} />
       </div>
     </>
   )

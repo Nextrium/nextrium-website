@@ -1,10 +1,11 @@
 import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 
-export type DashboardRole = 'admin' | 'content' | 'community' | 'moderator'
+export type DashboardRole = 'admin' | 'content' | 'community' | 'moderator' | 'archived'
 
 interface DashboardUserRole {
-  role: DashboardRole
+  role: 'admin' | 'content' | 'community' | 'moderator'
+  archived: boolean
 }
 
 const ROLE_COOKIE = 'nextrium-role'
@@ -40,11 +41,12 @@ export async function getDashboardRole(): Promise<DashboardRole> {
 
   const { data } = await supabase
     .from('dashboard_users')
-    .select('role')
+    .select('role, archived')
     .eq('user_id', user.id)
     .maybeSingle() as { data: DashboardUserRole | null; error: unknown }
 
   if (!data) return 'community'
+  if (data.archived) return 'archived'
 
   return data.role
 }

@@ -6,6 +6,7 @@ export interface FailedScreeningEntry {
   applicationId: string
   candidateName: string
   error?: string
+  needsTrackAssignment?: boolean
   jobId: string
   occurredAt: string
 }

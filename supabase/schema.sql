@@ -42,3 +42,16 @@ begin
       );
   end if;
 end $$;
+
+-- Staff archive: revokes a dashboard user's access without hard-deleting
+-- them (which would lose their activity-log attribution, since
+-- team_activity_logs.actor_id has no FK to enforce referential integrity
+-- but is still meant to identify who did what historically). Enforced two
+-- ways: (1) the 'archived' pseudo-role in lib/dashboard/accessControl.ts
+-- blocks every /dashboard path at the app layer, checked on every request
+-- via proxy.ts and lib/dashboard/getRole.ts; (2) the archive action also
+-- bans the underlying auth.users record (ban_duration) so their session
+-- cannot authenticate at all going forward, independent of app-layer
+-- checks or whatever RLS policies may or may not exist on other tables.
+alter table public.dashboard_users add column if not exists archived boolean not null default false;
+alter table public.dashboard_users add column if not exists archived_at timestamptz;
