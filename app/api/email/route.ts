@@ -48,8 +48,14 @@ export async function POST(request: Request) {
     const body = await request.json()
     const { subject, message, recipients, sender_id, fileAttachments } = body
 
+    // message may now be rich HTML from the composer (e.g. `<p></p>` when
+    // "empty") as well as the plain-text templates automated dispatch still
+    // sends — strip tags before checking so an empty editor can't pass here
+    // even if the frontend guard is bypassed.
+    const messageHasContent = typeof message === 'string' && message.replace(/<[^>]*>/g, '').trim().length > 0
+
     if (!subject?.trim())           return NextResponse.json({ error: 'Subject is required.' }, { status: 400 })
-    if (!message?.trim())           return NextResponse.json({ error: 'Message is required.' }, { status: 400 })
+    if (!messageHasContent)         return NextResponse.json({ error: 'Message is required.' }, { status: 400 })
     if (!recipients?.length)        return NextResponse.json({ error: 'At least one recipient is required.' }, { status: 400 })
 
     const supabase = createServiceClient()

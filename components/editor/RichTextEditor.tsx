@@ -20,6 +20,7 @@ interface RichTextEditorProps {
   content: string
   onChange: (html: string) => void
   placeholder?: string
+  imageFolder?: string
 }
 
 type Level = 1 | 2 | 3 | 4
@@ -47,7 +48,7 @@ function ToolbarDivider() {
   return <div className="tbar-divider" />
 }
 
-export default function RichTextEditor({ content, onChange, placeholder = 'Start writing...' }: RichTextEditorProps) {
+export default function RichTextEditor({ content, onChange, placeholder = 'Start writing...', imageFolder }: RichTextEditorProps) {
   const [showImageUpload,  setShowImageUpload]  = useState(false)
   const [showLinkInput,    setShowLinkInput]    = useState(false)
   const [linkUrl,          setLinkUrl]          = useState('')
@@ -261,7 +262,7 @@ export default function RichTextEditor({ content, onChange, placeholder = 'Start
         )}
 
         {showImageUpload && (
-          <ImageUpload onInsert={insertImage} onClose={() => setShowImageUpload(false)} />
+          <ImageUpload onInsert={insertImage} onClose={() => setShowImageUpload(false)} folder={imageFolder} />
         )}
 
         <EditorContent editor={editor} />
