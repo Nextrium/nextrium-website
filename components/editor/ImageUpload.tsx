@@ -7,11 +7,12 @@ import { normalizeUrl } from '@/lib/normalizeUrl'
 interface ImageUploadProps {
   onInsert: (url: string) => void
   onClose: () => void
+  folder?: string
 }
 
 type Tab = 'upload' | 'url'
 
-export default function ImageUpload({ onInsert, onClose }: ImageUploadProps) {
+export default function ImageUpload({ onInsert, onClose, folder = 'posts' }: ImageUploadProps) {
   const [tab,          setTab]          = useState<Tab>('upload')
   const [urlInput,     setUrlInput]     = useState('')
   const [uploading,    setUploading]    = useState(false)
@@ -29,7 +30,7 @@ export default function ImageUpload({ onInsert, onClose }: ImageUploadProps) {
       const supabase = createClient()
       const ext      = file.name.split('.').pop()
       const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-      const path     = `posts/${filename}`
+      const path     = `${folder}/${filename}`
       const { error: uploadError } = await supabase.storage.from('media').upload(path, file, { upsert: false, contentType: file.type })
       if (uploadError) throw uploadError
       const { data } = supabase.storage.from('media').getPublicUrl(path)

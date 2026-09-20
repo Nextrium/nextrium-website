@@ -4,7 +4,14 @@ import { useState, useMemo } from 'react'
 import type { Application, TeamMember } from '@/lib/types/database'
 import { logActivityAction } from '@/app/actions/activityLog'
 import { alreadyEmailedThisResult } from '@/lib/feedbackRecommendation'
+import RichTextEditor from '@/components/editor/RichTextEditor'
 import type { ScreeningSendInfo } from './page'
+
+// TipTap's "empty" content is still `<p></p>`, not `''` — a plain
+// tag/whitespace strip is enough to tell real content from an empty editor.
+function isEmptyHtml(html: string): boolean {
+  return html.replace(/<[^>]*>/g, '').trim().length === 0
+}
 
 interface EmailSender {
   id: string
@@ -149,14 +156,14 @@ export default function EmailComposeClient({
   }
 
   function openPreview() {
-    if (!subject.trim() || !message.trim() || recipients.length === 0) return
+    if (!subject.trim() || isEmptyHtml(message) || recipients.length === 0) return
     setSendError('')
     setResults(null)
     setPreviewOpen(true)
   }
 
   async function handleSend() {
-    if (!subject.trim() || !message.trim() || recipients.length === 0) return
+    if (!subject.trim() || isEmptyHtml(message) || recipients.length === 0) return
     setSending(true)
     setResults(null)
     setSendError('')
@@ -356,7 +363,7 @@ export default function EmailComposeClient({
             <span>Message</span>
             <span style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', color: 'var(--grey-dark)', textTransform: 'none', letterSpacing: 'normal' }}>Variables: {'{{name}}'} · {'{{role}}'} · {'{{email}}'}</span>
           </div>
-          <textarea className="compose-input compose-textarea" placeholder={`Hi {{name}},\n\nWrite your message here...`} value={message} onChange={(e) => setMessage(e.target.value)} />
+          <RichTextEditor content={message} onChange={setMessage} placeholder={`Hi {{name}}, write your message here...`} imageFolder="email" />
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
             <div className="compose-label">
@@ -404,7 +411,7 @@ export default function EmailComposeClient({
             type="button"
             className="send-btn"
             onClick={openPreview}
-            disabled={sending || !subject.trim() || !message.trim() || recipients.length === 0}
+            disabled={sending || !subject.trim() || isEmptyHtml(message) || recipients.length === 0}
           >
             Review &amp; send to {recipients.length} recipient{recipients.length !== 1 ? 's' : ''}
           </button>
