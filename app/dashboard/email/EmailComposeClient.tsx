@@ -3,6 +3,8 @@
 import { useState, useMemo } from 'react'
 import type { Application, TeamMember } from '@/lib/types/database'
 import { logActivityAction } from '@/app/actions/activityLog'
+import { alreadyEmailedThisResult } from '@/lib/feedbackRecommendation'
+import type { ScreeningSendInfo } from './page'
 
 interface EmailSender {
   id: string
@@ -33,10 +35,12 @@ export default function EmailComposeClient({
   senders,
   applicants,
   teamMembers,
+  screeningSendInfo,
 }: {
   senders: EmailSender[]
   applicants: Application[]
   teamMembers: TeamMember[]
+  screeningSendInfo: Record<string, ScreeningSendInfo>
 }) {
   const defaultSender = senders.find((s) => s.is_default) ?? senders[0]
 
@@ -51,6 +55,7 @@ export default function EmailComposeClient({
   const [sending,         setSending]         = useState(false)
   const [results,         setResults]         = useState<SendResult[] | null>(null)
   const [sendError,       setSendError]       = useState('')
+  const [previewOpen,     setPreviewOpen]     = useState(false)
   const [attachmentFiles, setAttachmentFiles] = useState<{ name: string; content: string }[]>([])
 
   function toggleSelected(id: string) {
@@ -113,6 +118,16 @@ export default function EmailComposeClient({
     return []
   }, [source, selectedIds, manualRecipients, applicants, teamMembers])
 
+  // Only meaningful for the applicants source — team/manual recipients have
+  // no screening-result concept. Informational for this composer (the hard
+  // block lives server-side for the automated dispatch paths only); this is
+  // a heads-up so a recruiter isn't surprised, not a restriction on what
+  // they can manually send.
+  const selectedApplicantDuplicates = useMemo(() => {
+    if (source !== 'applicants') return []
+    return filteredApplicants.filter((a) => selectedIds.has(a.id) && alreadyEmailedThisResult(screeningSendInfo[a.id]))
+  }, [source, filteredApplicants, selectedIds, screeningSendInfo])
+
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? [])
     const encoded = await Promise.all(
@@ -131,6 +146,13 @@ export default function EmailComposeClient({
 
   function removeFile(index: number) {
     setAttachmentFiles((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  function openPreview() {
+    if (!subject.trim() || !message.trim() || recipients.length === 0) return
+    setSendError('')
+    setResults(null)
+    setPreviewOpen(true)
   }
 
   async function handleSend() {
@@ -164,6 +186,7 @@ export default function EmailComposeClient({
       clearSelection()
       setManualText('')
       setAttachmentFiles([])
+      setPreviewOpen(false)
     } catch (err) {
       setSendError(err instanceof Error ? err.message : 'Something went wrong.')
     } finally {
@@ -194,6 +217,7 @@ export default function EmailComposeClient({
         .recipient-row:last-child { border-bottom: none; }
         .recipient-row:hover { background: rgba(255,255,255,0.02); }
         .recipient-row input { accent-color: var(--orange); cursor: pointer; }
+        .recipient-already-sent { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.08em; text-transform: uppercase; padding: 3px 7px; background: rgba(34,193,122,0.08); border: 1px solid rgba(34,193,122,0.25); color: var(--success); white-space: nowrap; flex-shrink: 0; }
         .recipient-name { font-size: 12px; color: var(--white); }
         .recipient-email { font-size: 10px; color: var(--grey-dark); }
         .recipient-actions { display: flex; gap: 8px; margin-bottom: 10px; }
@@ -208,6 +232,14 @@ export default function EmailComposeClient({
         .results-box { margin-top: 16px; padding: 14px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); }
         .results-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; font-size: 12px; }
         .error-box { padding: 10px 14px; font-size: 12px; background: rgba(232,69,69,0.08); border: 1px solid rgba(232,69,69,0.3); color: var(--error); margin-bottom: 16px; }
+        .send-preview-backdrop { position: fixed; inset: 0; z-index: 80; background: rgba(7,22,40,0.75); display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .send-preview-panel { width: 100%; max-width: 480px; max-height: 80vh; overflow-y: auto; background: var(--navy); border: 1px solid rgba(255,255,255,0.1); padding: 24px; display: flex; flex-direction: column; gap: 14px; }
+        .send-preview-title { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--white); }
+        .send-preview-summary { font-size: 13px; color: var(--off-white); line-height: 1.6; }
+        .send-preview-duplicates { background: rgba(212,168,67,0.06); border: 1px solid rgba(212,168,67,0.25); padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+        .send-preview-duplicates-title { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--warning); }
+        .send-preview-duplicate-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12px; color: var(--off-white); }
+        .send-preview-actions { display: flex; gap: 10px; justify-content: flex-end; }
         @media (max-width: 900px) { .email-layout { grid-template-columns: 1fr; } }
       `}</style>
 
@@ -269,10 +301,15 @@ export default function EmailComposeClient({
                 {filteredApplicants.map((a) => (
                   <label key={a.id} className="recipient-row">
                     <input type="checkbox" checked={selectedIds.has(a.id)} onChange={() => toggleSelected(a.id)} />
-                    <div>
+                    <div style={{ flex: 1 }}>
                       <div className="recipient-name">{a.name}</div>
                       <div className="recipient-email">{a.email} · {a.role_title ?? 'Open application'}</div>
                     </div>
+                    {alreadyEmailedThisResult(screeningSendInfo[a.id]) && (
+                      <span className="recipient-already-sent" title="Already sent this result — uncheck to exclude">
+                        ✉ Sent
+                      </span>
+                    )}
                   </label>
                 ))}
               </div>
@@ -366,11 +403,46 @@ export default function EmailComposeClient({
           <button
             type="button"
             className="send-btn"
-            onClick={handleSend}
+            onClick={openPreview}
             disabled={sending || !subject.trim() || !message.trim() || recipients.length === 0}
           >
-            {sending ? 'Sending...' : `Send to ${recipients.length} recipient${recipients.length !== 1 ? 's' : ''}`}
+            Review &amp; send to {recipients.length} recipient{recipients.length !== 1 ? 's' : ''}
           </button>
+
+          {previewOpen && (
+            <div className="send-preview-backdrop" onClick={() => !sending && setPreviewOpen(false)}>
+              <div className="send-preview-panel" onClick={(e) => e.stopPropagation()}>
+                <div className="send-preview-title">Confirm send</div>
+                <div className="send-preview-summary">
+                  Sending to <strong>{recipients.length}</strong> recipient{recipients.length !== 1 ? 's' : ''}
+                  {selectedApplicantDuplicates.length > 0 && <> — <strong style={{ color: 'var(--warning)' }}>{selectedApplicantDuplicates.length}</strong> already received this exact result</>}.
+                </div>
+
+                {selectedApplicantDuplicates.length > 0 && (
+                  <div className="send-preview-duplicates">
+                    <div className="send-preview-duplicates-title">⚠ Already sent this result — still included:</div>
+                    {selectedApplicantDuplicates.map((a) => (
+                      <div key={a.id} className="send-preview-duplicate-row">
+                        <span>{a.name} · {a.email}</span>
+                        <button type="button" className="recipient-action-btn" onClick={() => toggleSelected(a.id)}>Remove</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {sendError && <div className="error-box">{sendError}</div>}
+
+                <div className="send-preview-actions">
+                  <button type="button" className="recipient-action-btn" onClick={() => setPreviewOpen(false)} disabled={sending}>
+                    Back
+                  </button>
+                  <button type="button" className="send-btn" onClick={handleSend} disabled={sending || recipients.length === 0} style={{ marginTop: 0 }}>
+                    {sending ? 'Sending...' : `Confirm & send to ${recipients.length}`}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {results && (
             <div className="results-box">

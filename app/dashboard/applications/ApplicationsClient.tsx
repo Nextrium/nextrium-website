@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { normalizeUrl } from '@/lib/normalizeUrl'
+import { alreadyEmailedThisResult } from '@/lib/feedbackRecommendation'
 import type { Application, AgentScreeningResult } from '@/lib/types/database'
 import { useDashboardSearch } from '@/lib/dashboard/useDashboardSearch'
 import DashboardSearchBox from '@/components/dashboard/DashboardSearchBox'
@@ -619,7 +620,7 @@ export default function ApplicationsClient({
   }, {} as Record<Application['status'], number>)
 
   const unscannedCount = applications.filter((a) => !screeningResults[a.id]).length
-  const pendingEmailCount = applications.filter((a) => screeningResults[a.id] && !screeningResults[a.id].email_sent).length
+  const pendingEmailCount = applications.filter((a) => screeningResults[a.id] && !alreadyEmailedThisResult(screeningResults[a.id])).length
   const selectedScreening = selected ? screeningResults[selected.id] : null
   const selectedConsensus = selectedScreening ? ((selectedScreening.full_result as any)?.consensus || selectedScreening.full_result) : null
   const selectedLayer2    = selectedConsensus?.layer2ArtifactScorecard ?? null
@@ -1215,6 +1216,14 @@ export default function ApplicationsClient({
                             ✓
                           </span>
                         )}
+                        {alreadyEmailedThisResult(screening) && (
+                          <span
+                            title="Already sent this result — resending would be identical content"
+                            style={{ color: 'var(--success)', fontSize: '11px', marginRight: '6px' }}
+                          >
+                            ✉
+                          </span>
+                        )}
                         <span className="dash-badge" style={{ background: ss.bg, color: ss.color, border: `1px solid ${ss.color}33` }}>
                           {app.status}
                         </span>
@@ -1333,6 +1342,14 @@ export default function ApplicationsClient({
                                   style={{ color: 'var(--success)', fontSize: '12px', marginRight: '6px' }}
                                 >
                                   ✓
+                                </span>
+                              )}
+                              {alreadyEmailedThisResult(screening) && (
+                                <span
+                                  title="Already sent this result — resending would be identical content"
+                                  style={{ color: 'var(--success)', fontSize: '11px', marginRight: '6px' }}
+                                >
+                                  ✉
                                 </span>
                               )}
                               <span className="dash-badge" style={{ background: ss.bg, color: ss.color, border: `1px solid ${ss.color}33` }}>
@@ -1824,15 +1841,24 @@ export default function ApplicationsClient({
                         {/* Quick AI Action: Load AI Feedback into Email */}
                         {selectedConsensus.applicantFeedbackLetter && (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {alreadyEmailedThisResult(selectedScreening) && (
+                              <div style={{ fontSize: '11px', color: 'var(--success)' }}>
+                                ✉ Already sent this result — resending is disabled since the recommendation hasn't changed since the last send.
+                              </div>
+                            )}
                             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                               <button
                                 type="button"
                                 onClick={() => handleSendFeedbackToSelected(selected.id)}
-                                disabled={perCandidateEmailSending}
+                                disabled={perCandidateEmailSending || alreadyEmailedThisResult(selectedScreening)}
                                 className="ai-btn ai-btn-primary"
                                 style={{ flex: 1 }}
                               >
-                                {perCandidateEmailSending ? 'Sending...' : '📧 Send AI Feedback Email'}
+                                {perCandidateEmailSending
+                                  ? 'Sending...'
+                                  : alreadyEmailedThisResult(selectedScreening)
+                                  ? '✉ Already Sent'
+                                  : '📧 Send AI Feedback Email'}
                               </button>
                               <button
                                 type="button"

@@ -238,6 +238,8 @@ export async function screenCandidateAction(
     screened_at: (screeningRecord as any)?.screened_at ?? new Date().toISOString(),
     email_sent: (screeningRecord as any)?.email_sent ?? false,
     webhook_sent: (screeningRecord as any)?.webhook_sent ?? false,
+    last_emailed_recommendation: (screeningRecord as any)?.last_emailed_recommendation ?? null,
+    last_emailed_at: (screeningRecord as any)?.last_emailed_at ?? null,
   }
 
   revalidatePath('/dashboard/applications')

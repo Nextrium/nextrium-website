@@ -520,6 +520,8 @@ export type Database = {
           screened_at: string
           email_sent: boolean
           webhook_sent: boolean
+          last_emailed_recommendation: string | null
+          last_emailed_at: string | null
           created_at?: string
         }
         Insert: {

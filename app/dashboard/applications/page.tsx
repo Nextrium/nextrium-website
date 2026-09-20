@@ -41,7 +41,7 @@ async function getSenders(): Promise<EmailSender[]> {
 // number of candidates - ApplicationsClient lazily fetches the full row
 // (via getScreeningResultsForApplications) only when a candidate is
 // selected. See selectApp() in ApplicationsClient.tsx.
-const SCREENING_LIST_COLUMNS = 'id, application_id, input_hash, evaluation_track, composite_score, consensus_tier, recommendation, screened_at, email_sent, webhook_sent'
+const SCREENING_LIST_COLUMNS = 'id, application_id, input_hash, evaluation_track, composite_score, consensus_tier, recommendation, screened_at, email_sent, webhook_sent, last_emailed_recommendation'
 
 async function getScreeningResults(): Promise<Record<string, AgentScreeningResult>> {
   const supabase = createServiceClient()
