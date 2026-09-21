@@ -1,10 +1,10 @@
 import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 
-export type DashboardRole = 'admin' | 'content' | 'community' | 'moderator' | 'archived'
+export type DashboardRole = 'admin' | 'content' | 'community' | 'moderator' | 'member' | 'archived'
 
 interface DashboardUserRole {
-  role: 'admin' | 'content' | 'community' | 'moderator'
+  role: 'admin' | 'content' | 'community' | 'moderator' | 'member'
   archived: boolean
 }
 

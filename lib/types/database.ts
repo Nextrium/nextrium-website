@@ -490,7 +490,7 @@ export type Database = {
         Row: {
           id: string
           user_id: string
-          role: 'admin' | 'content' | 'community' | 'moderator'
+          role: 'admin' | 'content' | 'community' | 'moderator' | 'member'
           archived: boolean
           archived_at: string | null
           bio: string | null
@@ -506,7 +506,7 @@ export type Database = {
         Insert: {
           id?: string
           user_id: string
-          role?: 'admin' | 'content' | 'community' | 'moderator'
+          role?: 'admin' | 'content' | 'community' | 'moderator' | 'member'
           archived?: boolean
           archived_at?: string | null
           bio?: string | null
@@ -521,7 +521,7 @@ export type Database = {
         }
         Update: {
           user_id?: string
-          role?: 'admin' | 'content' | 'community' | 'moderator'
+          role?: 'admin' | 'content' | 'community' | 'moderator' | 'member'
           archived?: boolean
           archived_at?: string | null
           bio?: string | null

@@ -34,7 +34,20 @@ export const BLOCKED_PATHS: Record<string, string[]> = {
   archived: ['/dashboard'],
 }
 
+// member is the one role that needs "deny everything except X" instead of
+// "allow everything except X" — a blocklist would have to enumerate every
+// current and future admin page to stay safe, and silently under-block any
+// new page added later. Listed here, isRestricted treats the role as
+// allowlisted instead of falling through to BLOCKED_PATHS.
+export const ALLOWED_PATHS: Record<string, string[]> = {
+  member: ['/dashboard/people'],
+}
+
 export function isRestricted(pathname: string, role: string): boolean {
+  const allowed = ALLOWED_PATHS[role]
+  if (allowed) {
+    return !allowed.some((path) => pathname.startsWith(path))
+  }
   const blocked = BLOCKED_PATHS[role] ?? BLOCKED_PATHS['community']
   return blocked.some((path) => pathname.startsWith(path))
 }
