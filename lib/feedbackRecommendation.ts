@@ -25,3 +25,22 @@ export function alreadyEmailedThisResult(screening: { email_sent?: boolean | nul
   if (!screening?.email_sent || !screening.last_emailed_recommendation) return false
   return normalizeFeedbackRecommendation(screening.recommendation) === screening.last_emailed_recommendation
 }
+
+// Mirrors agents-engine/src/services/emailDispatch.ts's
+// humanConfirmedCurrentResult gate exactly, so this dashboard's bulk-send
+// count/badge never disagrees with what the backend will actually do.
+// Strong Hire candidates are reserved for personal recruiter outreach
+// until a human has reviewed (applications.last_reviewed_at) at or after
+// the moment this specific recommendation was decided (screened_at,
+// bumped on rebuttal-accept too) — a stale review from before a rescreen
+// or rebuttal doesn't count as approving the current result.
+export function isHeldForHumanConfirmation(
+  screening: { recommendation?: string | null; screened_at?: string | null } | null | undefined,
+  application: { last_reviewed_at?: string | null } | null | undefined
+): boolean {
+  if (!screening) return false
+  if (normalizeFeedbackRecommendation(screening.recommendation) !== 'Strong Hire') return false
+  const reviewedAt = application?.last_reviewed_at ? new Date(application.last_reviewed_at).getTime() : 0
+  const decidedAt = screening.screened_at ? new Date(screening.screened_at).getTime() : Infinity
+  return !(reviewedAt > 0 && reviewedAt >= decidedAt)
+}

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { normalizeUrl } from '@/lib/normalizeUrl'
-import { alreadyEmailedThisResult } from '@/lib/feedbackRecommendation'
+import { alreadyEmailedThisResult, isHeldForHumanConfirmation } from '@/lib/feedbackRecommendation'
 import type { Application, AgentScreeningResult } from '@/lib/types/database'
 import { useDashboardSearch } from '@/lib/dashboard/useDashboardSearch'
 import DashboardSearchBox from '@/components/dashboard/DashboardSearchBox'
@@ -620,7 +620,10 @@ export default function ApplicationsClient({
   }, {} as Record<Application['status'], number>)
 
   const unscannedCount = applications.filter((a) => !screeningResults[a.id]).length
-  const pendingEmailCount = applications.filter((a) => screeningResults[a.id] && !alreadyEmailedThisResult(screeningResults[a.id])).length
+  const emailEligibleApplications = applications.filter((a) => screeningResults[a.id] && !alreadyEmailedThisResult(screeningResults[a.id]))
+  const heldForReviewApplications = emailEligibleApplications.filter((a) => isHeldForHumanConfirmation(screeningResults[a.id], a))
+  const pendingEmailCount = emailEligibleApplications.length - heldForReviewApplications.length
+  const heldForReviewCount = heldForReviewApplications.length
   const selectedScreening = selected ? screeningResults[selected.id] : null
   const selectedConsensus = selectedScreening ? ((selectedScreening.full_result as any)?.consensus || selectedScreening.full_result) : null
   const selectedLayer2    = selectedConsensus?.layer2ArtifactScorecard ?? null
@@ -830,6 +833,7 @@ export default function ApplicationsClient({
         .ai-btn-secondary:hover:not(:disabled) { background: rgba(219,103,39,0.08); }
         .ai-btn-toggle { border: 1px solid rgba(255,255,255,0.15); background: none; color: var(--grey-mid); }
         .ai-btn-toggle:hover:not(:disabled) { color: var(--white); border-color: rgba(255,255,255,0.3); }
+        .ai-held-note { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--warning); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; padding: 0 4px; cursor: help; }
         .ai-btn-toggle.active { border-color: var(--orange); background: rgba(219,103,39,0.12); color: var(--orange); }
         .ai-status-ok { font-family: var(--font-mono); font-size: 8px; color: var(--success); letter-spacing: 0.1em; white-space: nowrap; }
         .ai-progress-wrap { padding: 0 16px 12px; background: rgba(219,103,39,0.04); border-bottom: 1px solid rgba(255,255,255,0.06); }
@@ -1001,6 +1005,14 @@ export default function ApplicationsClient({
                   >
                     {bulkEmailSending ? 'Sending feedback emails...' : `📧 Send AI Feedback Emails (${pendingEmailCount})`}
                   </button>
+                )}
+                {heldForReviewCount > 0 && (
+                  <span
+                    className="ai-held-note"
+                    title="Strong Hire candidates are reserved for personal outreach until you've reviewed the current result — use Mark as Human Reviewed on each to make them eligible for bulk send."
+                  >
+                    🕓 {heldForReviewCount} accepted candidate{heldForReviewCount !== 1 ? 's' : ''} awaiting your review before bulk send
+                  </span>
                 )}
                 <button
                   type="button"
