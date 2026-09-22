@@ -266,6 +266,7 @@ export type Database = {
           archived_reason: string | null
           archived_by: string | null
           archived_by_email: string | null
+          invited_to_team_at: string | null
         }
         Insert: {
           id?: string
@@ -500,6 +501,7 @@ export type Database = {
           discord_linked_at: string | null
           staff_track_id: string | null
           onboarding_completed_at: string | null
+          application_id: string | null
           created_at: string
           updated_at: string
         }
@@ -516,6 +518,7 @@ export type Database = {
           discord_linked_at?: string | null
           staff_track_id?: string | null
           onboarding_completed_at?: string | null
+          application_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -531,6 +534,7 @@ export type Database = {
           discord_linked_at?: string | null
           staff_track_id?: string | null
           onboarding_completed_at?: string | null
+          application_id?: string | null
           updated_at?: string
         }
       }

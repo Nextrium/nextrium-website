@@ -21,6 +21,7 @@ import {
   markApplicationReviewed,
   archiveApplication,
   unarchiveApplication,
+  inviteApplicantToTeam,
   type BulkScreenOutcome,
   type ReviewedInfo,
   type ArchivedInfo,
@@ -118,6 +119,9 @@ export default function ApplicationsClient({
   const [archiveError,     setArchiveError]      = useState<string | null>(null)
   const [archiveReasonBox, setArchiveReasonBox]  = useState(false)
   const [archiveReason,    setArchiveReason]     = useState('')
+  const [inviting,      setInviting]      = useState(false)
+  const [inviteError,   setInviteError]   = useState<string | null>(null)
+  const [invitedIds,    setInvitedIds]    = useState<Set<string>>(new Set())
 
   // Table view state
   const [viewMode,        setViewMode]        = useState<'list' | 'table'>('list')
@@ -270,6 +274,18 @@ export default function ApplicationsClient({
       setArchiveError(error)
     }
     setArchiving(false)
+  }
+
+  async function handleInviteToTeam(id: string) {
+    setInviting(true)
+    setInviteError(null)
+    const { error } = await inviteApplicantToTeam(id)
+    if (error) {
+      setInviteError(error)
+    } else {
+      setInvitedIds((prev) => new Set(prev).add(id))
+    }
+    setInviting(false)
   }
 
   async function handleDelete(id: string) {
@@ -2127,6 +2143,28 @@ export default function ApplicationsClient({
                       </div>
                     )}
                   </div>
+
+                  {selected.status === 'accepted' && !(selected as any).archived && (
+                    <div style={{ borderTop: '1px solid rgba(219,103,39,0.15)', paddingTop: '16px' }}>
+                      {(selected as any).invited_to_team_at || invitedIds.has(selected.id) ? (
+                        <div style={{ fontSize: '12px', color: 'var(--success)', lineHeight: '1.5' }}>
+                          ✓ Invited to the team{(selected as any).invited_to_team_at ? ` on ${new Date((selected as any).invited_to_team_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}.
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {inviteError && <div style={{ fontSize: '11.5px', color: 'var(--error)' }}>{inviteError}</div>}
+                          <button
+                            type="button"
+                            onClick={() => handleInviteToTeam(selected.id)}
+                            disabled={inviting}
+                            style={{ width: '100%', padding: '9px 14px', fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.12em', textTransform: 'uppercase', cursor: 'pointer', border: '1px solid var(--orange)', background: 'none', color: 'var(--orange)', transition: 'all 0.15s ease', textAlign: 'left', opacity: inviting ? 0.6 : 1 }}
+                          >
+                            {inviting ? 'Sending invite…' : '👥 Invite to Team'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   <div style={{ borderTop: '1px solid rgba(212,168,67,0.15)', paddingTop: '16px' }}>
                     {(selected as any).archived ? (

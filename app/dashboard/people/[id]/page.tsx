@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
-import { createServiceClient } from '@/lib/supabase/server'
+import Link from 'next/link'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import Header from '@/components/dashboard/Header'
 
 export const dynamic = 'force-dynamic'
@@ -67,6 +68,10 @@ export default async function PersonProfilePage({ params }: { params: Promise<{ 
   const profile = await getProfile(id)
   if (!profile) notFound()
 
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const isOwnProfile = user?.id === profile.userId
+
   const displayName = profile.email.split('@')[0]
   const handles = Object.entries(profile.socialHandles).filter(([, v]) => !!v)
 
@@ -90,9 +95,15 @@ export default async function PersonProfilePage({ params }: { params: Promise<{ 
         .profile-handle-label { color: var(--grey-mid); }
         .profile-handle-value { color: var(--off-white); }
         .profile-empty { font-size: 13px; color: var(--grey-dark); }
+        .profile-edit-link { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--orange); text-decoration: none; border: 1px solid rgba(219,103,39,0.3); padding: 8px 14px; }
+        .profile-edit-link:hover { background: rgba(219,103,39,0.08); }
       `}</style>
 
-      <Header title={displayName} description={ROLE_LABELS[profile.role] ?? profile.role} />
+      <Header
+        title={displayName}
+        description={ROLE_LABELS[profile.role] ?? profile.role}
+        action={isOwnProfile ? <Link href="/dashboard/people/me" className="profile-edit-link">Edit my profile</Link> : undefined}
+      />
       <div className="dash-content">
         <div className="profile-wrap">
           <div className="profile-card">

@@ -534,3 +534,82 @@ export async function getScreeningResultsForApplications(
     return {}
   }
 }
+
+// Invites an accepted applicant onto the dashboard as a "member" — reuses
+// the same raw Supabase invite endpoint Team Access uses for staff
+// invites. Re-checks status server-side (not just trusting the UI only
+// showing this button for accepted applications) and checks
+// invited_to_team_at first so a double-click or a stale page can't send a
+// second invite email or create a duplicate dashboard_users row.
+export async function inviteApplicantToTeam(applicationId: string): Promise<{ error?: string }> {
+  try {
+    const authClient = await createClient()
+    const { data: { user } } = await authClient.auth.getUser()
+    if (!user) return { error: 'Not signed in.' }
+
+    const supabase = createServiceClient()
+
+    const { data: application, error: fetchError } = await (supabase.from('applications') as any)
+      .select('id, name, email, status, invited_to_team_at')
+      .eq('id', applicationId)
+      .single()
+    if (fetchError || !application) throw new Error(fetchError?.message ?? 'Application not found.')
+    if (application.status !== 'accepted') throw new Error('Only accepted applicants can be invited to the team.')
+    if (application.invited_to_team_at) throw new Error('This applicant has already been invited.')
+
+    const supabaseUrl    = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const supabaseSecret = process.env.SUPABASE_SECRET_KEY!
+    const siteUrl        = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://www.nextrium.org'
+    const redirectTo     = `${siteUrl}/auth/callback`
+
+    const res = await fetch(`${supabaseUrl}/auth/v1/invite?redirect_to=${encodeURIComponent(redirectTo)}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'apikey':        supabaseSecret,
+        'Authorization': `Bearer ${supabaseSecret}`,
+      },
+      body: JSON.stringify({
+        email: application.email,
+        data: { role: 'member' },
+        redirect_to: redirectTo,
+      }),
+    })
+
+    const rawText = await res.text()
+    let json: any = {}
+    try {
+      json = JSON.parse(rawText)
+    } catch {
+      throw new Error(`Supabase returned unexpected response (${res.status}): ${rawText.slice(0, 200)}`)
+    }
+    if (!res.ok) throw new Error(json.message ?? json.error_description ?? json.msg ?? 'Failed to invite applicant.')
+
+    const userId = json.id
+    if (!userId) throw new Error('Invite succeeded but no user ID was returned.')
+
+    const now = new Date().toISOString()
+    const { error: insertError } = await (supabase.from('dashboard_users') as any).insert({
+      user_id: userId,
+      role: 'member',
+      application_id: applicationId,
+    })
+    if (insertError) throw new Error(insertError.message)
+
+    const { error: updateError } = await (supabase.from('applications') as any)
+      .update({ invited_to_team_at: now })
+      .eq('id', applicationId)
+    if (updateError) throw new Error(updateError.message)
+
+    revalidatePath('/dashboard/applications')
+    logActivity({
+      action: 'applicant_invited_to_team',
+      targetType: 'application',
+      targetId: applicationId,
+      details: { email: application.email },
+    }).catch(() => {})
+    return {}
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Failed to invite applicant.' }
+  }
+}
