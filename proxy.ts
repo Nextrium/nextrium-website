@@ -15,6 +15,9 @@ interface RoleQueryResult {
   role: string
   archived: boolean
   onboarded: boolean
+  // false = the lookup itself failed or timed out, so we know nothing about
+  // this account. Distinct from 'none' (lookup succeeded, no row).
+  verified: boolean
 }
 
 async function fetchUserRole(userId: string): Promise<RoleQueryResult> {
@@ -34,10 +37,15 @@ async function fetchUserRole(userId: string): Promise<RoleQueryResult> {
     setTimeout(() => resolve({ data: null, error: 'timeout' }), ROLE_QUERY_TIMEOUT_MS)
   )
 
-  const { data } = await Promise.race([queryPromise, timeoutPromise])
-  if (!data) return { role: 'community', archived: false, onboarded: true }
-  if (data.archived) return { role: 'archived', archived: true, onboarded: true }
-  return { role: data.role, archived: false, onboarded: !!data.onboarding_completed_at }
+  // Fail closed. A timeout or query error used to resolve to 'community'
+  // and get cached, handing real dashboard access to whoever happened to hit
+  // a slow lookup. Now it is "unverified" (503, never cached), and a
+  // successful lookup with no row is 'none' (no access).
+  const { data, error } = await Promise.race([queryPromise, timeoutPromise])
+  if (error) return { role: 'none', archived: false, onboarded: true, verified: false }
+  if (!data) return { role: 'none', archived: false, onboarded: true, verified: true }
+  if (data.archived) return { role: 'archived', archived: true, onboarded: true, verified: true }
+  return { role: data.role, archived: false, onboarded: !!data.onboarding_completed_at, verified: true }
 }
 
 /**
@@ -62,17 +70,22 @@ async function getUserRole(
   if (cached) {
     const [cachedUserId, cachedRole, cachedOnboarded] = cached.split(':')
     if (cachedUserId === userId && cachedRole) {
-      return { role: cachedRole, archived: cachedRole === 'archived', onboarded: cachedOnboarded === '1' }
+      return { role: cachedRole, archived: cachedRole === 'archived', onboarded: cachedOnboarded === '1', verified: true }
     }
   }
 
   const result = await fetchUserRole(userId)
-  response.cookies.set(ROLE_COOKIE, `${userId}:${result.role}:${result.onboarded ? '1' : '0'}`, {
-    maxAge: ROLE_COOKIE_MAX_AGE,
-    httpOnly: true,
-    sameSite: 'lax',
-    path: '/',
-  })
+  // Only cache an answer that grants something. Caching 'none' would keep a
+  // freshly invited account locked out for up to the cookie's lifetime, and
+  // an unverified lookup must be retried on the next request.
+  if (result.verified && result.role !== 'none') {
+    response.cookies.set(ROLE_COOKIE, `${userId}:${result.role}:${result.onboarded ? '1' : '0'}`, {
+      maxAge: ROLE_COOKIE_MAX_AGE,
+      httpOnly: true,
+      sameSite: 'lax',
+      path: '/',
+    })
+  }
   return result
 }
 
@@ -90,7 +103,17 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  const { role, onboarded } = await getUserRole(request, response, user.id)
+  const { role, onboarded, verified } = await getUserRole(request, response, user.id)
+
+  // The access lookup failed or timed out: we don't know who this is, so
+  // grant nothing. A plain 503 rather than a redirect, because bouncing
+  // through /login could loop while the lookup keeps failing.
+  if (!verified) {
+    return new NextResponse('Could not verify your access right now. Please refresh in a moment.', {
+      status: 503,
+      headers: { 'Cache-Control': 'no-store' },
+    })
+  }
 
   // Archived blocks the entire /dashboard tree (including /dashboard
   // itself), so redirecting there like every other restriction does would
@@ -98,6 +121,13 @@ export async function proxy(request: NextRequest) {
   // visitor, with a message explaining why.
   if (role === 'archived') {
     return NextResponse.redirect(new URL('/login?error=' + encodeURIComponent('Your dashboard access has been revoked. Contact an administrator.'), request.url))
+  }
+
+  // Signed in but never granted dashboard access. Same loop hazard as
+  // archived (the whole tree is blocked), so same exit: /login. The login
+  // page must not bounce this account straight back — see login/page.tsx.
+  if (role === 'none') {
+    return NextResponse.redirect(new URL('/login?error=' + encodeURIComponent('This account does not have dashboard access. Contact an administrator.'), request.url))
   }
 
   // Forced post-invite profile setup — the same page doubles as "edit my

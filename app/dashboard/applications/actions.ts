@@ -4,6 +4,7 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { fetchAgentsEngine } from '@/lib/agentsEngine'
 import { logActivity } from '@/lib/activityLog'
+import { getVerifiedDashboardRole } from '@/lib/dashboard/getRole'
 import type { AgentScreeningResult } from '@/lib/types/database'
 
 export interface ReviewedInfo {
@@ -543,9 +544,14 @@ export async function getScreeningResultsForApplications(
 // second invite email or create a duplicate dashboard_users row.
 export async function inviteApplicantToTeam(applicationId: string): Promise<{ error?: string }> {
   try {
-    const authClient = await createClient()
-    const { data: { user } } = await authClient.auth.getUser()
-    if (!user) return { error: 'Not signed in.' }
+    // Creating accounts is staff-only. Signed-in is not enough now that
+    // low-privilege member accounts exist, and server actions can be called
+    // outside the page that renders them, so the role is checked here, with
+    // a verified identity, not left to the page's middleware gate.
+    const role = await getVerifiedDashboardRole()
+    if (role !== 'admin' && role !== 'moderator') {
+      return { error: 'You do not have permission to invite applicants.' }
+    }
 
     const supabase = createServiceClient()
 

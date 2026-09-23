@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { createServiceClient } from '@/lib/supabase/server'
-import { getDashboardRole } from '@/lib/dashboard/getRole'
+import { getVerifiedDashboardRole } from '@/lib/dashboard/getRole'
 import { isRestricted } from '@/lib/dashboard/accessControl'
 
 // This route sends real email through Brevo using Nextrium's own sender
@@ -31,11 +31,11 @@ async function isAuthorized(request: Request): Promise<boolean> {
     }
   }
 
-  // getDashboardRole() defaults to 'community' when there's no session at
-  // all, and 'community' is itself blocked from /dashboard/email — so an
-  // unauthenticated caller is correctly denied here too, with no separate
-  // "is there a user" check needed.
-  const role = await getDashboardRole()
+  // This route is not covered by proxy.ts, so the session must be verified
+  // with the auth server here (getVerifiedDashboardRole) rather than read
+  // from the cookie. No session, an unverifiable one, or an account with no
+  // dashboard_users row all resolve to 'none', which isRestricted denies.
+  const role = await getVerifiedDashboardRole()
   return !isRestricted('/dashboard/email', role)
 }
 
