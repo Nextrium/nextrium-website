@@ -122,6 +122,7 @@ export default function ApplicationsClient({
   const [inviting,      setInviting]      = useState(false)
   const [inviteError,   setInviteError]   = useState<string | null>(null)
   const [invitedIds,    setInvitedIds]    = useState<Set<string>>(new Set())
+  const [inviteNotes,   setInviteNotes]   = useState<Record<string, string>>({})
 
   // Table view state
   const [viewMode,        setViewMode]        = useState<'list' | 'table'>('list')
@@ -279,11 +280,19 @@ export default function ApplicationsClient({
   async function handleInviteToTeam(id: string) {
     setInviting(true)
     setInviteError(null)
-    const { error } = await inviteApplicantToTeam(id)
+    const { error, existingAccount, existingRole } = await inviteApplicantToTeam(id)
     if (error) {
       setInviteError(error)
     } else {
       setInvitedIds((prev) => new Set(prev).add(id))
+      if (existingAccount) {
+        setInviteNotes((prev) => ({
+          ...prev,
+          [id]: existingRole
+            ? `Already on the team as ${existingRole}. No invitation email was sent.`
+            : 'This person already had an account, so they were added to the team directly. No invitation email was sent — let them know they can sign in.',
+        }))
+      }
     }
     setInviting(false)
   }
@@ -460,8 +469,10 @@ export default function ApplicationsClient({
   }
 
   function handleBatchScreen() {
-    const unscanned = applications.filter((a) => !screeningResults[a.id])
-    return runBulkScreenJob(unscanned.map((a) => a.id))
+    // Auto-Screen All covers pending applications only; anything already
+    // moved out of Pending can still be screened with "Select candidates".
+    const pending = applications.filter((a) => a.status === 'pending' && !(a as any).archived && !screeningResults[a.id])
+    return runBulkScreenJob(pending.map((a) => a.id))
   }
 
   function handleScreenSelected() {
@@ -640,12 +651,9 @@ export default function ApplicationsClient({
     return acc
   }, {} as Record<Application['status'], number>)
 
-  // Every non-archived application that has no screening result yet,
-  // whatever its status: many were moved out of Pending by hand before they
-  // were ever screened, so this is larger than the Pending tile.
-  const unscannedApplications = activeApplications.filter((a) => !screeningResults[a.id])
-  const unscannedCount = unscannedApplications.length
-  const unscannedPendingCount = unscannedApplications.filter((a) => a.status === 'pending').length
+  // Pending applications that have no screening result yet — the same set
+  // the Auto-Screen All button screens.
+  const unscannedCount = activeApplications.filter((a) => a.status === 'pending' && !screeningResults[a.id]).length
   const emailEligibleApplications = applications.filter((a) => screeningResults[a.id] && !alreadyEmailedThisResult(screeningResults[a.id]))
   const heldForReviewApplications = emailEligibleApplications.filter((a) => isHeldForHumanConfirmation(screeningResults[a.id], a))
   const pendingEmailCount = emailEligibleApplications.length - heldForReviewApplications.length
@@ -1021,11 +1029,6 @@ export default function ApplicationsClient({
                   </button>
                 ) : (
                   <span className="ai-status-ok">✓ All Screened</span>
-                )}
-                {unscannedCount > 0 && unscannedCount !== unscannedPendingCount && (
-                  <span className="ai-held-note" title="Applications with no AI screening result yet. Many were moved out of Pending by hand before they were screened.">
-                    {unscannedPendingCount} pending · {unscannedCount - unscannedPendingCount} other statuses, never screened
-                  </span>
                 )}
                 {pendingEmailCount > 0 && (
                   <button
@@ -2164,6 +2167,7 @@ export default function ApplicationsClient({
                       {(selected as any).invited_to_team_at || invitedIds.has(selected.id) ? (
                         <div style={{ fontSize: '12px', color: 'var(--success)', lineHeight: '1.5' }}>
                           ✓ Invited to the team{(selected as any).invited_to_team_at ? ` on ${new Date((selected as any).invited_to_team_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}.
+                          {inviteNotes[selected.id] && <div style={{ marginTop: '6px', color: 'var(--grey-mid)' }}>{inviteNotes[selected.id]}</div>}
                         </div>
                       ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

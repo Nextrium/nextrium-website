@@ -236,8 +236,11 @@ export default function Sidebar({ role }: { role: DashboardRole }) {
         </nav>
 
         <div className="sidebar-footer">
+          <Link href="/dashboard/people/me" className="sidebar-footer-link">◉ My Profile</Link>
           <Link href="/" className="sidebar-footer-link" target="_blank">↗ View site</Link>
-          <Link href="/dashboard/settings" className="sidebar-footer-link">⚙ Settings</Link>
+          {(role === 'admin' || role === 'moderator') && (
+            <Link href="/dashboard/settings" className="sidebar-footer-link">⚙ Settings</Link>
+          )}
         </div>
       </aside>
     </>
