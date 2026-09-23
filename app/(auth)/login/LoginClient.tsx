@@ -23,7 +23,7 @@ export default function LoginClient({ message, error: initialError }: { message?
       setError(authError.message || 'Invalid email or password.')
       return
     }
-    logActivityAction({ action: 'sign_in', actorEmail: email }).catch(() => {})
+    logActivityAction({ action: 'sign_in' }).catch(() => {})
     router.push('/dashboard')
     router.refresh()
   }
