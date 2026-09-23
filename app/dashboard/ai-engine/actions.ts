@@ -1,6 +1,7 @@
 'use server'
 
 import { fetchAgentsEngine } from '@/lib/agentsEngine'
+import { roleDenial, STAFF_ROLES } from '@/lib/dashboard/requireRole'
 
 export interface FailedScreeningEntry {
   applicationId: string
@@ -32,6 +33,9 @@ export interface AgentMetrics {
 }
 
 export async function getAgentMetrics(): Promise<{ metrics?: AgentMetrics; error?: string }> {
+  const denied = await roleDenial(STAFF_ROLES)
+  if (denied) return { error: denied }
+
   const res = await fetchAgentsEngine('/api/v1/agents/hr/metrics', { method: 'GET' })
 
   if (!res.ok) {

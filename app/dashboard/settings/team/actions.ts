@@ -1,11 +1,29 @@
 'use server'
 
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { logActivity } from '@/lib/activityLog'
+import { getVerifiedIdentity } from '@/lib/dashboard/getRole'
+
+// Every action here manages who can access the dashboard, so all of them are
+// admin-only, checked inside the action with a verified identity (the page's
+// middleware gate alone is not enough — server actions can be called
+// outside the page that renders them).
+const VALID_ROLES = ['admin', 'content', 'community', 'moderator', 'member']
+const NOT_ALLOWED = 'You do not have permission to do this.'
+
+async function requireAdmin(): Promise<{ userId: string } | null> {
+  const me = await getVerifiedIdentity()
+  return me && me.role === 'admin' ? { userId: me.userId } : null
+}
 
 export async function inviteUser(email: string, role: string): Promise<{ error?: string }> {
   try {
+    if (!(await requireAdmin())) return { error: NOT_ALLOWED }
+    if (!VALID_ROLES.includes(role)) return { error: 'Invalid role.' }
+    email = (email ?? '').trim().toLowerCase()
+    if (!email.includes('@')) return { error: 'Enter a valid email address.' }
+
     const supabaseUrl    = process.env.NEXT_PUBLIC_SUPABASE_URL!
     const supabaseSecret = process.env.SUPABASE_SECRET_KEY!
     const siteUrl        = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://www.nextrium.org'
@@ -62,6 +80,13 @@ export async function inviteUser(email: string, role: string): Promise<{ error?:
 
 export async function updateRole(userId: string, role: string): Promise<{ error?: string }> {
   try {
+    const me = await requireAdmin()
+    if (!me) return { error: NOT_ALLOWED }
+    if (!VALID_ROLES.includes(role)) return { error: 'Invalid role.' }
+    if (me.userId === userId) {
+      return { error: 'You cannot change your own role — ask another admin, so the dashboard is never left without one.' }
+    }
+
     const supabase = createServiceClient()
 
     const { error } = await (supabase.from('dashboard_users') as any)
@@ -96,10 +121,9 @@ const ARCHIVE_BAN_DURATION = '876000h'
  */
 export async function archiveUser(userId: string): Promise<{ error?: string }> {
   try {
-    const supabase = await createClient()
-    const { data: { user: actingUser } } = await supabase.auth.getUser()
-    if (!actingUser) return { error: 'Not signed in.' }
-    if (actingUser.id === userId) {
+    const actingUser = await requireAdmin()
+    if (!actingUser) return { error: NOT_ALLOWED }
+    if (actingUser.userId === userId) {
       return { error: 'You cannot archive your own account — ask another admin to do it, to avoid locking yourself out with nobody able to reverse it.' }
     }
 
@@ -128,6 +152,8 @@ export async function archiveUser(userId: string): Promise<{ error?: string }> {
 
 export async function unarchiveUser(userId: string): Promise<{ error?: string }> {
   try {
+    if (!(await requireAdmin())) return { error: NOT_ALLOWED }
+
     const supabase = createServiceClient()
 
     const { error: updateError } = await (supabase.from('dashboard_users') as any)
@@ -152,6 +178,12 @@ export async function unarchiveUser(userId: string): Promise<{ error?: string }>
 
 export async function removeUser(userId: string): Promise<{ error?: string }> {
   try {
+    const me = await requireAdmin()
+    if (!me) return { error: NOT_ALLOWED }
+    if (me.userId === userId) {
+      return { error: 'You cannot remove your own access — ask another admin, so the dashboard is never left without one.' }
+    }
+
     const supabase = createServiceClient()
 
     const { error } = await (supabase.from('dashboard_users') as any)

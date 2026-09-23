@@ -63,8 +63,17 @@ export async function getDashboardRole(): Promise<DashboardRole> {
  * those are not guaranteed to have passed through proxy.ts.
  */
 export async function getVerifiedDashboardRole(): Promise<DashboardRole> {
+  return (await getVerifiedIdentity())?.role ?? 'none'
+}
+
+/**
+ * The verified caller (auth-server checked) with their fresh role, or null
+ * when there is no valid session. Use when an action needs the caller's id
+ * or email as well as their role, so it never trusts client-supplied ones.
+ */
+export async function getVerifiedIdentity(): Promise<{ userId: string; email: string | null; role: DashboardRole } | null> {
   const supabase = await createClient()
   const { data: { user }, error } = await supabase.auth.getUser()
-  if (error || !user) return 'none'
-  return lookupRole(user.id)
+  if (error || !user) return null
+  return { userId: user.id, email: user.email ?? null, role: await lookupRole(user.id) }
 }

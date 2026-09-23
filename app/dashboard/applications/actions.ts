@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { fetchAgentsEngine } from '@/lib/agentsEngine'
 import { logActivity } from '@/lib/activityLog'
 import { getVerifiedDashboardRole } from '@/lib/dashboard/getRole'
+import { roleDenial, STAFF_ROLES } from '@/lib/dashboard/requireRole'
 import type { AgentScreeningResult } from '@/lib/types/database'
 
 export interface ReviewedInfo {
@@ -24,6 +25,8 @@ export interface ReviewedInfo {
  */
 export async function markApplicationReviewed(applicationId: string): Promise<{ reviewed?: ReviewedInfo; error?: string }> {
   try {
+    const denied = await roleDenial(STAFF_ROLES)
+    if (denied) return { error: denied }
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Not signed in.' }
@@ -85,6 +88,8 @@ export interface ArchivedInfo {
  */
 export async function archiveApplication(applicationId: string, reason?: string): Promise<{ archived?: ArchivedInfo; error?: string }> {
   try {
+    const denied = await roleDenial(STAFF_ROLES)
+    if (denied) return { error: denied }
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Not signed in.' }
@@ -130,6 +135,8 @@ export async function archiveApplication(applicationId: string, reason?: string)
 
 export async function unarchiveApplication(applicationId: string): Promise<{ archived?: ArchivedInfo; error?: string }> {
   try {
+    const denied = await roleDenial(STAFF_ROLES)
+    if (denied) return { error: denied }
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Not signed in.' }
@@ -172,6 +179,8 @@ export async function unarchiveApplication(applicationId: string): Promise<{ arc
 
 export async function deleteApplication(id: string): Promise<{ error?: string }> {
   try {
+    const denied = await roleDenial(STAFF_ROLES)
+    if (denied) return { error: denied }
     const supabase = createServiceClient()
     const { data: existing } = await (supabase.from('applications') as any)
       .select('name, email')
@@ -200,6 +209,9 @@ export async function screenCandidateAction(
   applicationId: string,
   forceRescan: boolean = false
 ): Promise<{ error?: string; result?: any; screeningRecord?: AgentScreeningResult; statusUpdated?: string | null }> {
+  const denied = await roleDenial(STAFF_ROLES)
+  if (denied) return { error: denied }
+
   const res = await fetchAgentsEngine('/api/v1/agents/hr/screen-consensus', {
     method: 'POST',
     body: JSON.stringify({
@@ -276,6 +288,9 @@ export interface DispatchEmailsResult {
 }
 
 export async function dispatchEmailsAction(applicationIds: string[] = []): Promise<DispatchEmailsResult> {
+  const denied = await roleDenial(STAFF_ROLES)
+  if (denied) return { error: denied }
+
   const res = await fetchAgentsEngine('/api/v1/agents/hr/dispatch-emails', {
     method: 'POST',
     body: JSON.stringify({ applicationIds }),
@@ -335,6 +350,9 @@ export async function startBulkScreenAction(
   applicationIds: string[],
   trackOverrides?: Record<string, string>
 ): Promise<{ jobId?: string; total?: number; error?: string }> {
+  const denied = await roleDenial(STAFF_ROLES)
+  if (denied) return { error: denied }
+
   const res = await fetchAgentsEngine('/api/v1/agents/hr/bulk-screen', {
     method: 'POST',
     body: JSON.stringify({ applicationIds, trackOverrides }),
@@ -362,6 +380,9 @@ export async function startBulkScreenAction(
 export async function getBulkScreenJobStatus(
   jobId: string
 ): Promise<{ job?: BulkScreenJob; error?: string }> {
+  const denied = await roleDenial(STAFF_ROLES)
+  if (denied) return { error: denied }
+
   const res = await fetchAgentsEngine(`/api/v1/agents/hr/bulk-screen/${jobId}`, {
     method: 'GET',
   })
@@ -394,6 +415,8 @@ export interface RebuttalDetail {
 
 export async function getRebuttalDetail(reportId: string): Promise<{ rebuttal?: RebuttalDetail; error?: string }> {
   try {
+    const denied = await roleDenial(STAFF_ROLES)
+    if (denied) return { error: denied }
     const supabase = createServiceClient()
     // screening_rebuttals' actual timestamp column is submitted_at, not
     // created_at (the live schema drifted from what supabase/schema.sql
@@ -436,6 +459,9 @@ export async function getRebuttalDetail(reportId: string): Promise<{ rebuttal?: 
 export async function triggerRebuttalRescreen(
   rebuttalId: string
 ): Promise<{ error?: string; status?: string; httpStatus?: number }> {
+  const denied = await roleDenial(STAFF_ROLES)
+  if (denied) return { error: denied }
+
   const res = await fetchAgentsEngine(`/api/v1/agents/copilot/rebuttals/${rebuttalId}/rescreen`, {
     method: 'POST',
     body: JSON.stringify({}),
@@ -464,6 +490,9 @@ export async function resolveRebuttalAction(
   recruiterNotes?: string,
   manualOverrides?: { compositeScore?: number; recommendation?: string }
 ): Promise<ResolveRebuttalOutcome> {
+  const denied = await roleDenial(STAFF_ROLES)
+  if (denied) return { error: denied }
+
   const res = await fetchAgentsEngine(`/api/v1/agents/copilot/rebuttals/${rebuttalId}/resolve`, {
     method: 'POST',
     body: JSON.stringify({ action, recruiterNotes, dispatchEmail: true, manualOverrides }),
@@ -502,6 +531,9 @@ export interface FreshFeedbackLetter {
 export async function getFreshFeedbackLetter(
   applicationId: string
 ): Promise<{ letter?: FreshFeedbackLetter; error?: string }> {
+  const denied = await roleDenial(STAFF_ROLES)
+  if (denied) return { error: denied }
+
   const res = await fetchAgentsEngine(`/api/v1/agents/hr/feedback-letter/${applicationId}`, {
     method: 'GET',
   })
@@ -517,6 +549,7 @@ export async function getScreeningResultsForApplications(
   applicationIds: string[]
 ): Promise<Record<string, AgentScreeningResult>> {
   if (applicationIds.length === 0) return {}
+  if (await roleDenial(STAFF_ROLES)) return {}
   try {
     const supabase = createServiceClient()
     const { data } = await supabase

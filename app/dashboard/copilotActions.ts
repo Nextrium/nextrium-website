@@ -1,6 +1,7 @@
 'use server'
 
 import { fetchAgentsEngine } from '@/lib/agentsEngine'
+import { roleDenial, STAFF_ROLES } from '@/lib/dashboard/requireRole'
 
 export interface CopilotChatParams {
   domainType?: string
@@ -29,6 +30,9 @@ export interface CopilotChatResult {
 }
 
 export async function sendCopilotChat(params: CopilotChatParams): Promise<CopilotChatResult> {
+  const denied = await roleDenial(STAFF_ROLES)
+  if (denied) return { error: denied }
+
   const res = await fetchAgentsEngine('/api/v1/agents/copilot/chat', {
     method: 'POST',
     body: JSON.stringify({ domainType: 'hr_screening', ...params }),
@@ -58,6 +62,9 @@ export async function getCopilotHistory(
   domainType: string,
   resourceId: string
 ): Promise<{ history: CopilotHistoryMessage[]; error?: string }> {
+  const denied = await roleDenial(STAFF_ROLES)
+  if (denied) return { history: [], error: denied }
+
   const res = await fetchAgentsEngine(
     `/api/v1/agents/copilot/history/${encodeURIComponent(domainType)}/${encodeURIComponent(resourceId)}`,
     { method: 'GET' }
