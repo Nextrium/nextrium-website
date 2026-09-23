@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { logActivity } from '@/lib/activityLog'
 import { getVerifiedIdentity } from '@/lib/dashboard/getRole'
 import { canLinkDiscord } from '@/lib/discordLink'
+import { ACCESS_SYNC, emitAutomationEvent } from '@/lib/automation/server'
 
 export interface ProfileInput {
   bio: string
@@ -55,6 +56,20 @@ export async function saveProfile(input: ProfileInput): Promise<{ error?: string
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Failed to save profile.' }
   }
+}
+
+export interface AccessCheckResult {
+  name: string
+  status: 'success' | 'waiting' | 'failed' | 'skipped'
+  detail: string
+}
+
+// Re-runs the caller's own access rules (e.g. after they finish verifying in Discord).
+export async function syncMyDiscordAccess(): Promise<{ error?: string; results?: AccessCheckResult[] }> {
+  const me = await getVerifiedIdentity()
+  if (!me || !canLinkDiscord(me.role)) return { error: 'You do not have permission to do this.' }
+  const outcomes = await emitAutomationEvent(ACCESS_SYNC, me.userId)
+  return { results: outcomes.map((o) => ({ name: o.ruleName, status: o.status, detail: o.detail })) }
 }
 
 // Removes the Discord link from the caller's own profile only.
