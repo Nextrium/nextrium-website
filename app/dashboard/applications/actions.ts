@@ -636,7 +636,7 @@ export async function inviteApplicantToTeam(
       // (an account that already has a dashboard role keeps that role).
       const existingId = await findAuthUserIdByEmail(application.email)
       if (!existingId) throw new Error('This email already has an account that could not be found. Please try again.')
-      const grant = await grantDashboardAccess(existingId, 'member', applicationId)
+      const grant = await grantDashboardAccess(existingId, 'member', applicationId, true)
       if (grant.status === 'archived') {
         throw new Error('This person has an archived team account. Unarchive it in Team Access first.')
       }
@@ -648,6 +648,7 @@ export async function inviteApplicantToTeam(
       const { error: insertError } = await (supabase.from('dashboard_users') as any).insert({
         user_id: userId,
         role: 'member',
+        is_team_member: true,
         application_id: applicationId,
       })
       if (insertError) throw new Error(insertError.message)

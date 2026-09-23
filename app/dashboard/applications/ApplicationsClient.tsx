@@ -289,8 +289,10 @@ export default function ApplicationsClient({
         setInviteNotes((prev) => ({
           ...prev,
           [id]: existingRole
-            ? `Already on the team as ${existingRole}. No invitation email was sent.`
-            : 'This person already had an account, so they were added to the team directly. No invitation email was sent — let them know they can sign in.',
+            ? (existingRole === 'member'
+                ? 'Already a team member. No invitation email was sent.'
+                : `Keeps their ${existingRole} access and is now also marked as a team member. No invitation email was sent.`)
+            : 'This person already had an account, so they were added as a team member directly. No invitation email was sent — let them know they can sign in.',
         }))
       }
     }

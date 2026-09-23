@@ -14,7 +14,7 @@ async function getPeople(): Promise<PersonCard[]> {
   const supabase = createServiceClient()
 
   const { data: dashboardUsers } = await (supabase.from('dashboard_users') as any)
-    .select('user_id, role, bio, social_handles, discord_username, discord_linked_at, staff_track_id, created_at')
+    .select('*')
     .eq('archived', false)
     .order('created_at', { ascending: true })
 
@@ -40,13 +40,16 @@ async function getPeople(): Promise<PersonCard[]> {
     discordUsername: u.discord_username,
     discordLinked:   !!u.discord_linked_at,
     trackName:       u.staff_track_id ? (trackNameMap[u.staff_track_id] ?? null) : null,
+    isTeamMember:    !!u.is_team_member || u.role === 'member',
   }))
 }
 
 export default async function PeoplePage() {
   const people = await getPeople()
   const staff = people.filter((p) => STAFF_ROLES.includes(p.role))
-  const members = people.filter((p) => p.role === 'member')
+  // Team membership is separate from the access role, so a moderator or
+  // admin who is also a team member appears under both tabs.
+  const members = people.filter((p) => p.isTeamMember)
 
   return (
     <>

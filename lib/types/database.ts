@@ -502,6 +502,7 @@ export type Database = {
           staff_track_id: string | null
           onboarding_completed_at: string | null
           application_id: string | null
+          is_team_member: boolean
           created_at: string
           updated_at: string
         }
@@ -519,6 +520,7 @@ export type Database = {
           staff_track_id?: string | null
           onboarding_completed_at?: string | null
           application_id?: string | null
+          is_team_member?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -535,6 +537,7 @@ export type Database = {
           staff_track_id?: string | null
           onboarding_completed_at?: string | null
           application_id?: string | null
+          is_team_member?: boolean
           updated_at?: string
         }
       }

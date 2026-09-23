@@ -12,6 +12,7 @@ export interface PersonCard {
   discordUsername: string | null
   discordLinked:   boolean
   trackName:       string | null
+  isTeamMember:    boolean
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -35,6 +36,7 @@ function PersonCardItem({ person }: { person: PersonCard }) {
         <div className="person-card-meta">
           <span className="person-card-role">{ROLE_LABELS[person.role] ?? person.role}</span>
           {person.trackName && <span className="person-card-track">{person.trackName}</span>}
+          {person.isTeamMember && person.role !== 'member' && <span className="person-card-track">Also team member</span>}
         </div>
       </div>
       <div className="person-card-badges">

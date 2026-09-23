@@ -22,30 +22,42 @@ export async function findAuthUserIdByEmail(email: string): Promise<string | nul
 
 export type GrantResult =
   | { status: 'created' }
-  | { status: 'exists'; role: string }
+  | { status: 'exists'; role: string; becameMember: boolean }
   | { status: 'archived' }
 
 /**
  * Gives an existing account dashboard access. An account that already has a
- * dashboard row keeps its current role; only a missing link to the
- * application is filled in.
+ * dashboard row keeps its current role: being a team member (able to log
+ * contributions) is a separate flag that sits alongside any role, so a
+ * moderator or admin can be both.
  */
-export async function grantDashboardAccess(userId: string, role: string, applicationId?: string): Promise<GrantResult> {
+export async function grantDashboardAccess(
+  userId: string,
+  role: string,
+  applicationId?: string,
+  asTeamMember = false,
+): Promise<GrantResult> {
   const service = createServiceClient() as any
-  const { data: existing } = await service.from('dashboard_users')
-    .select('role, archived, application_id').eq('user_id', userId).maybeSingle()
+  const { data: existing } = await service.from('dashboard_users').select('*').eq('user_id', userId).maybeSingle()
 
   if (existing) {
     if (existing.archived) return { status: 'archived' }
-    if (applicationId && !existing.application_id) {
-      await service.from('dashboard_users').update({ application_id: applicationId }).eq('user_id', userId)
+    const patch: Record<string, unknown> = {}
+    if (applicationId && !existing.application_id) patch.application_id = applicationId
+    const becameMember = asTeamMember && !existing.is_team_member
+    if (becameMember) patch.is_team_member = true
+    if (Object.keys(patch).length > 0) {
+      const { error } = await service.from('dashboard_users')
+        .update({ ...patch, updated_at: new Date().toISOString() }).eq('user_id', userId)
+      if (error) throw new Error(error.message)
     }
-    return { status: 'exists', role: existing.role }
+    return { status: 'exists', role: existing.role, becameMember }
   }
 
   const { error } = await service.from('dashboard_users').insert({
     user_id: userId,
     role,
+    is_team_member: asTeamMember || role === 'member',
     ...(applicationId ? { application_id: applicationId } : {}),
   })
   if (error) throw new Error(error.message)

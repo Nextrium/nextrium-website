@@ -25,9 +25,13 @@ export interface InvitedUserRow {
   email: string
   archived: boolean
   archived_at: string | null
+  is_team_member: boolean
 }
 
-export async function inviteUser(email: string, role: string): Promise<{ error?: string; notice?: string; added?: InvitedUserRow }> {
+export async function inviteUser(
+  email: string,
+  role: string
+): Promise<{ error?: string; notice?: string; added?: InvitedUserRow; teamMemberSet?: string }> {
   try {
     if (!(await requireAdmin())) return { error: NOT_ALLOWED }
     if (!VALID_ROLES.includes(role)) return { error: 'Invalid role.' }
@@ -74,8 +78,18 @@ export async function inviteUser(email: string, role: string): Promise<{ error?:
       // directly instead of refusing. No invitation email is sent.
       const existingId = await findAuthUserIdByEmail(email)
       if (!existingId) throw new Error('This email already has an account that could not be found. Please try again.')
-      const grant = await grantDashboardAccess(existingId, role)
+      const grant = await grantDashboardAccess(existingId, role, undefined, role === 'member')
       if (grant.status === 'exists') {
+        // Choosing Member for someone who already has a role adds team
+        // membership on top of it; their access level does not change.
+        if (role === 'member') {
+          return {
+            notice: grant.becameMember
+              ? `${email} keeps their ${grant.role} access and is now also a team member. No invitation email was sent.`
+              : `${email} is already a team member.`,
+            teamMemberSet: existingId,
+          }
+        }
         return { error: `This person already has dashboard access as ${grant.role}. Change their role from the list below.` }
       }
       if (grant.status === 'archived') {
@@ -90,6 +104,7 @@ export async function inviteUser(email: string, role: string): Promise<{ error?:
       const { error: insertError } = await (supabase.from('dashboard_users') as any).insert({
         user_id: userId,
         role,
+        is_team_member: role === 'member',
       })
       if (insertError) throw new Error(insertError.message)
     }
@@ -103,10 +118,46 @@ export async function inviteUser(email: string, role: string): Promise<{ error?:
     }).catch(() => {})
     return {
       notice,
-      added: { user_id: userId, role, created_at: new Date().toISOString(), email, archived: false, archived_at: null },
+      added: {
+        user_id: userId, role, created_at: new Date().toISOString(), email,
+        archived: false, archived_at: null, is_team_member: role === 'member',
+      },
     }
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Failed to invite user.' }
+  }
+}
+
+// Team membership (able to log contributions) is separate from the access
+// role, so admins and moderators can be team members too.
+export async function setTeamMember(userId: string, isMember: boolean): Promise<{ error?: string }> {
+  try {
+    if (!(await requireAdmin())) return { error: NOT_ALLOWED }
+
+    const supabase = createServiceClient()
+    const { data: row } = await (supabase.from('dashboard_users') as any)
+      .select('role').eq('user_id', userId).maybeSingle()
+    if (!row) return { error: 'User not found.' }
+    if (!isMember && row.role === 'member') {
+      return { error: 'Their role is Member, so they are a team member by definition. Change their role first.' }
+    }
+
+    const { error } = await (supabase.from('dashboard_users') as any)
+      .update({ is_team_member: isMember, updated_at: new Date().toISOString() })
+      .eq('user_id', userId)
+    if (error) throw new Error(error.message)
+
+    revalidatePath('/dashboard/settings/team')
+    revalidatePath('/dashboard/people')
+    logActivity({
+      action: 'team_member_flag_updated',
+      targetType: 'dashboard_user',
+      targetId: userId,
+      details: { isMember },
+    }).catch(() => {})
+    return {}
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Failed to update team membership.' }
   }
 }
 
