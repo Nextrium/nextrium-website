@@ -1,10 +1,13 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import { runEvent, type ActionHandler, type EngineDeps, type RuleOutcome, type SubjectContext } from './engine'
 import { createDiscordAssignRole } from './discordAssignRole'
+import { createDiscordRemoveRoles } from './discordRemoveRoles'
 
 // Fired whenever something that affects a person's outside access changes:
 // they link Discord, their track changes, or they ask for a re-check.
 export const ACCESS_SYNC = 'member.access_sync'
+// Fired when someone's dashboard access is archived.
+export const ACCESS_REVOKED = 'member.access_revoked'
 
 const SUBJECT_TYPE = 'dashboard_user'
 
@@ -34,6 +37,9 @@ function buildHandlers(): Record<string, ActionHandler> {
   return {
     'discord.assign_role': botToken && guildId
       ? createDiscordAssignRole({ fetchFn: fetch, botToken, guildId, verifiedRoleId: process.env.DISCORD_VERIFIED_ROLE_ID || undefined })
+      : notConfigured,
+    'discord.remove_roles': botToken && guildId
+      ? createDiscordRemoveRoles({ fetchFn: fetch, botToken, guildId })
       : notConfigured,
   }
 }
@@ -90,9 +96,26 @@ function createDeps(): EngineDeps {
 /** Never throws: an automation problem must not break the action that triggered it. */
 export async function emitAutomationEvent(triggerType: string, userId: string): Promise<RuleOutcome[]> {
   try {
-    return await runEvent(createDeps(), triggerType, userId)
+    return await runEvent(createDeps(), triggerType, userId, {
+      archivedOnly: triggerType === ACCESS_REVOKED,
+      requireDiscordLink: triggerType === ACCESS_SYNC,
+    })
   } catch (err) {
     console.error('[automation] event failed:', err instanceof Error ? err.message : err)
     return []
+  }
+}
+
+/**
+ * Retires this person's earlier "done" records so their rules can run afresh
+ * (for example when access is restored after being archived). Rows are
+ * marked, not deleted, so the history stays.
+ */
+export async function supersedeSuccesses(userId: string): Promise<void> {
+  try {
+    await db().from('automation_log').update({ status: 'superseded' })
+      .eq('subject_type', SUBJECT_TYPE).eq('subject_id', userId).eq('status', 'success')
+  } catch (err) {
+    console.error('[automation] could not retire earlier results:', err instanceof Error ? err.message : err)
   }
 }

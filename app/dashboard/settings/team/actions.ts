@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { logActivity } from '@/lib/activityLog'
 import { getVerifiedIdentity } from '@/lib/dashboard/getRole'
 import { findAuthUserIdByEmail, grantDashboardAccess, isEmailAlreadyRegistered } from '@/lib/dashboard/teamAccounts'
+import { ACCESS_REVOKED, ACCESS_SYNC, emitAutomationEvent, supersedeSuccesses } from '@/lib/automation/server'
 
 // Every action here manages who can access the dashboard, so all of them are
 // admin-only, checked inside the action with a verified identity (the page's
@@ -221,6 +222,11 @@ export async function archiveUser(userId: string): Promise<{ error?: string }> {
     const { error: banError } = await serviceClient.auth.admin.updateUserById(userId, { ban_duration: ARCHIVE_BAN_DURATION })
     if (banError) throw new Error(`Access flag set but session revocation failed: ${banError.message}`)
 
+    // Withdraw their Discord roles, then retire the earlier "done" records so
+    // their access can be granted again if they are ever unarchived.
+    await emitAutomationEvent(ACCESS_REVOKED, userId)
+    await supersedeSuccesses(userId)
+
     revalidatePath('/dashboard/settings/team')
     logActivity({
       action: 'team_user_archived',
@@ -246,6 +252,9 @@ export async function unarchiveUser(userId: string): Promise<{ error?: string }>
 
     const { error: unbanError } = await supabase.auth.admin.updateUserById(userId, { ban_duration: 'none' })
     if (unbanError) throw new Error(`Access flag cleared but session restore failed: ${unbanError.message}`)
+
+    // Restore their Discord roles (only applies if they had connected Discord).
+    await emitAutomationEvent(ACCESS_SYNC, userId)
 
     revalidatePath('/dashboard/settings/team')
     logActivity({

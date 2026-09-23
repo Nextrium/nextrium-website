@@ -69,9 +69,23 @@ export function ruleMatches(rule: Pick<Rule, 'trigger_config'>, ctx: SubjectCont
  * has already succeeded for that person is not run again. A handler that
  * throws is recorded as failed and does not stop the other rules.
  */
-export async function runEvent(deps: EngineDeps, triggerType: string, userId: string): Promise<RuleOutcome[]> {
+export interface RunOptions {
+  // For clean-up events (an archived person's access being withdrawn): run only for archived people instead of only for active ones.
+  archivedOnly?: boolean
+  // Skip people who haven't connected Discord, so a Discord-only event doesn't log "waiting" rows for everyone.
+  requireDiscordLink?: boolean
+}
+
+export async function runEvent(
+  deps: EngineDeps,
+  triggerType: string,
+  userId: string,
+  options: RunOptions = {},
+): Promise<RuleOutcome[]> {
   const ctx = await deps.loadContext(userId)
-  if (!ctx || ctx.archived) return []
+  if (!ctx) return []
+  if (options.archivedOnly ? !ctx.archived : ctx.archived) return []
+  if (options.requireDiscordLink && !ctx.discordUserId) return []
 
   const outcomes: RuleOutcome[] = []
   for (const rule of await deps.loadRules(triggerType)) {
