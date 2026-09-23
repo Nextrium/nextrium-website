@@ -1,3 +1,9 @@
+# Database schema — never tracked in git. Reveals table/column names, RLS
+# policy logic, and internal reasoning comments to every repo contributor,
+# not just intended collaborators. SQL for any DB change is shared
+# directly (chat/file handoff) for manual execution, never committed here.
+supabase/schema.sql
+
 # Logs
 logs
 !app/dashboard/logs/

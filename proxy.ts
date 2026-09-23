@@ -11,7 +11,16 @@ const ROLE_COOKIE = 'nextrium-role'
 const ROLE_COOKIE_MAX_AGE = 30
 const ROLE_QUERY_TIMEOUT_MS = 4000 // never let one slow Supabase response hang the whole middleware
 
-async function fetchUserRole(userId: string): Promise<string> {
+interface RoleQueryResult {
+  role: string
+  archived: boolean
+  onboarded: boolean
+  // false = the lookup itself failed or timed out, so we know nothing about
+  // this account. Distinct from 'none' (lookup succeeded, no row).
+  verified: boolean
+}
+
+async function fetchUserRole(userId: string): Promise<RoleQueryResult> {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SECRET_KEY!,
@@ -20,18 +29,23 @@ async function fetchUserRole(userId: string): Promise<string> {
 
   const queryPromise = supabase
     .from('dashboard_users')
-    .select('role, archived')
+    .select('role, archived, onboarding_completed_at')
     .eq('user_id', userId)
-    .maybeSingle() as unknown as Promise<{ data: { role: string; archived: boolean } | null; error: unknown }>
+    .maybeSingle() as unknown as Promise<{ data: { role: string; archived: boolean; onboarding_completed_at: string | null } | null; error: unknown }>
 
   const timeoutPromise = new Promise<{ data: null; error: 'timeout' }>((resolve) =>
     setTimeout(() => resolve({ data: null, error: 'timeout' }), ROLE_QUERY_TIMEOUT_MS)
   )
 
-  const { data } = await Promise.race([queryPromise, timeoutPromise])
-  if (!data) return 'community'
-  if (data.archived) return 'archived'
-  return data.role;
+  // Fail closed. A timeout or query error used to resolve to 'community'
+  // and get cached, handing real dashboard access to whoever happened to hit
+  // a slow lookup. Now it is "unverified" (503, never cached), and a
+  // successful lookup with no row is 'none' (no access).
+  const { data, error } = await Promise.race([queryPromise, timeoutPromise])
+  if (error) return { role: 'none', archived: false, onboarded: true, verified: false }
+  if (!data) return { role: 'none', archived: false, onboarded: true, verified: true }
+  if (data.archived) return { role: 'archived', archived: true, onboarded: true, verified: true }
+  return { role: data.role, archived: false, onboarded: !!data.onboarding_completed_at, verified: true }
 }
 
 /**
@@ -47,24 +61,32 @@ async function getUserRole(
   request: NextRequest,
   response: NextResponse,
   userId: string
-): Promise<string> {
-  // Cookie value is "<userId>:<role>" — binding it to the signed-in user id
-  // means a different account signing in on the same browser can never
-  // inherit a stale cached role left over from whoever used it before.
+): Promise<RoleQueryResult> {
+  // Cookie value is "<userId>:<role>:<onboarded 0|1>" — binding it to the
+  // signed-in user id means a different account signing in on the same
+  // browser can never inherit a stale cached role left over from whoever
+  // used it before.
   const cached = request.cookies.get(ROLE_COOKIE)?.value
   if (cached) {
-    const [cachedUserId, cachedRole] = cached.split(':')
-    if (cachedUserId === userId && cachedRole) return cachedRole
+    const [cachedUserId, cachedRole, cachedOnboarded] = cached.split(':')
+    if (cachedUserId === userId && cachedRole) {
+      return { role: cachedRole, archived: cachedRole === 'archived', onboarded: cachedOnboarded === '1', verified: true }
+    }
   }
 
-  const role = await fetchUserRole(userId)
-  response.cookies.set(ROLE_COOKIE, `${userId}:${role}`, {
-    maxAge: ROLE_COOKIE_MAX_AGE,
-    httpOnly: true,
-    sameSite: 'lax',
-    path: '/',
-  })
-  return role
+  const result = await fetchUserRole(userId)
+  // Only cache an answer that grants something. Caching 'none' would keep a
+  // freshly invited account locked out for up to the cookie's lifetime, and
+  // an unverified lookup must be retried on the next request.
+  if (result.verified && result.role !== 'none') {
+    response.cookies.set(ROLE_COOKIE, `${userId}:${result.role}:${result.onboarded ? '1' : '0'}`, {
+      maxAge: ROLE_COOKIE_MAX_AGE,
+      httpOnly: true,
+      sameSite: 'lax',
+      path: '/',
+    })
+  }
+  return result
 }
 
 export async function proxy(request: NextRequest) {
@@ -81,7 +103,17 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  const role = await getUserRole(request, response, user.id)
+  const { role, onboarded, verified } = await getUserRole(request, response, user.id)
+
+  // The access lookup failed or timed out: we don't know who this is, so
+  // grant nothing. A plain 503 rather than a redirect, because bouncing
+  // through /login could loop while the lookup keeps failing.
+  if (!verified) {
+    return new NextResponse('Could not verify your access right now. Please refresh in a moment.', {
+      status: 503,
+      headers: { 'Cache-Control': 'no-store' },
+    })
+  }
 
   // Archived blocks the entire /dashboard tree (including /dashboard
   // itself), so redirecting there like every other restriction does would
@@ -91,8 +123,28 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL('/login?error=' + encodeURIComponent('Your dashboard access has been revoked. Contact an administrator.'), request.url))
   }
 
+  // Signed in but never granted dashboard access. Same loop hazard as
+  // archived (the whole tree is blocked), so same exit: /login. The login
+  // page must not bounce this account straight back — see login/page.tsx.
+  if (role === 'none') {
+    return NextResponse.redirect(new URL('/login?error=' + encodeURIComponent('This account does not have dashboard access. Contact an administrator.'), request.url))
+  }
+
+  // Forced post-invite profile setup — the same page doubles as "edit my
+  // profile" later, so this only ever fires once per account. Existing
+  // accounts were backfilled with onboarding_completed_at set, so this
+  // never surprises anyone who was already using the dashboard.
+  const ONBOARDING_PATH = '/dashboard/people/me'
+  if (!onboarded && pathname !== ONBOARDING_PATH) {
+    return NextResponse.redirect(new URL(ONBOARDING_PATH, request.url))
+  }
+
   if (isRestricted(pathname, role)) {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+    // member is allowlisted to /dashboard/people only, so the usual
+    // "bounce back to /dashboard" would loop forever for them exactly like
+    // the archived case above — land them on the one place they can go.
+    const landingPath = role === 'member' ? '/dashboard/people' : '/dashboard'
+    return NextResponse.redirect(new URL(landingPath, request.url))
   }
 
   return response

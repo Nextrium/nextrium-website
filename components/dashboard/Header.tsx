@@ -17,11 +17,10 @@ export default function Header({ title, description, action }: HeaderProps) {
 
   async function handleSignOut() {
     const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    // Log first: the server identifies the actor from the live session,
+    // which no longer exists once signOut has run.
+    await logActivityAction({ action: 'sign_out' }).catch(() => {})
     await supabase.auth.signOut()
-    // Capture the actor before sign-out clears the session, since the
-    // server action logging this can no longer read it from cookies after.
-    logActivityAction({ action: 'sign_out', actorId: user?.id, actorEmail: user?.email }).catch(() => {})
     router.push('/login')
     router.refresh()
   }

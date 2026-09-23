@@ -7,20 +7,25 @@ import NTMark from '@/components/shared/NTMark'
 import { useDashboard } from './DashboardContext'
 import type { DashboardRole } from '@/lib/dashboard/getRole'
 
-// Sub-navigation shown under "Applications" while on that page — real
-// links (?status=...) rather than in-page tab state, so a status view is
+// Sub-navigation shown under a nav item while on that page — real links
+// (a query param) rather than in-page tab state, so a specific view is
 // bookmarkable and reachable straight from the sidebar without scrolling.
 const APPLICATIONS_SUB_ITEMS = [
-  { label: 'All',         status: 'all' },
-  { label: 'Pending',     status: 'pending' },
-  { label: 'Reviewed',    status: 'reviewed' },
-  { label: 'Shortlisted', status: 'shortlisted' },
-  { label: 'Accepted',    status: 'accepted' },
-  { label: 'Rejected',       status: 'rejected' },
-  { label: 'Rebuttals',      status: 'rebuttal' },
-  { label: 'Human Reviewed', status: 'human-reviewed' },
-  { label: 'Track Review',   status: 'track-review' },
-  { label: 'Archived',       status: 'archived' },
+  { label: 'All',         value: 'all' },
+  { label: 'Pending',     value: 'pending' },
+  { label: 'Reviewed',    value: 'reviewed' },
+  { label: 'Shortlisted', value: 'shortlisted' },
+  { label: 'Accepted',    value: 'accepted' },
+  { label: 'Rejected',       value: 'rejected' },
+  { label: 'Rebuttals',      value: 'rebuttal' },
+  { label: 'Human Reviewed', value: 'human-reviewed' },
+  { label: 'Track Review',   value: 'track-review' },
+  { label: 'Archived',       value: 'archived' },
+]
+
+const PEOPLE_SUB_ITEMS = [
+  { label: 'Staff',                 value: 'staff' },
+  { label: 'General Team Members',  value: 'members' },
 ]
 
 const ALL_NAV_GROUPS = [
@@ -34,14 +39,28 @@ const ALL_NAV_GROUPS = [
       { label: 'Events',             href: '/dashboard/events',             icon: '◉', roles: ['admin', 'content', 'community', 'moderator'] as DashboardRole[] },
       { label: 'Roles',              href: '/dashboard/roles',              icon: '◎', roles: ['admin', 'moderator'] as DashboardRole[] },
       { label: 'Community Projects', href: '/dashboard/community-projects', icon: '◈', roles: ['admin', 'content', 'community', 'moderator'] as DashboardRole[] },
-      { label: 'Team',               href: '/dashboard/team',               icon: '◈', roles: ['admin', 'moderator'] as DashboardRole[] },
+      // Public-facing bios CMS (nextrium.org/team) — distinct from the
+      // internal staff/member directory below, which is a different nav
+      // item on purpose so the two are never confused.
+      { label: 'Team Bios',          href: '/dashboard/team',               icon: '◈', roles: ['admin', 'moderator'] as DashboardRole[] },
+    ],
+  },
+  {
+    label: 'Team',
+    roles: ['admin', 'content', 'community', 'moderator', 'member'] as DashboardRole[],
+    items: [
+      {
+        label: 'Team', href: '/dashboard/people', icon: '◈',
+        roles: ['admin', 'content', 'community', 'moderator', 'member'] as DashboardRole[],
+        subItems: PEOPLE_SUB_ITEMS, subQueryKey: 'view',
+      },
     ],
   },
   {
     label: 'Inbox',
     roles: ['admin', 'moderator'] as DashboardRole[],
     items: [
-      { label: 'Applications', href: '/dashboard/applications', icon: '◐', roles: ['admin', 'moderator'] as DashboardRole[] },
+      { label: 'Applications', href: '/dashboard/applications', icon: '◐', roles: ['admin', 'moderator'] as DashboardRole[], subItems: APPLICATIONS_SUB_ITEMS, subQueryKey: 'status' },
       { label: 'Contact',      href: '/dashboard/contact',      icon: '◑', roles: ['admin', 'moderator'] as DashboardRole[] },
       { label: 'Send Email',   href: '/dashboard/email',        icon: '✉', roles: ['admin', 'moderator'] as DashboardRole[] },
       { label: 'AI Engine',    href: '/dashboard/ai-engine',    icon: '⚡', roles: ['admin', 'moderator'] as DashboardRole[] },
@@ -61,15 +80,20 @@ export default function Sidebar({ role }: { role: DashboardRole }) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const { sidebarOpen, closeSidebar } = useDashboard()
-  const activeStatus = searchParams.get('status') ?? 'all'
-  const isApplicationsActive = pathname === '/dashboard/applications' || pathname.startsWith('/dashboard/applications/')
-  const [subNavOpen, setSubNavOpen] = useState(isApplicationsActive)
 
-  // Auto-expand when navigating onto Applications; leave the user's manual
-  // collapse alone otherwise.
+  // Which sub-nav'd item (by href) is currently expanded — generalized from
+  // a single Applications-only boolean so any item can carry sub-items.
+  const activeSubNavHref = ALL_NAV_GROUPS
+    .flatMap((g) => g.items)
+    .find((item: any) => item.subItems && (pathname === item.href || pathname.startsWith(item.href + '/')))
+    ?.href ?? null
+  const [openSubNavHref, setOpenSubNavHref] = useState<string | null>(activeSubNavHref)
+
+  // Auto-expand when navigating onto a sub-nav'd item; leave the user's
+  // manual collapse of a different one alone otherwise.
   useEffect(() => {
-    if (isApplicationsActive) setSubNavOpen(true)
-  }, [isApplicationsActive])
+    if (activeSubNavHref) setOpenSubNavHref(activeSubNavHref)
+  }, [activeSubNavHref])
 
   const navGroups = ALL_NAV_GROUPS
     .map((group) => ({
@@ -146,26 +170,28 @@ export default function Sidebar({ role }: { role: DashboardRole }) {
           {navGroups.map((group) => (
             <div key={group.label} className="sidebar-group">
               <div className="sidebar-group-label">{group.label}</div>
-              {group.items.map((item) => {
+              {group.items.map((item: any) => {
                 const isActive = item.href === '/dashboard'
                   ? pathname === '/dashboard'
                   : pathname === item.href || pathname.startsWith(item.href + '/')
-                const isApplications = item.href === '/dashboard/applications'
+                const hasSubItems = !!item.subItems?.length
+                const isOpen = openSubNavHref === item.href
+                const activeSubValue = searchParams.get(item.subQueryKey ?? 'status') ?? item.subItems?.[0]?.value
                 return (
                   <div key={item.href}>
-                    {isApplications ? (
+                    {hasSubItems ? (
                       <button
                         type="button"
                         className={`sidebar-item-row toggle ${isActive ? 'active' : ''}`}
-                        onClick={() => setSubNavOpen((v) => !v)}
-                        aria-label={subNavOpen ? 'Collapse Applications sub-navigation' : 'Expand Applications sub-navigation'}
-                        aria-expanded={subNavOpen}
+                        onClick={() => setOpenSubNavHref((v) => (v === item.href ? null : item.href))}
+                        aria-label={isOpen ? `Collapse ${item.label} sub-navigation` : `Expand ${item.label} sub-navigation`}
+                        aria-expanded={isOpen}
                       >
                         <span className="sidebar-item">
                           <span className="sidebar-icon">{item.icon}</span>
                           {item.label}
                         </span>
-                        <span className={`sidebar-subnav-toggle ${subNavOpen ? 'open' : ''}`}>▾</span>
+                        <span className={`sidebar-subnav-toggle ${isOpen ? 'open' : ''}`}>▾</span>
                       </button>
                     ) : (
                       <div className={`sidebar-item-row ${isActive ? 'active' : ''}`}>
@@ -175,13 +201,27 @@ export default function Sidebar({ role }: { role: DashboardRole }) {
                         </Link>
                       </div>
                     )}
-                    {isApplications && subNavOpen && (
+                    {hasSubItems && isOpen && (
                       <div className="sidebar-subnav">
-                        {APPLICATIONS_SUB_ITEMS.map((sub) => {
-                          const subActive = activeStatus === sub.status
-                          const href = sub.status === 'all' ? item.href : `${item.href}?status=${sub.status}`
+                        {item.subItems.map((sub: { label: string; value: string }) => {
+                          const subActive = activeSubValue === sub.value
+                          const href = sub.value === item.subItems[0].value ? item.href : `${item.href}?${item.subQueryKey ?? 'status'}=${sub.value}`
                           return (
-                            <Link key={sub.status} href={href} className={`sidebar-subitem ${subActive ? 'active' : ''}`}>
+                            <Link
+                              key={sub.value}
+                              href={href}
+                              className={`sidebar-subitem ${subActive ? 'active' : ''}`}
+                              onClick={(e) => {
+                                // Already on this page: the tabs filter data the page
+                                // has loaded, so switch by updating the URL only. A
+                                // normal link would re-run the whole page on the server
+                                // for every tab click.
+                                if (pathname !== item.href) return
+                                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return
+                                e.preventDefault()
+                                window.history.pushState(null, '', href)
+                              }}
+                            >
                               {sub.label}
                             </Link>
                           )
@@ -196,8 +236,11 @@ export default function Sidebar({ role }: { role: DashboardRole }) {
         </nav>
 
         <div className="sidebar-footer">
+          <Link href="/dashboard/people/me" className="sidebar-footer-link">◉ My Profile</Link>
           <Link href="/" className="sidebar-footer-link" target="_blank">↗ View site</Link>
-          <Link href="/dashboard/settings" className="sidebar-footer-link">⚙ Settings</Link>
+          {(role === 'admin' || role === 'moderator') && (
+            <Link href="/dashboard/settings" className="sidebar-footer-link">⚙ Settings</Link>
+          )}
         </div>
       </aside>
     </>

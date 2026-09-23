@@ -266,6 +266,7 @@ export type Database = {
           archived_reason: string | null
           archived_by: string | null
           archived_by_email: string | null
+          invited_to_team_at: string | null
         }
         Insert: {
           id?: string
@@ -490,21 +491,131 @@ export type Database = {
         Row: {
           id: string
           user_id: string
-          role: 'admin' | 'content' | 'community' | 'moderator'
+          role: 'admin' | 'content' | 'community' | 'moderator' | 'member'
+          archived: boolean
+          archived_at: string | null
+          bio: string | null
+          social_handles: Json
+          discord_user_id: string | null
+          discord_username: string | null
+          discord_linked_at: string | null
+          staff_track_id: string | null
+          onboarding_completed_at: string | null
+          application_id: string | null
+          is_team_member: boolean
           created_at: string
           updated_at: string
         }
         Insert: {
           id?: string
           user_id: string
-          role?: 'admin' | 'content' | 'community' | 'moderator'
+          role?: 'admin' | 'content' | 'community' | 'moderator' | 'member'
+          archived?: boolean
+          archived_at?: string | null
+          bio?: string | null
+          social_handles?: Json
+          discord_user_id?: string | null
+          discord_username?: string | null
+          discord_linked_at?: string | null
+          staff_track_id?: string | null
+          onboarding_completed_at?: string | null
+          application_id?: string | null
+          is_team_member?: boolean
           created_at?: string
           updated_at?: string
         }
         Update: {
           user_id?: string
-          role?: 'admin' | 'content' | 'community' | 'moderator'
+          role?: 'admin' | 'content' | 'community' | 'moderator' | 'member'
+          archived?: boolean
+          archived_at?: string | null
+          bio?: string | null
+          social_handles?: Json
+          discord_user_id?: string | null
+          discord_username?: string | null
+          discord_linked_at?: string | null
+          staff_track_id?: string | null
+          onboarding_completed_at?: string | null
+          application_id?: string | null
+          is_team_member?: boolean
           updated_at?: string
+        }
+      }
+      staff_tracks: {
+        Row: {
+          id: string
+          name: string
+          description: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          description?: string | null
+          created_at?: string
+        }
+        Update: {
+          name?: string
+          description?: string | null
+        }
+      }
+      automation_rules: {
+        Row: {
+          id: string
+          name: string
+          trigger_type: string
+          trigger_config: Json
+          action_type: string
+          action_config: Json
+          enabled: boolean
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          trigger_type: string
+          trigger_config?: Json
+          action_type: string
+          action_config?: Json
+          enabled?: boolean
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          name?: string
+          trigger_type?: string
+          trigger_config?: Json
+          action_type?: string
+          action_config?: Json
+          enabled?: boolean
+          updated_at?: string
+        }
+      }
+      automation_log: {
+        Row: {
+          id: string
+          rule_id: string
+          subject_type: string
+          subject_id: string
+          status: string
+          detail: Json
+          ran_at: string
+        }
+        Insert: {
+          id?: string
+          rule_id: string
+          subject_type: string
+          subject_id: string
+          status?: string
+          detail?: Json
+          ran_at?: string
+        }
+        Update: {
+          status?: string
+          detail?: Json
         }
       }
       agent_screening_results: {
@@ -607,6 +718,9 @@ export type HubProject           = Database['public']['Tables']['hub_projects'][
 export type Role                 = Database['public']['Tables']['roles']['Row']
 export type SiteSetting          = Database['public']['Tables']['site_settings']['Row']
 export type DashboardUser        = Database['public']['Tables']['dashboard_users']['Row']
+export type StaffTrack           = Database['public']['Tables']['staff_tracks']['Row']
+export type AutomationRule       = Database['public']['Tables']['automation_rules']['Row']
+export type AutomationLog        = Database['public']['Tables']['automation_log']['Row']
 export type AgentScreeningResult = Database['public']['Tables']['agent_screening_results']['Row']
 export type ScreeningReport      = Database['public']['Tables']['screening_reports']['Row']
 

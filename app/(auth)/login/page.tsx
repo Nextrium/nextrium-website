@@ -25,7 +25,10 @@ export default async function LoginPage({ searchParams }: Props) {
       .eq('user_id', user.id)
       .maybeSingle() as { data: { archived: boolean } | null }
 
-    if (!dashboardUser?.archived) redirect('/dashboard')
+    // Only bounce an account that actually has a live dashboard_users row.
+    // A signed-in account with no row is denied by the middleware and sent
+    // back here, so redirecting it to /dashboard would loop forever.
+    if (dashboardUser && !dashboardUser.archived) redirect('/dashboard')
   }
 
   const { message, error } = await searchParams

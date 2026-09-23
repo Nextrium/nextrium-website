@@ -32,12 +32,18 @@ export default function ContactClient({ submissions: initial }: ContactClientPro
   const [submissions, setSubmissions] = useState(initial)
   const [selected,    setSelected]    = useState<ContactSubmission | null>(null)
   const [updating,    setUpdating]    = useState(false)
+  const [updateError, setUpdateError] = useState<string | null>(null)
 
   async function updateStatus(id: string, status: ContactSubmission['status']) {
     setUpdating(true)
+    setUpdateError(null)
     const supabase = createClient()
-    const { error } = await (supabase.from('contact_submissions') as any).update({ status }).eq('id', id)
-    if (!error) {
+    // .select() returns the rows actually changed. Without it a blocked
+    // update (row-level security matching nothing) looks like success.
+    const { data, error } = await (supabase.from('contact_submissions') as any).update({ status }).eq('id', id).select('id')
+    if (error || !data?.length) {
+      setUpdateError('Could not update this message\'s status. You may not have permission, or it was changed elsewhere. Refresh and try again.')
+    } else {
       setSubmissions((prev) => prev.map((s) => s.id === id ? { ...s, status } : s))
       if (selected?.id === id) setSelected((prev) => prev ? { ...prev, status } : null)
       logActivityAction({
@@ -171,6 +177,7 @@ export default function ContactClient({ submissions: initial }: ContactClientPro
                   </div>
                   <div>
                     <div className="detail-section-title">Status</div>
+                    {updateError && <div style={{ fontSize: '11.5px', color: 'var(--error)', marginBottom: '8px' }}>{updateError}</div>}
                     <div className="detail-status-row">
                       {STATUS_OPTIONS.map((s) => (
                         <button key={s} type="button"

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { inviteUser, updateRole, removeUser, archiveUser, unarchiveUser } from './actions'
+import { inviteUser, updateRole, removeUser, archiveUser, unarchiveUser, setTeamMember } from './actions'
 
 interface DashboardUserRow {
   user_id: string
@@ -10,13 +10,18 @@ interface DashboardUserRow {
   email: string
   archived: boolean
   archived_at: string | null
+  is_team_member: boolean
 }
 
+// "Member" is contribution-only access (Team page and their own profile). To
+// let an admin or moderator log contributions too, keep their role and tick
+// "Team member" on their row instead.
 const ROLE_OPTIONS = [
   { value: 'admin',     label: 'Admin' },
   { value: 'moderator', label: 'Moderator' },
   { value: 'content',   label: 'Content' },
   { value: 'community', label: 'Community' },
+  { value: 'member',    label: 'Member (contributions only)' },
 ]
 
 export default function TeamAccessClient({ users: initial }: { users: DashboardUserRow[] }) {
@@ -39,11 +44,13 @@ export default function TeamAccessClient({ users: initial }: { users: DashboardU
     setInviteError('')
     setInviteSuccess('')
 
-    const { error } = await inviteUser(inviteEmail.trim(), inviteRole)
+    const { error, notice, added, teamMemberSet } = await inviteUser(inviteEmail.trim(), inviteRole)
     if (error) {
       setInviteError(error)
     } else {
-      setInviteSuccess(`Invite sent to ${inviteEmail.trim()}.`)
+      if (added) setUsers((prev) => [...prev, added])
+      if (teamMemberSet) setUsers((prev) => prev.map((u) => u.user_id === teamMemberSet ? { ...u, is_team_member: true } : u))
+      setInviteSuccess(notice ?? `Invite sent to ${inviteEmail.trim()}.`)
       setInviteEmail('')
       setInviteRole('content')
     }
@@ -54,7 +61,19 @@ export default function TeamAccessClient({ users: initial }: { users: DashboardU
     setUpdatingId(userId)
     const { error } = await updateRole(userId, role)
     if (!error) {
-      setUsers((prev) => prev.map((u) => u.user_id === userId ? { ...u, role } : u))
+      setUsers((prev) => prev.map((u) => u.user_id === userId ? { ...u, role, is_team_member: u.is_team_member || role === 'member' } : u))
+    }
+    setUpdatingId(null)
+  }
+
+  async function handleTeamMemberToggle(userId: string, isMember: boolean) {
+    setUpdatingId(userId)
+    setInviteError('')
+    const { error } = await setTeamMember(userId, isMember)
+    if (error) {
+      setInviteError(error)
+    } else {
+      setUsers((prev) => prev.map((u) => u.user_id === userId ? { ...u, is_team_member: isMember } : u))
     }
     setUpdatingId(null)
   }
@@ -146,6 +165,17 @@ export default function TeamAccessClient({ users: initial }: { users: DashboardU
                     <div className="team-user-date">
                       Added {new Date(user.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                     </div>
+                    {!user.archived && (
+                      <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginTop: '6px', fontSize: '11px', color: 'var(--off-white)', cursor: user.role === 'member' ? 'default' : 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={user.is_team_member}
+                          disabled={updatingId === user.user_id || user.role === 'member'}
+                          onChange={(e) => handleTeamMemberToggle(user.user_id, e.target.checked)}
+                        />
+                        Team member (can log contributions)
+                      </label>
+                    )}
                     {archiveError && (archivingId === user.user_id || confirmArchive === user.user_id) && (
                       <div style={{ fontSize: '11px', color: 'var(--error)', marginTop: '4px' }}>{archiveError}</div>
                     )}

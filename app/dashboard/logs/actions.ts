@@ -1,6 +1,7 @@
 'use server'
 
 import { createServiceClient } from '@/lib/supabase/server'
+import { roleDenial, ADMIN_ONLY } from '@/lib/dashboard/requireRole'
 
 export interface TeamActivityLog {
   id: string
@@ -17,6 +18,9 @@ export async function getTeamActivityLogs(params: {
   limit?: number
   before?: string
 } = {}): Promise<{ logs: TeamActivityLog[]; error?: string }> {
+  const denied = await roleDenial(ADMIN_ONLY)
+  if (denied) return { logs: [], error: denied }
+
   try {
     const supabase = createServiceClient()
     let query = supabase
@@ -70,6 +74,9 @@ export interface AgentRunSummary {
  * rather than the whole table to keep this cheap as the log table grows.
  */
 export async function getRecentAgentRuns(scanLimit = 1500): Promise<{ runs: AgentRunSummary[]; error?: string }> {
+  const denied = await roleDenial(ADMIN_ONLY)
+  if (denied) return { runs: [], error: denied }
+
   try {
     const supabase = createServiceClient()
     const { data, error } = await supabase
@@ -112,6 +119,9 @@ export async function getRecentAgentRuns(scanLimit = 1500): Promise<{ runs: Agen
 }
 
 export async function getAgentRunTrace(runId: string): Promise<{ lines: AgentRunLogLine[]; error?: string }> {
+  const denied = await roleDenial(ADMIN_ONLY)
+  if (denied) return { lines: [], error: denied }
+
   try {
     const supabase = createServiceClient()
     const { data, error } = await supabase

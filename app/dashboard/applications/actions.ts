@@ -4,6 +4,9 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { fetchAgentsEngine } from '@/lib/agentsEngine'
 import { logActivity } from '@/lib/activityLog'
+import { getVerifiedDashboardRole } from '@/lib/dashboard/getRole'
+import { roleDenial, STAFF_ROLES } from '@/lib/dashboard/requireRole'
+import { findAuthUserIdByEmail, grantDashboardAccess, isEmailAlreadyRegistered } from '@/lib/dashboard/teamAccounts'
 import type { AgentScreeningResult } from '@/lib/types/database'
 
 export interface ReviewedInfo {
@@ -23,6 +26,8 @@ export interface ReviewedInfo {
  */
 export async function markApplicationReviewed(applicationId: string): Promise<{ reviewed?: ReviewedInfo; error?: string }> {
   try {
+    const denied = await roleDenial(STAFF_ROLES)
+    if (denied) return { error: denied }
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Not signed in.' }
@@ -51,7 +56,9 @@ export async function markApplicationReviewed(applicationId: string): Promise<{ 
 
     if (error) throw new Error(error.message)
 
-    revalidatePath('/dashboard/applications')
+    // No revalidatePath here (or in archive/unarchive): the client already
+    // applies the returned info to its own state, and revalidating re-runs
+    // the whole heavy applications page on the server for every click.
     return {
       reviewed: {
         firstReviewedByEmail: updated.first_reviewed_by_email,
@@ -84,6 +91,8 @@ export interface ArchivedInfo {
  */
 export async function archiveApplication(applicationId: string, reason?: string): Promise<{ archived?: ArchivedInfo; error?: string }> {
   try {
+    const denied = await roleDenial(STAFF_ROLES)
+    if (denied) return { error: denied }
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Not signed in.' }
@@ -105,7 +114,6 @@ export async function archiveApplication(applicationId: string, reason?: string)
 
     if (error) throw new Error(error.message)
 
-    revalidatePath('/dashboard/applications')
     logActivity({
       action: 'application_archived',
       targetType: 'application',
@@ -129,6 +137,8 @@ export async function archiveApplication(applicationId: string, reason?: string)
 
 export async function unarchiveApplication(applicationId: string): Promise<{ archived?: ArchivedInfo; error?: string }> {
   try {
+    const denied = await roleDenial(STAFF_ROLES)
+    if (denied) return { error: denied }
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Not signed in.' }
@@ -148,7 +158,6 @@ export async function unarchiveApplication(applicationId: string): Promise<{ arc
 
     if (error) throw new Error(error.message)
 
-    revalidatePath('/dashboard/applications')
     logActivity({
       action: 'application_unarchived',
       targetType: 'application',
@@ -171,6 +180,8 @@ export async function unarchiveApplication(applicationId: string): Promise<{ arc
 
 export async function deleteApplication(id: string): Promise<{ error?: string }> {
   try {
+    const denied = await roleDenial(STAFF_ROLES)
+    if (denied) return { error: denied }
     const supabase = createServiceClient()
     const { data: existing } = await (supabase.from('applications') as any)
       .select('name, email')
@@ -199,6 +210,9 @@ export async function screenCandidateAction(
   applicationId: string,
   forceRescan: boolean = false
 ): Promise<{ error?: string; result?: any; screeningRecord?: AgentScreeningResult; statusUpdated?: string | null }> {
+  const denied = await roleDenial(STAFF_ROLES)
+  if (denied) return { error: denied }
+
   const res = await fetchAgentsEngine('/api/v1/agents/hr/screen-consensus', {
     method: 'POST',
     body: JSON.stringify({
@@ -275,6 +289,9 @@ export interface DispatchEmailsResult {
 }
 
 export async function dispatchEmailsAction(applicationIds: string[] = []): Promise<DispatchEmailsResult> {
+  const denied = await roleDenial(STAFF_ROLES)
+  if (denied) return { error: denied }
+
   const res = await fetchAgentsEngine('/api/v1/agents/hr/dispatch-emails', {
     method: 'POST',
     body: JSON.stringify({ applicationIds }),
@@ -334,6 +351,9 @@ export async function startBulkScreenAction(
   applicationIds: string[],
   trackOverrides?: Record<string, string>
 ): Promise<{ jobId?: string; total?: number; error?: string }> {
+  const denied = await roleDenial(STAFF_ROLES)
+  if (denied) return { error: denied }
+
   const res = await fetchAgentsEngine('/api/v1/agents/hr/bulk-screen', {
     method: 'POST',
     body: JSON.stringify({ applicationIds, trackOverrides }),
@@ -361,6 +381,9 @@ export async function startBulkScreenAction(
 export async function getBulkScreenJobStatus(
   jobId: string
 ): Promise<{ job?: BulkScreenJob; error?: string }> {
+  const denied = await roleDenial(STAFF_ROLES)
+  if (denied) return { error: denied }
+
   const res = await fetchAgentsEngine(`/api/v1/agents/hr/bulk-screen/${jobId}`, {
     method: 'GET',
   })
@@ -393,6 +416,8 @@ export interface RebuttalDetail {
 
 export async function getRebuttalDetail(reportId: string): Promise<{ rebuttal?: RebuttalDetail; error?: string }> {
   try {
+    const denied = await roleDenial(STAFF_ROLES)
+    if (denied) return { error: denied }
     const supabase = createServiceClient()
     // screening_rebuttals' actual timestamp column is submitted_at, not
     // created_at (the live schema drifted from what supabase/schema.sql
@@ -435,6 +460,9 @@ export async function getRebuttalDetail(reportId: string): Promise<{ rebuttal?: 
 export async function triggerRebuttalRescreen(
   rebuttalId: string
 ): Promise<{ error?: string; status?: string; httpStatus?: number }> {
+  const denied = await roleDenial(STAFF_ROLES)
+  if (denied) return { error: denied }
+
   const res = await fetchAgentsEngine(`/api/v1/agents/copilot/rebuttals/${rebuttalId}/rescreen`, {
     method: 'POST',
     body: JSON.stringify({}),
@@ -463,6 +491,9 @@ export async function resolveRebuttalAction(
   recruiterNotes?: string,
   manualOverrides?: { compositeScore?: number; recommendation?: string }
 ): Promise<ResolveRebuttalOutcome> {
+  const denied = await roleDenial(STAFF_ROLES)
+  if (denied) return { error: denied }
+
   const res = await fetchAgentsEngine(`/api/v1/agents/copilot/rebuttals/${rebuttalId}/resolve`, {
     method: 'POST',
     body: JSON.stringify({ action, recruiterNotes, dispatchEmail: true, manualOverrides }),
@@ -501,6 +532,9 @@ export interface FreshFeedbackLetter {
 export async function getFreshFeedbackLetter(
   applicationId: string
 ): Promise<{ letter?: FreshFeedbackLetter; error?: string }> {
+  const denied = await roleDenial(STAFF_ROLES)
+  if (denied) return { error: denied }
+
   const res = await fetchAgentsEngine(`/api/v1/agents/hr/feedback-letter/${applicationId}`, {
     method: 'GET',
   })
@@ -516,6 +550,7 @@ export async function getScreeningResultsForApplications(
   applicationIds: string[]
 ): Promise<Record<string, AgentScreeningResult>> {
   if (applicationIds.length === 0) return {}
+  if (await roleDenial(STAFF_ROLES)) return {}
   try {
     const supabase = createServiceClient()
     const { data } = await supabase
@@ -532,5 +567,109 @@ export async function getScreeningResultsForApplications(
   } catch (err) {
     console.error('[getScreeningResultsForApplications] Error:', err)
     return {}
+  }
+}
+
+// Invites an accepted applicant onto the dashboard as a "member" — reuses
+// the same raw Supabase invite endpoint Team Access uses for staff
+// invites. Re-checks status server-side (not just trusting the UI only
+// showing this button for accepted applications) and checks
+// invited_to_team_at first so a double-click or a stale page can't send a
+// second invite email or create a duplicate dashboard_users row.
+export async function inviteApplicantToTeam(
+  applicationId: string
+): Promise<{ error?: string; existingAccount?: boolean; existingRole?: string }> {
+  try {
+    // Creating accounts is staff-only. Signed-in is not enough now that
+    // low-privilege member accounts exist, and server actions can be called
+    // outside the page that renders them, so the role is checked here, with
+    // a verified identity, not left to the page's middleware gate.
+    const role = await getVerifiedDashboardRole()
+    if (role !== 'admin' && role !== 'moderator') {
+      return { error: 'You do not have permission to invite applicants.' }
+    }
+
+    const supabase = createServiceClient()
+
+    const { data: application, error: fetchError } = await (supabase.from('applications') as any)
+      .select('id, name, email, status, invited_to_team_at')
+      .eq('id', applicationId)
+      .single()
+    if (fetchError || !application) throw new Error(fetchError?.message ?? 'Application not found.')
+    if (application.status !== 'accepted') throw new Error('Only accepted applicants can be invited to the team.')
+    if (application.invited_to_team_at) throw new Error('This applicant has already been invited.')
+
+    const supabaseUrl    = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const supabaseSecret = process.env.SUPABASE_SECRET_KEY!
+    const siteUrl        = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://www.nextrium.org'
+    const redirectTo     = `${siteUrl}/auth/callback`
+
+    const res = await fetch(`${supabaseUrl}/auth/v1/invite?redirect_to=${encodeURIComponent(redirectTo)}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'apikey':        supabaseSecret,
+        'Authorization': `Bearer ${supabaseSecret}`,
+      },
+      body: JSON.stringify({
+        email: application.email,
+        data: { role: 'member' },
+        redirect_to: redirectTo,
+      }),
+    })
+
+    const rawText = await res.text()
+    let json: any = {}
+    try {
+      json = JSON.parse(rawText)
+    } catch {
+      throw new Error(`Supabase returned unexpected response (${res.status}): ${rawText.slice(0, 200)}`)
+    }
+    let existingAccount = false
+    let existingRole: string | undefined
+
+    if (!res.ok) {
+      if (!isEmailAlreadyRegistered(json)) {
+        throw new Error(json.message ?? json.error_description ?? json.msg ?? 'Failed to invite applicant.')
+      }
+      // The applicant already has an account: give it team access directly
+      // (an account that already has a dashboard role keeps that role).
+      const existingId = await findAuthUserIdByEmail(application.email)
+      if (!existingId) throw new Error('This email already has an account that could not be found. Please try again.')
+      const grant = await grantDashboardAccess(existingId, 'member', applicationId, true)
+      if (grant.status === 'archived') {
+        throw new Error('This person has an archived team account. Unarchive it in Team Access first.')
+      }
+      existingAccount = true
+      if (grant.status === 'exists') existingRole = grant.role
+    } else {
+      const userId = json.id
+      if (!userId) throw new Error('Invite succeeded but no user ID was returned.')
+      const { error: insertError } = await (supabase.from('dashboard_users') as any).insert({
+        user_id: userId,
+        role: 'member',
+        is_team_member: true,
+        application_id: applicationId,
+      })
+      if (insertError) throw new Error(insertError.message)
+    }
+
+    const now = new Date().toISOString()
+
+    const { error: updateError } = await (supabase.from('applications') as any)
+      .update({ invited_to_team_at: now })
+      .eq('id', applicationId)
+    if (updateError) throw new Error(updateError.message)
+
+    revalidatePath('/dashboard/applications')
+    logActivity({
+      action: 'applicant_invited_to_team',
+      targetType: 'application',
+      targetId: applicationId,
+      details: { email: application.email, existingAccount },
+    }).catch(() => {})
+    return { existingAccount, existingRole }
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Failed to invite applicant.' }
   }
 }

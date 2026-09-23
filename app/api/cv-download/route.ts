@@ -1,7 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { getVerifiedDashboardRole } from '@/lib/dashboard/getRole'
+import { STAFF_ROLES } from '@/lib/dashboard/requireRole'
 
 export async function GET(request: NextRequest) {
+  // Applicant CVs are personal data. Only staff who can open the
+  // Applications page may download them, with a verified session (this route
+  // is not covered by proxy.ts).
+  const role = await getVerifiedDashboardRole()
+  if (!STAFF_ROLES.includes(role)) {
+    return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+  }
+
   const { searchParams } = new URL(request.url)
   const path = searchParams.get('path')
 
@@ -24,6 +34,11 @@ export async function GET(request: NextRequest) {
       // Remove bucket name "documents/"
       filePath = withoutVisibility.replace(/^documents\//, '')
     }
+  }
+
+  // Only files the application form itself stores; no traversal.
+  if (!filePath.startsWith('applications/') || filePath.includes('..') || filePath.includes('\\')) {
+    return NextResponse.json({ error: 'Invalid path' }, { status: 400 })
   }
 
   const { data, error } = await supabase
