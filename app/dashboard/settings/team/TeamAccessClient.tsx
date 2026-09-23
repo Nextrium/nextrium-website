@@ -39,11 +39,12 @@ export default function TeamAccessClient({ users: initial }: { users: DashboardU
     setInviteError('')
     setInviteSuccess('')
 
-    const { error } = await inviteUser(inviteEmail.trim(), inviteRole)
+    const { error, notice, added } = await inviteUser(inviteEmail.trim(), inviteRole)
     if (error) {
       setInviteError(error)
     } else {
-      setInviteSuccess(`Invite sent to ${inviteEmail.trim()}.`)
+      if (added) setUsers((prev) => [...prev, added])
+      setInviteSuccess(notice ?? `Invite sent to ${inviteEmail.trim()}.`)
       setInviteEmail('')
       setInviteRole('content')
     }

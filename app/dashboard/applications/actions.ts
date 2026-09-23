@@ -6,6 +6,7 @@ import { fetchAgentsEngine } from '@/lib/agentsEngine'
 import { logActivity } from '@/lib/activityLog'
 import { getVerifiedDashboardRole } from '@/lib/dashboard/getRole'
 import { roleDenial, STAFF_ROLES } from '@/lib/dashboard/requireRole'
+import { findAuthUserIdByEmail, grantDashboardAccess, isEmailAlreadyRegistered } from '@/lib/dashboard/teamAccounts'
 import type { AgentScreeningResult } from '@/lib/types/database'
 
 export interface ReviewedInfo {
@@ -575,7 +576,9 @@ export async function getScreeningResultsForApplications(
 // showing this button for accepted applications) and checks
 // invited_to_team_at first so a double-click or a stale page can't send a
 // second invite email or create a duplicate dashboard_users row.
-export async function inviteApplicantToTeam(applicationId: string): Promise<{ error?: string }> {
+export async function inviteApplicantToTeam(
+  applicationId: string
+): Promise<{ error?: string; existingAccount?: boolean; existingRole?: string }> {
   try {
     // Creating accounts is staff-only. Signed-in is not enough now that
     // low-privilege member accounts exist, and server actions can be called
@@ -622,18 +625,35 @@ export async function inviteApplicantToTeam(applicationId: string): Promise<{ er
     } catch {
       throw new Error(`Supabase returned unexpected response (${res.status}): ${rawText.slice(0, 200)}`)
     }
-    if (!res.ok) throw new Error(json.message ?? json.error_description ?? json.msg ?? 'Failed to invite applicant.')
+    let existingAccount = false
+    let existingRole: string | undefined
 
-    const userId = json.id
-    if (!userId) throw new Error('Invite succeeded but no user ID was returned.')
+    if (!res.ok) {
+      if (!isEmailAlreadyRegistered(json)) {
+        throw new Error(json.message ?? json.error_description ?? json.msg ?? 'Failed to invite applicant.')
+      }
+      // The applicant already has an account: give it team access directly
+      // (an account that already has a dashboard role keeps that role).
+      const existingId = await findAuthUserIdByEmail(application.email)
+      if (!existingId) throw new Error('This email already has an account that could not be found. Please try again.')
+      const grant = await grantDashboardAccess(existingId, 'member', applicationId)
+      if (grant.status === 'archived') {
+        throw new Error('This person has an archived team account. Unarchive it in Team Access first.')
+      }
+      existingAccount = true
+      if (grant.status === 'exists') existingRole = grant.role
+    } else {
+      const userId = json.id
+      if (!userId) throw new Error('Invite succeeded but no user ID was returned.')
+      const { error: insertError } = await (supabase.from('dashboard_users') as any).insert({
+        user_id: userId,
+        role: 'member',
+        application_id: applicationId,
+      })
+      if (insertError) throw new Error(insertError.message)
+    }
 
     const now = new Date().toISOString()
-    const { error: insertError } = await (supabase.from('dashboard_users') as any).insert({
-      user_id: userId,
-      role: 'member',
-      application_id: applicationId,
-    })
-    if (insertError) throw new Error(insertError.message)
 
     const { error: updateError } = await (supabase.from('applications') as any)
       .update({ invited_to_team_at: now })
@@ -645,9 +665,9 @@ export async function inviteApplicantToTeam(applicationId: string): Promise<{ er
       action: 'applicant_invited_to_team',
       targetType: 'application',
       targetId: applicationId,
-      details: { email: application.email },
+      details: { email: application.email, existingAccount },
     }).catch(() => {})
-    return {}
+    return { existingAccount, existingRole }
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Failed to invite applicant.' }
   }

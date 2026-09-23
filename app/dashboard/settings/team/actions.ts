@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { logActivity } from '@/lib/activityLog'
 import { getVerifiedIdentity } from '@/lib/dashboard/getRole'
+import { findAuthUserIdByEmail, grantDashboardAccess, isEmailAlreadyRegistered } from '@/lib/dashboard/teamAccounts'
 
 // Every action here manages who can access the dashboard, so all of them are
 // admin-only, checked inside the action with a verified identity (the page's
@@ -17,7 +18,16 @@ async function requireAdmin(): Promise<{ userId: string } | null> {
   return me && me.role === 'admin' ? { userId: me.userId } : null
 }
 
-export async function inviteUser(email: string, role: string): Promise<{ error?: string }> {
+export interface InvitedUserRow {
+  user_id: string
+  role: string
+  created_at: string
+  email: string
+  archived: boolean
+  archived_at: string | null
+}
+
+export async function inviteUser(email: string, role: string): Promise<{ error?: string; notice?: string; added?: InvitedUserRow }> {
   try {
     if (!(await requireAdmin())) return { error: NOT_ALLOWED }
     if (!VALID_ROLES.includes(role)) return { error: 'Invalid role.' }
@@ -53,26 +63,48 @@ export async function inviteUser(email: string, role: string): Promise<{ error?:
       throw new Error(`Supabase returned unexpected response (${res.status}): ${rawText.slice(0, 200)}`)
     }
 
-    if (!res.ok) throw new Error(json.message ?? json.error_description ?? json.msg ?? 'Failed to invite user.')
+    let userId: string
+    let notice: string | undefined
 
-    const userId = json.id
-    if (!userId) throw new Error('Invite succeeded but no user ID was returned.')
-
-    const supabase = createServiceClient()
-    const { error: insertError } = await (supabase.from('dashboard_users') as any).insert({
-      user_id: userId,
-      role,
-    })
-    if (insertError) throw new Error(insertError.message)
+    if (!res.ok) {
+      if (!isEmailAlreadyRegistered(json)) {
+        throw new Error(json.message ?? json.error_description ?? json.msg ?? 'Failed to invite user.')
+      }
+      // The email already has an account: give that account dashboard access
+      // directly instead of refusing. No invitation email is sent.
+      const existingId = await findAuthUserIdByEmail(email)
+      if (!existingId) throw new Error('This email already has an account that could not be found. Please try again.')
+      const grant = await grantDashboardAccess(existingId, role)
+      if (grant.status === 'exists') {
+        return { error: `This person already has dashboard access as ${grant.role}. Change their role from the list below.` }
+      }
+      if (grant.status === 'archived') {
+        return { error: 'This person has an archived account. Unarchive it from the list below instead.' }
+      }
+      userId = existingId
+      notice = `${email} already had an account, so they were added as ${role} directly. No invitation email was sent.`
+    } else {
+      if (!json.id) throw new Error('Invite succeeded but no user ID was returned.')
+      userId = json.id
+      const supabase = createServiceClient()
+      const { error: insertError } = await (supabase.from('dashboard_users') as any).insert({
+        user_id: userId,
+        role,
+      })
+      if (insertError) throw new Error(insertError.message)
+    }
 
     revalidatePath('/dashboard/settings/team')
     logActivity({
       action: 'team_user_invited',
       targetType: 'dashboard_user',
       targetId: userId,
-      details: { email, role },
+      details: { email, role, existingAccount: !!notice },
     }).catch(() => {})
-    return {}
+    return {
+      notice,
+      added: { user_id: userId, role, created_at: new Date().toISOString(), email, archived: false, archived_at: null },
+    }
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Failed to invite user.' }
   }
