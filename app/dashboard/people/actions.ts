@@ -3,6 +3,8 @@
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { logActivity } from '@/lib/activityLog'
+import { getVerifiedIdentity } from '@/lib/dashboard/getRole'
+import { canLinkDiscord } from '@/lib/discordLink'
 
 export interface ProfileInput {
   bio: string
@@ -52,5 +54,25 @@ export async function saveProfile(input: ProfileInput): Promise<{ error?: string
     return {}
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Failed to save profile.' }
+  }
+}
+
+// Removes the Discord link from the caller's own profile only.
+export async function unlinkDiscord(): Promise<{ error?: string }> {
+  try {
+    const me = await getVerifiedIdentity()
+    if (!me || !canLinkDiscord(me.role)) return { error: 'You do not have permission to do this.' }
+
+    const now = new Date().toISOString()
+    const { error } = await (createServiceClient().from('dashboard_users') as any)
+      .update({ discord_user_id: null, discord_username: null, discord_linked_at: null, updated_at: now })
+      .eq('user_id', me.userId)
+    if (error) throw new Error(error.message)
+
+    revalidatePath('/dashboard/people')
+    logActivity({ action: 'discord_unlinked', targetType: 'dashboard_user', targetId: me.userId }).catch(() => {})
+    return {}
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Failed to disconnect Discord.' }
   }
 }
