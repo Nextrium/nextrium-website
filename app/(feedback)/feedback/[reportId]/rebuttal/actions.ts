@@ -64,9 +64,16 @@ export async function submitRebuttal(
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://www.nextrium.org'
     const senderId = process.env.NEXTRIUM_OPERATIONS_SENDER_ID ?? ''
 
+    // The email route only accepts server-to-server calls that carry the
+    // shared key (or a staff session); without it this notification is
+    // refused and the .catch below hides that.
+    const serverKey = process.env.AGENTS_ENGINE_API_KEY
     await fetch(`${siteUrl}/api/email`, {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(serverKey ? { Authorization: `Bearer ${serverKey}` } : {}),
+      },
       body: JSON.stringify({
         subject:    `Rebuttal received for report ${reportId}`,
         message:    `A rebuttal has been submitted for evaluation report ${reportId}.\n\nDisputed dimensions:\n${disputedDimensions.join('\n')}\n\nEvidence statement:\n${evidenceStatement}\n\nPlease log into the Nextrium dashboard to review the original screening dossier alongside the submitted rebuttal.`,
