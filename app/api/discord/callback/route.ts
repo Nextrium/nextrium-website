@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getVerifiedIdentity } from '@/lib/dashboard/getRole'
 import { logActivity } from '@/lib/activityLog'
+import { ACCESS_SYNC, emitAutomationEvent } from '@/lib/automation/server'
 import { STATE_COOKIE, canLinkDiscord, fetchDiscordIdentity, readDiscordConfig, verifyState } from '@/lib/discordLink'
 
 function finish(request: NextRequest, result: string): NextResponse {
@@ -47,6 +48,10 @@ export async function GET(request: NextRequest) {
     // 23505 = that Discord account is already linked to another team member.
     return finish(request, error.code === '23505' ? 'taken' : 'error')
   }
+
+  // Apply any access rules right away; if they aren't verified in the
+  // server yet this simply waits and can be re-checked from the profile.
+  await emitAutomationEvent(ACCESS_SYNC, me.userId)
 
   logActivity({
     action: 'discord_linked',

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { saveProfile, unlinkDiscord } from '../actions'
+import { saveProfile, unlinkDiscord, syncMyDiscordAccess, type AccessCheckResult } from '../actions'
 
 const DISCORD_NOTICES: Record<string, { text: string; ok: boolean }> = {
   linked:      { text: 'Discord connected.', ok: true },
@@ -38,6 +38,17 @@ export default function ProfileEditClient({
   const [disconnecting, setDisconnecting] = useState(false)
   const [discordError, setDiscordError] = useState('')
   const notice = discordNotice ? DISCORD_NOTICES[discordNotice] : null
+  const [checking, setChecking] = useState(false)
+  const [accessResults, setAccessResults] = useState<AccessCheckResult[] | null>(null)
+
+  async function handleCheckAccess() {
+    setChecking(true)
+    setDiscordError('')
+    const res = await syncMyDiscordAccess()
+    setChecking(false)
+    if (res.error) { setDiscordError(res.error); return }
+    setAccessResults(res.results ?? [])
+  }
 
   async function handleDisconnect() {
     setDisconnecting(true)
@@ -81,6 +92,7 @@ export default function ProfileEditClient({
         .profile-discord-name { font-size: 13px; color: var(--off-white); line-height: 1.5; max-width: 60ch; }
         .profile-discord-btn { padding: 9px 16px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; cursor: pointer; border: 1px solid rgba(219,103,39,0.4); background: none; color: var(--orange); text-decoration: none; white-space: nowrap; }
         .profile-discord-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .profile-access-list { display: flex; flex-direction: column; gap: 6px; margin: -10px 0 22px; padding: 12px 14px; border: 1px solid rgba(255,255,255,0.06); background: var(--navy-mid); }
       `}</style>
 
       <div className="profile-form-wrap">
@@ -115,12 +127,31 @@ export default function ProfileEditClient({
           )}
           {discordError && <div className="profile-form-error">{discordError}</div>}
           {discordUsername ? (
+            <>
             <div className="profile-discord-row">
               <span className="profile-discord-name">Connected as <strong>{discordUsername}</strong></span>
-              <button type="button" className="profile-discord-btn" onClick={handleDisconnect} disabled={disconnecting}>
-                {disconnecting ? 'Disconnecting...' : 'Disconnect'}
-              </button>
+              <span style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <button type="button" className="profile-discord-btn" onClick={handleCheckAccess} disabled={checking}>
+                  {checking ? 'Checking...' : 'Check my Discord access'}
+                </button>
+                <button type="button" className="profile-discord-btn" onClick={handleDisconnect} disabled={disconnecting}>
+                  {disconnecting ? 'Disconnecting...' : 'Disconnect'}
+                </button>
+              </span>
             </div>
+            {accessResults && (
+              <div className="profile-access-list">
+                {accessResults.length === 0 ? (
+                  <div className="profile-discord-name">No Discord access rules apply to you yet.</div>
+                ) : accessResults.map((r, i) => (
+                  <div key={i} className="profile-discord-name">
+                    <strong>{r.status === 'success' || r.status === 'skipped' ? '✓' : r.status === 'waiting' ? '…' : '✕'}</strong>{' '}
+                    {r.name} — {r.detail}
+                  </div>
+                ))}
+              </div>
+            )}
+            </>
           ) : (
             <div className="profile-discord-row">
               <span className="profile-discord-name">
