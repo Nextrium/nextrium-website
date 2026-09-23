@@ -630,12 +630,22 @@ export default function ApplicationsClient({
     }
   }
 
+  // Archived applications are out of the pipeline (hidden from every list
+  // but their own tab), so they don't count toward the status tiles or the
+  // "still to screen" total either.
+  const activeApplications = applications.filter((a) => !(a as any).archived)
+
   const counts = STATUS_OPTIONS.reduce((acc, s) => {
-    acc[s] = applications.filter((a) => a.status === s).length
+    acc[s] = activeApplications.filter((a) => a.status === s).length
     return acc
   }, {} as Record<Application['status'], number>)
 
-  const unscannedCount = applications.filter((a) => !screeningResults[a.id]).length
+  // Every non-archived application that has no screening result yet,
+  // whatever its status: many were moved out of Pending by hand before they
+  // were ever screened, so this is larger than the Pending tile.
+  const unscannedApplications = activeApplications.filter((a) => !screeningResults[a.id])
+  const unscannedCount = unscannedApplications.length
+  const unscannedPendingCount = unscannedApplications.filter((a) => a.status === 'pending').length
   const emailEligibleApplications = applications.filter((a) => screeningResults[a.id] && !alreadyEmailedThisResult(screeningResults[a.id]))
   const heldForReviewApplications = emailEligibleApplications.filter((a) => isHeldForHumanConfirmation(screeningResults[a.id], a))
   const pendingEmailCount = emailEligibleApplications.length - heldForReviewApplications.length
@@ -1011,6 +1021,11 @@ export default function ApplicationsClient({
                   </button>
                 ) : (
                   <span className="ai-status-ok">✓ All Screened</span>
+                )}
+                {unscannedCount > 0 && unscannedCount !== unscannedPendingCount && (
+                  <span className="ai-held-note" title="Applications with no AI screening result yet. Many were moved out of Pending by hand before they were screened.">
+                    {unscannedPendingCount} pending · {unscannedCount - unscannedPendingCount} other statuses, never screened
+                  </span>
                 )}
                 {pendingEmailCount > 0 && (
                   <button

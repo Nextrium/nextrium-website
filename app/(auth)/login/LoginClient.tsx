@@ -1,13 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { logActivityAction } from '@/app/actions/activityLog'
 import NTMark from '@/components/shared/NTMark'
 
 export default function LoginClient({ message, error: initialError }: { message?: string; error?: string }) {
-  const router = useRouter()
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
   const [error, setError]       = useState<string | null>(initialError ?? null)
@@ -23,9 +21,11 @@ export default function LoginClient({ message, error: initialError }: { message?
       setError(authError.message || 'Invalid email or password.')
       return
     }
-    logActivityAction({ action: 'sign_in' }).catch(() => {})
-    router.push('/dashboard')
-    router.refresh()
+    // Wait for the log call, then do a full page load. A full load sends the
+    // new session cookie to the server and can't be cancelled by a competing
+    // client-side refresh, which is what left this page stuck after sign-in.
+    await logActivityAction({ action: 'sign_in' }).catch(() => {})
+    window.location.assign('/dashboard')
   }
 
   return (

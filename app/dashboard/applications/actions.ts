@@ -55,7 +55,9 @@ export async function markApplicationReviewed(applicationId: string): Promise<{ 
 
     if (error) throw new Error(error.message)
 
-    revalidatePath('/dashboard/applications')
+    // No revalidatePath here (or in archive/unarchive): the client already
+    // applies the returned info to its own state, and revalidating re-runs
+    // the whole heavy applications page on the server for every click.
     return {
       reviewed: {
         firstReviewedByEmail: updated.first_reviewed_by_email,
@@ -111,7 +113,6 @@ export async function archiveApplication(applicationId: string, reason?: string)
 
     if (error) throw new Error(error.message)
 
-    revalidatePath('/dashboard/applications')
     logActivity({
       action: 'application_archived',
       targetType: 'application',
@@ -156,7 +157,6 @@ export async function unarchiveApplication(applicationId: string): Promise<{ arc
 
     if (error) throw new Error(error.message)
 
-    revalidatePath('/dashboard/applications')
     logActivity({
       action: 'application_unarchived',
       targetType: 'application',

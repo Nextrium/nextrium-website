@@ -207,7 +207,21 @@ export default function Sidebar({ role }: { role: DashboardRole }) {
                           const subActive = activeSubValue === sub.value
                           const href = sub.value === item.subItems[0].value ? item.href : `${item.href}?${item.subQueryKey ?? 'status'}=${sub.value}`
                           return (
-                            <Link key={sub.value} href={href} className={`sidebar-subitem ${subActive ? 'active' : ''}`}>
+                            <Link
+                              key={sub.value}
+                              href={href}
+                              className={`sidebar-subitem ${subActive ? 'active' : ''}`}
+                              onClick={(e) => {
+                                // Already on this page: the tabs filter data the page
+                                // has loaded, so switch by updating the URL only. A
+                                // normal link would re-run the whole page on the server
+                                // for every tab click.
+                                if (pathname !== item.href) return
+                                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return
+                                e.preventDefault()
+                                window.history.pushState(null, '', href)
+                              }}
+                            >
                               {sub.label}
                             </Link>
                           )
