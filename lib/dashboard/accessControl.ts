@@ -33,6 +33,7 @@ export const BLOCKED_PATHS: Record<string, string[]> = {
   // their own (or anyone's) access level, or see internal processing logs.
   moderator: [
     '/dashboard/settings/team',
+    '/dashboard/settings/automations',
     '/dashboard/logs',
   ],
   // Pseudo-role for a staff member whose dashboard_users row has been
