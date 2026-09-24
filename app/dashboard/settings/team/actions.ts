@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { logActivity } from '@/lib/activityLog'
 import { getVerifiedIdentity } from '@/lib/dashboard/getRole'
 import { findAuthUserIdByEmail, grantDashboardAccess, isEmailAlreadyRegistered } from '@/lib/dashboard/teamAccounts'
+import { APPLICATION_TRACKS } from '@/lib/automation/rulesAdmin'
 import { ACCESS_REVOKED, ACCESS_SYNC, emitAutomationEvent, supersedeSuccesses } from '@/lib/automation/server'
 
 // Every action here manages who can access the dashboard, so all of them are
@@ -12,6 +13,7 @@ import { ACCESS_REVOKED, ACCESS_SYNC, emitAutomationEvent, supersedeSuccesses } 
 // middleware gate alone is not enough — server actions can be called
 // outside the page that renders them).
 const VALID_ROLES = ['admin', 'content', 'community', 'moderator', 'member']
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const NOT_ALLOWED = 'You do not have permission to do this.'
 
 async function requireAdmin(): Promise<{ userId: string } | null> {
@@ -292,5 +294,66 @@ export async function removeUser(userId: string): Promise<{ error?: string }> {
     return {}
   } catch (err) {
     return { error: err instanceof Error ? err.message : 'Failed to remove user.' }
+  }
+}
+/** Sets (or clears, with null) the track that decides a person's track role in Discord. */
+export async function setStaffTrack(userId: string, trackName: string | null): Promise<{ error?: string; notice?: string }> {
+  try {
+    if (!(await requireAdmin())) return { error: NOT_ALLOWED }
+    if (typeof userId !== 'string' || !UUID.test(userId)) return { error: 'Unknown person.' }
+    if (trackName !== null && !APPLICATION_TRACKS.includes(trackName)) return { error: 'Choose a valid track.' }
+
+    const db = createServiceClient() as any
+    const { data: person } = await db.from('dashboard_users').select('user_id, archived').eq('user_id', userId).maybeSingle()
+    if (!person) return { error: 'Unknown person.' }
+
+    let trackId: string | null = null
+    if (trackName) {
+      const { data: existing } = await db.from('staff_tracks').select('id').eq('name', trackName).limit(1)
+      if (existing && existing.length > 0) {
+        trackId = existing[0].id
+      } else {
+        const { data: created, error: createError } = await db.from('staff_tracks').insert({ name: trackName }).select('id').single()
+        if (createError || !created) return { error: 'Could not save the track.' }
+        trackId = created.id
+      }
+    }
+
+    const { error } = await db.from('dashboard_users').update({ staff_track_id: trackId, updated_at: new Date().toISOString() }).eq('user_id', userId)
+    if (error) return { error: 'Could not save the track.' }
+
+    // Adds the new track's role now if they are linked; the old track's role is left in place.
+    if (trackName && !person.archived) await emitAutomationEvent(ACCESS_SYNC, userId)
+
+    revalidatePath('/dashboard/settings/team')
+    revalidatePath('/dashboard/people')
+    logActivity({ action: 'team_user_track_updated', targetType: 'dashboard_user', targetId: userId, details: { track: trackName } }).catch(() => {})
+    return { notice: trackName ? `Track set to ${trackName}.` : 'Track cleared.' }
+  } catch {
+    return { error: 'Something went wrong. Try again.' }
+  }
+}
+
+/** Runs the Discord rules for one person now and reports what happened. */
+export async function syncPersonAccess(userId: string): Promise<{ error?: string; notice?: string }> {
+  try {
+    if (!(await requireAdmin())) return { error: NOT_ALLOWED }
+    if (typeof userId !== 'string' || !UUID.test(userId)) return { error: 'Unknown person.' }
+
+    const db = createServiceClient() as any
+    const { data: person } = await db.from('dashboard_users').select('archived, discord_user_id').eq('user_id', userId).maybeSingle()
+    if (!person) return { error: 'Unknown person.' }
+    if (person.archived) return { error: 'This person is archived. Restore them first.' }
+    if (!person.discord_user_id) return { error: 'They have not linked Discord yet. They can do it from their profile.' }
+
+    const outcomes = await emitAutomationEvent(ACCESS_SYNC, userId)
+    const failed = outcomes.find((o) => o.status === 'failed')
+    if (failed) return { error: `${failed.ruleName}: ${failed.detail}` }
+    const waiting = outcomes.find((o) => o.status === 'waiting')
+    if (waiting) return { notice: `${waiting.ruleName}: ${waiting.detail}` }
+    const granted = outcomes.filter((o) => o.status === 'success').length
+    return { notice: granted > 0 ? `Done. ${granted} role${granted === 1 ? '' : 's'} added.` : 'Already up to date.' }
+  } catch {
+    return { error: 'Something went wrong. Try again.' }
   }
 }

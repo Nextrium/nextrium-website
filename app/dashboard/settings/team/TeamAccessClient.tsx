@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { inviteUser, updateRole, removeUser, archiveUser, unarchiveUser, setTeamMember } from './actions'
+import { inviteUser, updateRole, removeUser, archiveUser, unarchiveUser, setTeamMember, setStaffTrack, syncPersonAccess } from './actions'
 
 interface DashboardUserRow {
   user_id: string
@@ -11,6 +11,8 @@ interface DashboardUserRow {
   archived: boolean
   archived_at: string | null
   is_team_member: boolean
+  track?: string | null
+  discord_linked?: boolean
 }
 
 // "Member" is contribution-only access (Team page and their own profile). To
@@ -24,7 +26,7 @@ const ROLE_OPTIONS = [
   { value: 'member',    label: 'Member (contributions only)' },
 ]
 
-export default function TeamAccessClient({ users: initial }: { users: DashboardUserRow[] }) {
+export default function TeamAccessClient({ users: initial, tracks }: { users: DashboardUserRow[]; tracks: string[] }) {
   const [users,          setUsers]          = useState(initial)
   const [inviteEmail,    setInviteEmail]    = useState('')
   const [inviteRole,     setInviteRole]     = useState('content')
@@ -37,6 +39,7 @@ export default function TeamAccessClient({ users: initial }: { users: DashboardU
   const [archivingId,    setArchivingId]    = useState<string | null>(null)
   const [confirmArchive, setConfirmArchive] = useState<string | null>(null)
   const [archiveError,   setArchiveError]   = useState<string | null>(null)
+  const [rowNote,        setRowNote]        = useState<{ id: string; kind: 'ok' | 'error'; text: string } | null>(null)
 
   async function handleInvite() {
     if (!inviteEmail.trim()) return
@@ -75,6 +78,27 @@ export default function TeamAccessClient({ users: initial }: { users: DashboardU
     } else {
       setUsers((prev) => prev.map((u) => u.user_id === userId ? { ...u, is_team_member: isMember } : u))
     }
+    setUpdatingId(null)
+  }
+
+  async function handleTrackChange(userId: string, value: string) {
+    setUpdatingId(userId)
+    setRowNote(null)
+    const { error, notice } = await setStaffTrack(userId, value || null)
+    if (error) {
+      setRowNote({ id: userId, kind: 'error', text: error })
+    } else {
+      setUsers((prev) => prev.map((u) => u.user_id === userId ? { ...u, track: value || null } : u))
+      setRowNote({ id: userId, kind: 'ok', text: notice ?? 'Saved.' })
+    }
+    setUpdatingId(null)
+  }
+
+  async function handleSync(userId: string) {
+    setUpdatingId(userId)
+    setRowNote(null)
+    const { error, notice } = await syncPersonAccess(userId)
+    setRowNote({ id: userId, kind: error ? 'error' : 'ok', text: error ?? notice ?? 'Done.' })
     setUpdatingId(null)
   }
 
@@ -175,6 +199,35 @@ export default function TeamAccessClient({ users: initial }: { users: DashboardU
                         />
                         Team member (can log contributions)
                       </label>
+                    )}
+                    {!user.archived && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                        <select
+                          className="team-role-select"
+                          value={user.track ?? ''}
+                          disabled={updatingId === user.user_id}
+                          onChange={(e) => handleTrackChange(user.user_id, e.target.value)}
+                          aria-label={`Track for ${user.email}`}
+                        >
+                          <option value="">No track</option>
+                          {tracks.map((t) => (
+                            <option key={t} value={t}>{t}</option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          className="team-remove-btn"
+                          style={{ borderColor: 'rgba(255,255,255,0.15)', color: 'var(--off-white)' }}
+                          disabled={updatingId === user.user_id}
+                          onClick={() => handleSync(user.user_id)}
+                          title={user.discord_linked ? 'Give this person their Discord roles now' : 'They have not linked Discord yet'}
+                        >
+                          Sync Discord
+                        </button>
+                      </div>
+                    )}
+                    {rowNote && rowNote.id === user.user_id && (
+                      <div style={{ fontSize: '11px', marginTop: '4px', color: rowNote.kind === 'ok' ? 'var(--success)' : 'var(--error)' }}>{rowNote.text}</div>
                     )}
                     {archiveError && (archivingId === user.user_id || confirmArchive === user.user_id) && (
                       <div style={{ fontSize: '11px', color: 'var(--error)', marginTop: '4px' }}>{archiveError}</div>
