@@ -13,6 +13,8 @@ interface DashboardUserRow {
   is_team_member: boolean
   track?: string | null
   discord_linked?: boolean
+  application_track?: string | null
+  has_application?: boolean
 }
 
 // "Member" is contribution-only access (Team page and their own profile). To
@@ -217,7 +219,7 @@ export default function TeamAccessClient({ users: initial, tracks }: { users: Da
                           onChange={(e) => handleTrackChange(user.user_id, e.target.value)}
                           aria-label={`Track for ${user.email}`}
                         >
-                          <option value="">No track</option>
+                          <option value="">{user.application_track ? `From application: ${user.application_track}` : 'No track'}</option>
                           {tracks.map((t) => (
                             <option key={t} value={t}>{t}</option>
                           ))}
@@ -241,6 +243,11 @@ export default function TeamAccessClient({ users: initial, tracks }: { users: Da
                         >
                           Send password link
                         </button>
+                      </div>
+                    )}
+                    {!user.archived && !user.track && !user.application_track && user.has_application && (
+                      <div style={{ fontSize: '11px', marginTop: '4px', color: 'var(--warning)' }}>
+                        This applicant was never screened, so no track role will be given. Pick a track above.
                       </div>
                     )}
                     {rowNote && rowNote.id === user.user_id && (

@@ -42,7 +42,24 @@ async function getDashboardUsers(): Promise<DashboardUserRow[]> {
   const trackNames: Record<string, string> = {}
   ;(trackRows ?? []).forEach((t: any) => { trackNames[t.id] = t.name })
 
+  // The track the Discord rules will use when no staff track is set: the latest screening result.
+  const applicationIds = dashboardUsers.map((u: any) => u.application_id).filter(Boolean)
+  const screenedTrack: Record<string, string> = {}
+  if (applicationIds.length > 0) {
+    const { data: results } = await (supabase.from('agent_screening_results') as any)
+      .select('application_id, evaluation_track, screened_at')
+      .in('application_id', applicationIds)
+      .order('screened_at', { ascending: false })
+    ;(results ?? []).forEach((r: any) => {
+      if (r.evaluation_track && !screenedTrack[r.application_id]) screenedTrack[r.application_id] = r.evaluation_track
+    })
+  }
+
   return dashboardUsers.map((u: any) => ({
+    track:            u.staff_track_id ? (trackNames[u.staff_track_id] ?? null) : null,
+    application_track: u.application_id ? (screenedTrack[u.application_id] ?? null) : null,
+    has_application:  !!u.application_id,
+    discord_linked:   !!u.discord_user_id,
     user_id:     u.user_id,
     role:        u.role,
     created_at:  u.created_at,
