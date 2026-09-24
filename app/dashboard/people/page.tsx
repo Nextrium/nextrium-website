@@ -1,4 +1,7 @@
+import { redirect } from 'next/navigation'
 import { createServiceClient } from '@/lib/supabase/server'
+import { getVerifiedIdentity } from '@/lib/dashboard/getRole'
+import { canSeeDirectory, canViewPerson } from '@/lib/dashboard/peopleVisibility'
 import Header from '@/components/dashboard/Header'
 import PeopleClient, { type PersonCard } from './PeopleClient'
 
@@ -45,17 +48,23 @@ async function getPeople(): Promise<PersonCard[]> {
 }
 
 export default async function PeoplePage() {
-  const people = await getPeople()
-  const staff = people.filter((p) => STAFF_ROLES.includes(p.role))
+  // Only admins and moderators get the directory; everyone else sees their own profile.
+  const me = await getVerifiedIdentity()
+  if (!me || !canSeeDirectory(me.role)) redirect('/dashboard/people/me')
+
+  const everyone = await getPeople()
+  const visible = everyone.filter((p) => canViewPerson(me, p))
+  const canSeeStaff = me.role === 'admin'
+  const staff = canSeeStaff ? visible.filter((p) => STAFF_ROLES.includes(p.role)) : []
   // Team membership is separate from the access role, so a moderator or
-  // admin who is also a team member appears under both tabs.
-  const members = people.filter((p) => p.isTeamMember)
+  // admin who is also a team member appears under both tabs (for admins).
+  const members = visible.filter((p) => p.isTeamMember)
 
   return (
     <>
       <Header title="Team" description="Staff and team member profiles — social handles, tracks, and how to reach them" />
       <div className="dash-content">
-        <PeopleClient staff={staff} members={members} />
+        <PeopleClient staff={staff} members={members} canSeeStaff={canSeeStaff} />
       </div>
     </>
   )

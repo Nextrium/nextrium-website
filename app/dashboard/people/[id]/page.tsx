@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
+import { getVerifiedIdentity } from '@/lib/dashboard/getRole'
+import { canViewPerson } from '@/lib/dashboard/peopleVisibility'
 import Header from '@/components/dashboard/Header'
 
 export const dynamic = 'force-dynamic'
@@ -31,13 +33,14 @@ interface ProfileData {
   discordLinked:   boolean
   trackName:       string | null
   createdAt:       string
+  isTeamMember:    boolean
 }
 
 async function getProfile(userId: string): Promise<ProfileData | null> {
   const supabase = createServiceClient()
 
   const { data: dashboardUser } = await (supabase.from('dashboard_users') as any)
-    .select('user_id, role, bio, social_handles, discord_username, discord_linked_at, staff_track_id, created_at, archived')
+    .select('user_id, role, bio, social_handles, discord_username, discord_linked_at, staff_track_id, created_at, archived, is_team_member')
     .eq('user_id', userId)
     .maybeSingle()
 
@@ -60,17 +63,17 @@ async function getProfile(userId: string): Promise<ProfileData | null> {
     discordLinked:   !!dashboardUser.discord_linked_at,
     trackName:       trackResult?.data?.name ?? null,
     createdAt:       dashboardUser.created_at,
+    isTeamMember:    !!dashboardUser.is_team_member || dashboardUser.role === 'member',
   }
 }
 
 export default async function PersonProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const profile = await getProfile(id)
-  if (!profile) notFound()
-
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  const isOwnProfile = user?.id === profile.userId
+  const me = await getVerifiedIdentity()
+  const profile = me ? await getProfile(id) : null
+  // Not-found rather than forbidden, so the page doesn't confirm who has an account.
+  if (!me || !profile || !canViewPerson(me, profile)) notFound()
+  const isOwnProfile = me.userId === profile.userId
 
   const displayName = profile.email.split('@')[0]
   const handles = Object.entries(profile.socialHandles).filter(([, v]) => !!v)

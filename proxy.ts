@@ -142,8 +142,8 @@ export async function proxy(request: NextRequest) {
   if (isRestricted(pathname, role)) {
     // member is allowlisted to /dashboard/people only, so the usual
     // "bounce back to /dashboard" would loop forever for them exactly like
-    // the archived case above — land them on the one place they can go.
-    const landingPath = role === 'member' ? '/dashboard/people' : '/dashboard'
+    // the archived case above — land them on their own profile, the one place they can go.
+    const landingPath = role === 'member' ? '/dashboard/people/me' : '/dashboard'
     return NextResponse.redirect(new URL(landingPath, request.url))
   }
 
