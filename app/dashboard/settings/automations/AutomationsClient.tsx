@@ -22,7 +22,7 @@ export default function AutomationsClient({ rules: initial, roles, rolesError, t
   const [creating, setCreating] = useState(false)
 
   const assignable = roles.filter((r) => r.assignable)
-  const roleName = (id: string | null) => roles.find((r) => r.id === id)?.name ?? 'Role not found in Discord'
+  const roleName = (id: string | null) => roles.find((r) => r.id === id)?.name ?? (rolesError ? 'Role name unavailable' : 'Role not found in Discord')
 
   async function handleRoleChange(rule: RuleRow, roleId: string) {
     setBusyId(rule.id)
@@ -62,6 +62,32 @@ export default function AutomationsClient({ rules: initial, roles, rolesError, t
 
   return (
     <div>
+      <style>{`
+        .team-access-layout { display: grid; grid-template-columns: 1fr 320px; gap: 24px; align-items: start; }
+        .team-access-panel { background: var(--navy); border: 1px solid rgba(255,255,255,0.06); }
+        .team-access-panel-title { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--grey-mid); padding: 16px 20px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+        .team-user-row { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center; padding: 14px 20px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+        .team-user-row:last-child { border-bottom: none; }
+        .team-user-email { font-size: 13px; color: var(--white); }
+        .team-user-date { font-size: 11px; color: var(--grey-dark); font-family: var(--font-mono); margin-top: 3px; }
+        .team-role-badge { font-family: var(--font-mono); font-size: 7.5px; letter-spacing: 0.12em; text-transform: uppercase; padding: 3px 8px; display: inline-block; }
+        .team-role-select { background: var(--navy-mid); border: 1px solid rgba(255,255,255,0.08); color: var(--white); font-family: var(--font-dm); font-size: 12px; padding: 6px 10px; outline: none; cursor: pointer; }
+        .team-remove-btn { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase; padding: 6px 10px; background: none; border: 1px solid rgba(232,69,69,0.3); color: var(--error); cursor: pointer; transition: all 0.15s ease; white-space: nowrap; }
+        .team-remove-btn.confirm { background: rgba(232,69,69,0.1); border-color: var(--error); }
+        .team-remove-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .team-archived-badge { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; padding: 6px 10px; background: rgba(212,168,67,0.08); border: 1px solid rgba(212,168,67,0.3); color: var(--warning); white-space: nowrap; }
+        .invite-panel { display: flex; flex-direction: column; gap: 14px; padding: 20px; }
+        .invite-input { background: var(--navy-mid); border: 1px solid rgba(255,255,255,0.08); color: var(--white); font-family: var(--font-dm); font-size: 13px; padding: 10px 12px; outline: none; width: 100%; }
+        .invite-input:focus { border-color: var(--orange); }
+        .invite-select { background: var(--navy-mid); border: 1px solid rgba(255,255,255,0.08); color: var(--white); font-family: var(--font-dm); font-size: 13px; padding: 10px 12px; outline: none; width: 100%; cursor: pointer; }
+        .invite-btn { padding: 10px 16px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase; cursor: pointer; border: 1px solid var(--orange); background: var(--orange); color: var(--white); transition: all 0.15s ease; }
+        .invite-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .invite-label { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--grey-mid); }
+        .invite-success { padding: 10px 14px; font-size: 12px; background: rgba(34,193,122,0.08); border: 1px solid rgba(34,193,122,0.2); color: var(--success); }
+        .invite-error { padding: 10px 14px; font-size: 12px; background: rgba(232,69,69,0.08); border: 1px solid rgba(232,69,69,0.3); color: var(--error); }
+        .team-empty { padding: 48px 20px; text-align: center; font-size: 13px; color: var(--grey-dark); }
+        @media (max-width: 900px) { .team-access-layout { grid-template-columns: 1fr; } }
+      `}</style>
       {rolesError && <div className="invite-error">{rolesError} Role names cannot be shown until this is fixed.</div>}
       {message && <div className={message.kind === 'ok' ? 'invite-success' : 'invite-error'}>{message.text}</div>}
 
