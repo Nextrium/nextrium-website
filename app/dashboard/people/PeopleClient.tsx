@@ -47,9 +47,9 @@ function PersonCardItem({ person }: { person: PersonCard }) {
   )
 }
 
-export default function PeopleClient({ staff, members }: { staff: PersonCard[]; members: PersonCard[] }) {
+export default function PeopleClient({ staff, members, canSeeStaff }: { staff: PersonCard[]; members: PersonCard[]; canSeeStaff: boolean }) {
   const searchParams = useSearchParams()
-  const view = searchParams.get('view') ?? 'staff'
+  const view = canSeeStaff ? (searchParams.get('view') ?? 'staff') : 'members'
   const list = view === 'members' ? members : staff
 
   return (
@@ -73,7 +73,7 @@ export default function PeopleClient({ staff, members }: { staff: PersonCard[]; 
       `}</style>
 
       <div className="person-tabs">
-        <Link href="/dashboard/people" className={`person-tab ${view !== 'members' ? 'active' : ''}`}>Staff ({staff.length})</Link>
+        {canSeeStaff && <Link href="/dashboard/people" className={`person-tab ${view !== 'members' ? 'active' : ''}`}>Staff ({staff.length})</Link>}
         <Link href="/dashboard/people?view=members" className={`person-tab ${view === 'members' ? 'active' : ''}`}>General Team Members ({members.length})</Link>
       </div>
 

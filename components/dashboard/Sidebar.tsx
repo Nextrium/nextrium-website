@@ -47,11 +47,11 @@ const ALL_NAV_GROUPS = [
   },
   {
     label: 'Team',
-    roles: ['admin', 'content', 'community', 'moderator', 'member'] as DashboardRole[],
+    roles: ['admin', 'moderator'] as DashboardRole[],
     items: [
       {
         label: 'Team', href: '/dashboard/people', icon: '◈',
-        roles: ['admin', 'content', 'community', 'moderator', 'member'] as DashboardRole[],
+        roles: ['admin', 'moderator'] as DashboardRole[],
         subItems: PEOPLE_SUB_ITEMS, subQueryKey: 'view',
       },
     ],
@@ -99,7 +99,10 @@ export default function Sidebar({ role }: { role: DashboardRole }) {
   const navGroups = ALL_NAV_GROUPS
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) => item.roles.includes(role)),
+      // Moderators see only team members, so the Staff/Members split is admin-only.
+      items: group.items
+        .filter((item) => item.roles.includes(role))
+        .map((item: any) => (item.href === '/dashboard/people' && role !== 'admin' ? { ...item, subItems: undefined } : item)),
     }))
     .filter((group) => group.roles.includes(role) && group.items.length > 0)
 
