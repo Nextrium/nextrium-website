@@ -1,5 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import Header from '@/components/dashboard/Header'
+import { APPLICATION_TRACKS } from '@/lib/automation/rulesAdmin'
 import TeamAccessClient from './TeamAccessClient'
 
 export const metadata = { title: 'Team Access' }
@@ -37,6 +38,10 @@ async function getDashboardUsers(): Promise<DashboardUserRow[]> {
     })
   }
 
+  const { data: trackRows } = await (supabase.from('staff_tracks') as any).select('id, name')
+  const trackNames: Record<string, string> = {}
+  ;(trackRows ?? []).forEach((t: any) => { trackNames[t.id] = t.name })
+
   return dashboardUsers.map((u: any) => ({
     user_id:     u.user_id,
     role:        u.role,
@@ -54,7 +59,7 @@ export default async function TeamAccessPage() {
     <>
       <Header title="Team Access" description="Manage who has access to the dashboard and their role" />
       <div className="dash-content">
-        <TeamAccessClient users={users} />
+        <TeamAccessClient users={users} tracks={APPLICATION_TRACKS} />
       </div>
     </>
   )

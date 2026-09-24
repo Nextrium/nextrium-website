@@ -72,6 +72,7 @@ const ALL_NAV_GROUPS = [
     roles: ['admin'] as DashboardRole[],
     items: [
       { label: 'Team Access', href: '/dashboard/settings/team', icon: '◈', roles: ['admin'] as DashboardRole[] },
+      { label: 'Discord Rules', href: '/dashboard/settings/automations', icon: '⚙', roles: ['admin'] as DashboardRole[] },
     ],
   },
 ]

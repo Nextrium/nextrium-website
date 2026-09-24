@@ -651,7 +651,14 @@ export async function inviteApplicantToTeam(
         is_team_member: true,
         application_id: applicationId,
       })
-      if (insertError) throw new Error(insertError.message)
+      if (insertError) {
+        // The invite email has already gone out by this point, so say so instead of
+        // showing a raw database error that implies nothing happened.
+        throw new Error(
+          `The invitation email was sent, but dashboard access could not be saved (${insertError.message}). ` +
+          'Click Invite to Team again to finish granting access; the applicant does not need a new email.'
+        )
+      }
     }
 
     const now = new Date().toISOString()
