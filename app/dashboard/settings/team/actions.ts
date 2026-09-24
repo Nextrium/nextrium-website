@@ -357,3 +357,34 @@ export async function syncPersonAccess(userId: string): Promise<{ error?: string
     return { error: 'Something went wrong. Try again.' }
   }
 }
+
+/** Emails an existing dashboard user a single-use link to choose a password. Admin only; no public reset exists. */
+export async function sendPasswordSetupLink(userId: string): Promise<{ error?: string; notice?: string }> {
+  try {
+    if (!(await requireAdmin())) return { error: NOT_ALLOWED }
+    if (typeof userId !== 'string' || !UUID.test(userId)) return { error: 'Unknown person.' }
+
+    const supabase = createServiceClient()
+    const { data: row } = await (supabase.from('dashboard_users') as any).select('archived').eq('user_id', userId).maybeSingle()
+    if (!row) return { error: 'Unknown person.' }
+    if (row.archived) return { error: 'This person is archived. Restore them first.' }
+
+    const { data: authData, error: authError } = await supabase.auth.admin.getUserById(userId)
+    const email = authData?.user?.email
+    if (authError || !email) return { error: 'Could not find that account.' }
+
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://www.nextrium.org'
+    const secret = process.env.SUPABASE_SECRET_KEY!
+    const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/recover?redirect_to=${encodeURIComponent(`${siteUrl}/auth/callback`)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: secret, Authorization: `Bearer ${secret}` },
+      body: JSON.stringify({ email }),
+    })
+    if (!res.ok) return { error: 'The email could not be sent. Try again in a minute.' }
+
+    logActivity({ action: 'team_password_link_sent', targetType: 'dashboard_user', targetId: userId }).catch(() => {})
+    return { notice: `Password setup link sent to ${email}.` }
+  } catch {
+    return { error: 'Something went wrong. Try again.' }
+  }
+}

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { inviteUser, updateRole, removeUser, archiveUser, unarchiveUser, setTeamMember, setStaffTrack, syncPersonAccess } from './actions'
+import { inviteUser, updateRole, removeUser, archiveUser, unarchiveUser, setTeamMember, setStaffTrack, syncPersonAccess, sendPasswordSetupLink } from './actions'
 
 interface DashboardUserRow {
   user_id: string
@@ -99,6 +99,14 @@ export default function TeamAccessClient({ users: initial, tracks }: { users: Da
     setRowNote(null)
     const { error, notice } = await syncPersonAccess(userId)
     setRowNote({ id: userId, kind: error ? 'error' : 'ok', text: error ?? notice ?? 'Done.' })
+    setUpdatingId(null)
+  }
+
+  async function handlePasswordLink(userId: string) {
+    setUpdatingId(userId)
+    setRowNote(null)
+    const { error, notice } = await sendPasswordSetupLink(userId)
+    setRowNote({ id: userId, kind: error ? 'error' : 'ok', text: error ?? notice ?? 'Sent.' })
     setUpdatingId(null)
   }
 
@@ -223,6 +231,15 @@ export default function TeamAccessClient({ users: initial, tracks }: { users: Da
                           title={user.discord_linked ? 'Give this person their Discord roles now' : 'They have not linked Discord yet'}
                         >
                           Sync Discord
+                        </button>
+                        <button
+                          type="button"
+                          className="team-remove-btn"
+                          style={{ borderColor: 'rgba(255,255,255,0.15)', color: 'var(--off-white)' }}
+                          disabled={updatingId === user.user_id}
+                          onClick={() => handlePasswordLink(user.user_id)}
+                        >
+                          Send password link
                         </button>
                       </div>
                     )}
