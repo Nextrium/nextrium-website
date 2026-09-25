@@ -345,6 +345,7 @@ export interface BulkScreenJob {
   current_index: number
   results: BulkScreenOutcome[]
   error: string | null
+  heartbeat_at?: string | null
 }
 
 export async function startBulkScreenAction(
