@@ -46,6 +46,9 @@ export async function submitRebuttal(
       .from('screening_rebuttals') as any)
       .insert({
         report_id:           reportId,
+        // The dashboard's rebuttal detail and the engine's rescreen look the
+        // rebuttal up by application, so it must carry the report's app id.
+        application_id:      report.application_id,
         disputed_dimensions: disputedDimensions,
         evidence_statement:  evidenceStatement.trim(),
         evidence_urls:       evidenceUrls.filter((u) => u.trim()),
