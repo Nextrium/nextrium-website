@@ -6,8 +6,9 @@ import { CATEGORY_LABELS, COMPLEXITY_LABELS, EXTENSION_DAYS } from '@/lib/contri
 import { CONTRIBUTION_STATUS_MEMBER_LABELS, TASK_STATUS_LABELS, deadlineLabel, effectiveDeadline, isOverdue } from '@/lib/contributions/taskView'
 import ExtensionRequest from './ExtensionRequest'
 import SubmissionForm from './SubmissionForm'
+import ReviewHistory from './ReviewHistory'
 import { sanitizeBrief } from '@/lib/contributions/sanitize'
-import type { Contribution, Task } from '@/lib/types/database'
+import type { Contribution, ContributionReview, Task } from '@/lib/types/database'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Task' }
@@ -31,6 +32,11 @@ export default async function MyTaskPage({ params }: Props) {
   const { data: contributionRow } = await supabase.from('contributions')
     .select('*').eq('task_id', task.id).eq('contributor_id', auth.caller.userId).maybeSingle()
   const contribution: Contribution | null = contributionRow
+  const { data: reviewRows } = contribution
+    ? await supabase.from('contribution_reviews').select('*').eq('contribution_id', contribution.id)
+        .order('submission_number', { ascending: false }).order('created_at', { ascending: false })
+    : { data: [] }
+  const reviews: ContributionReview[] = reviewRows ?? []
 
   const now = new Date()
   const deadline = effectiveDeadline(task)
@@ -90,6 +96,7 @@ export default async function MyTaskPage({ params }: Props) {
                 {contribution.evidence_url && <a className="mt-hint" href={contribution.evidence_url} target="_blank" rel="noopener noreferrer">{contribution.evidence_url}</a>}
               </div>
             )}
+            <ReviewHistory reviews={reviews} />
             {task.links.length > 0 && (
               <div className="mt-panel mt-links">
                 <div className="mt-panel-title">Links</div>
