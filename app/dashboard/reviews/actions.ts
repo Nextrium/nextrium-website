@@ -9,6 +9,12 @@ import { reviewContribution } from '@/lib/contributions/reviewService'
 import { changesRequestedEmail, rejectedEmail, verifiedEmail } from '@/lib/contributions/emails'
 import { notifyMember, notifyReviewResult, siteUrl } from '@/lib/contributions/notify'
 
+/** True when the contribution is already in `status` — a repeated click, so no second log or email. */
+async function alreadyIn(contributionId: string, status: string): Promise<boolean> {
+  const { data } = await db().from('contributions').select('status').eq('id', contributionId).maybeSingle()
+  return data?.status === status
+}
+
 async function taskTitle(taskId: string): Promise<string> {
   const { data } = await db().from('tasks').select('title').eq('id', taskId).maybeSingle()
   return data?.title ?? 'your task'
@@ -44,6 +50,7 @@ export async function verifyContribution(contributionId: string, basePoints: num
   if ('error' in auth) return { ok: false, error: auth.error }
   if (!UUID.test(contributionId)) return { ok: false, error: 'That submission could not be found.' }
   if (!Number.isInteger(basePoints) || basePoints < 0) return { ok: false, error: 'Choose the base points to award.' }
+  if (await alreadyIn(contributionId, 'verified')) return { ok: true }
 
   const { data, error } = await db().rpc('verify_contribution', {
     p_contribution_id: contributionId, p_actor: auth.caller.userId, p_base_points: basePoints,
@@ -64,6 +71,7 @@ export async function requestChanges(contributionId: string, notes: string): Pro
   const auth = await requireStaff()
   if ('error' in auth) return { ok: false, error: auth.error }
   if (!UUID.test(contributionId)) return { ok: false, error: 'That submission could not be found.' }
+  if (await alreadyIn(contributionId, 'changes_requested')) return { ok: true }
 
   const { data, error } = await db().rpc('request_contribution_changes', {
     p_contribution_id: contributionId, p_actor: auth.caller.userId, p_notes: (notes ?? '').slice(0, NOTES_MAX),
@@ -83,6 +91,7 @@ export async function rejectContribution(contributionId: string, notes: string):
   const auth = await requireStaff()
   if ('error' in auth) return { ok: false, error: auth.error }
   if (!UUID.test(contributionId)) return { ok: false, error: 'That submission could not be found.' }
+  if (await alreadyIn(contributionId, 'rejected')) return { ok: true }
 
   const { data, error } = await db().rpc('reject_contribution', {
     p_contribution_id: contributionId, p_actor: auth.caller.userId, p_notes: (notes ?? '').slice(0, NOTES_MAX),
