@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Header from '@/components/dashboard/Header'
 import RichTextEditor from '@/components/editor/RichTextEditor'
 import { cancelTask, createTask, updateTask } from '../actions'
+import AssignmentPanel from './AssignmentPanel'
 import {
   CATEGORIES,
   CATEGORY_LABELS,
@@ -178,7 +179,7 @@ export default function TaskEditor({ task, members, hasSubmission }: Props) {
               <div className="task-kv"><span>Deadline</span><span>{defaults.deadlineDays} days after assignment</span></div>
             </div>
 
-            {/* Assignment panel is added in the next sprint. */}
+            {!isNew && !isClosed && <AssignmentPanel task={task} members={members} hasSubmission={hasSubmission} />}
             {!isNew && members.length === 0 && (
               <div className="task-panel"><span className="task-hint">No members yet. Invite people from Applications → Invite to Team.</span></div>
             )}

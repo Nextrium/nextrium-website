@@ -5,6 +5,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { logActivity } from '@/lib/activityLog'
 import { requireStaff } from '@/lib/contributions/auth'
 import { parseTaskInput } from '@/lib/contributions/taskInput'
+import { describeDbError } from '@/lib/contributions/errors'
 import type { Task } from '@/lib/types/database'
 
 // The generated Database type doesn't satisfy supabase-js's schema shape
@@ -102,6 +103,76 @@ export async function cancelTask(taskId: string): Promise<Result> {
 
   await logActivity({
     action: 'task_cancelled', targetType: 'task', targetId: taskId, details: { title: task.title },
+    actorId: auth.caller.userId, actorEmail: auth.caller.email ?? undefined,
+  })
+  revalidatePath('/dashboard/tasks')
+  revalidatePath(`/dashboard/tasks/${taskId}`)
+  return { ok: true }
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * Assigns (or reassigns) a task to an active member. The database function
+ * enforces the rules: draft/assigned task, no submission yet, assignee is an
+ * onboarded, non-archived member, deadline in the future.
+ */
+export async function assignTask(taskId: string, assigneeId: string, deadlineAt?: string | null): Promise<Result> {
+  const auth = await requireStaff()
+  if ('error' in auth) return { ok: false, error: auth.error }
+  if (!UUID.test(taskId) || !UUID.test(assigneeId)) return { ok: false, error: 'Choose a member to assign.' }
+  let deadline: string | null = null
+  if (deadlineAt) {
+    const d = new Date(deadlineAt)
+    if (Number.isNaN(d.getTime())) return { ok: false, error: 'That deadline is not a valid date.' }
+    deadline = d.toISOString()
+  }
+
+  const { data, error } = await db().rpc('assign_contribution_task', {
+    p_task_id: taskId, p_assignee: assigneeId, p_actor: auth.caller.userId, p_deadline_at: deadline,
+  })
+  if (error) return { ok: false, error: describeDbError(error, 'Could not assign the task.') }
+
+  await logActivity({
+    action: 'task_assigned', targetType: 'task', targetId: taskId,
+    details: { title: data?.title, assignee: assigneeId, deadline: data?.deadline_at },
+    actorId: auth.caller.userId, actorEmail: auth.caller.email ?? undefined,
+  })
+  revalidatePath('/dashboard/tasks')
+  revalidatePath(`/dashboard/tasks/${taskId}`)
+  return { ok: true }
+}
+
+/** Returns an assigned task (with no submission) to draft. */
+export async function unassignTask(taskId: string): Promise<Result> {
+  const auth = await requireStaff()
+  if ('error' in auth) return { ok: false, error: auth.error }
+  if (!UUID.test(taskId)) return { ok: false, error: 'That task could not be found.' }
+
+  const { data, error } = await db().rpc('unassign_contribution_task', { p_task_id: taskId })
+  if (error) return { ok: false, error: describeDbError(error, 'Could not unassign the task.') }
+
+  await logActivity({
+    action: 'task_unassigned', targetType: 'task', targetId: taskId, details: { title: data?.title },
+    actorId: auth.caller.userId, actorEmail: auth.caller.email ?? undefined,
+  })
+  revalidatePath('/dashboard/tasks')
+  revalidatePath(`/dashboard/tasks/${taskId}`)
+  return { ok: true }
+}
+
+/** Grants or denies a member's pending extension request. */
+export async function decideExtension(taskId: string, approve: boolean): Promise<Result> {
+  const auth = await requireStaff()
+  if ('error' in auth) return { ok: false, error: auth.error }
+  if (!UUID.test(taskId)) return { ok: false, error: 'That task could not be found.' }
+
+  const { data, error } = await db().rpc('decide_task_extension', { p_task_id: taskId, p_approve: approve === true })
+  if (error) return { ok: false, error: describeDbError(error, 'Could not update the extension.') }
+
+  await logActivity({
+    action: approve ? 'task_extension_granted' : 'task_extension_denied', targetType: 'task', targetId: taskId,
+    details: { title: data?.title, extendedTo: data?.extended_deadline_at },
     actorId: auth.caller.userId, actorEmail: auth.caller.email ?? undefined,
   })
   revalidatePath('/dashboard/tasks')
