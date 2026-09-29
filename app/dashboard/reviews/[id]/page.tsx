@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { createServiceClient } from '@/lib/supabase/server'
 import Header from '@/components/dashboard/Header'
 import ReviewHistory from '@/components/contributions/ReviewHistory'
+import DecisionPanel from './DecisionPanel'
 import { requireStaff } from '@/lib/contributions/auth'
 import { getMemberDirectory } from '@/lib/contributions/members'
 import { sanitizeBrief } from '@/lib/contributions/sanitize'
@@ -98,7 +99,13 @@ export default async function ReviewDetailPage({ params }: Props) {
               {c.review_score !== null && <div className="mt-kv"><span>Automated score</span><span>{Math.round(Number(c.review_score))}/100</span></div>}
               {c.final_points !== null && <div className="mt-kv"><span>Points awarded</span><span>{c.final_points}</span></div>}
             </div>
-            {/* Decision panel added in the next sprint. */}
+            {['needs_human', 'ai_approved', 'review_failed', 'changes_requested'].includes(c.status) && (
+              <DecisionPanel contributionId={c.id} min={task.point_range_min} max={task.point_range_max}
+                timingMultiplier={multiplier !== null ? Number(multiplier) : null} />
+            )}
+            {c.status === 'pending_review' && <div className="mt-panel"><span className="mt-hint">The automated review is running. Decisions open when it finishes.</span></div>}
+            {c.status === 'verified' && <div className="mt-panel"><span className="mt-hint">Verified{c.verified_at ? ` on ${fmt(c.verified_at)}` : ''}. {c.final_points} points awarded.</span></div>}
+            {c.status === 'rejected' && <div className="mt-panel"><span className="mt-hint">Rejected. The task was cancelled.</span></div>}
           </div>
         </div>
       </div>
