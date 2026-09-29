@@ -56,6 +56,7 @@ const ACTION_LABELS: Record<string, string> = {
   task_unassigned: 'Unassigned task',
   task_extension_granted: 'Granted task extension',
   task_extension_denied: 'Denied task extension',
+  task_extension_requested: 'Requested task extension',
 }
 
 const ACTION_COLORS: Record<string, string> = {
@@ -103,6 +104,7 @@ const ACTION_COLORS: Record<string, string> = {
   task_unassigned: 'var(--slate)',
   task_extension_granted: 'var(--success)',
   task_extension_denied: 'var(--error)',
+  task_extension_requested: 'var(--orange)',
 }
 
 const LEVEL_COLORS: Record<string, string> = {
@@ -184,6 +186,7 @@ function summarizeDetails(log: TeamActivityLog): string {
     case 'task_unassigned':
     case 'task_extension_granted':
     case 'task_extension_denied':
+    case 'task_extension_requested':
       return (d.title as string) || '—'
     case 'email_sent':
       return [d.subject, d.recipientCount !== undefined ? `${d.recipientCount} recipient(s)` : null].filter(Boolean).join(' · ') || '—'
