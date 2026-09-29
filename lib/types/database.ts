@@ -915,6 +915,14 @@ export type Database = {
         Args: { p_contribution_id: string; p_submission_number: number }
         Returns: Database['public']['Tables']['contributions']['Row']
       }
+      request_contribution_changes: {
+        Args: { p_contribution_id: string; p_actor: string; p_notes: string }
+        Returns: Database['public']['Tables']['contributions']['Row']
+      }
+      reject_contribution: {
+        Args: { p_contribution_id: string; p_actor: string; p_notes: string }
+        Returns: Database['public']['Tables']['contributions']['Row']
+      }
       verify_contribution: {
         Args: { p_contribution_id: string; p_actor: string; p_base_points: number; p_notes?: string | null }
         Returns: Database['public']['Tables']['contributions']['Row']
