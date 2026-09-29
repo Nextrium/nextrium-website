@@ -5,6 +5,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { logActivity } from '@/lib/activityLog'
 import { requireStaff } from '@/lib/contributions/auth'
 import { describeDbError } from '@/lib/contributions/errors'
+import { reviewContribution } from '@/lib/contributions/reviewService'
 
 type Result = { ok: true } | { ok: false; error: string }
 
@@ -78,4 +79,32 @@ export async function rejectContribution(contributionId: string, notes: string):
   await log('contribution_rejected', contributionId, { title: data.title }, auth.caller)
   revalidate(contributionId)
   return { ok: true }
+}
+
+/**
+ * Re-runs the automated review for a submission whose review failed
+ * (timeout, rate limit, service error). Staff-triggered only — there is no
+ * automatic retry. Safe if two people click at once: the database stores at
+ * most one service review per submission.
+ */
+export async function retryReview(contributionId: string): Promise<Result & { status?: string }> {
+  const auth = await requireStaff()
+  if ('error' in auth) return { ok: false, error: auth.error }
+  if (!UUID.test(contributionId)) return { ok: false, error: 'That submission could not be found.' }
+
+  const { data: c } = await db().from('contributions').select('status, title').eq('id', contributionId).maybeSingle()
+  if (!c) return { ok: false, error: 'That submission could not be found.' }
+  if (c.status !== 'review_failed') return { ok: false, error: 'Only submissions whose review failed can be retried.' }
+
+  const outcome = await reviewContribution(contributionId)
+  await log('contribution_review_retried', contributionId, { title: c.title, result: outcome.kind === 'reviewed' ? outcome.status : outcome.reason }, auth.caller)
+  revalidate(contributionId)
+  if (outcome.kind === 'failed') {
+    const why = outcome.reason === 'rate_limited'
+      ? `The review service is rate limiting${outcome.retryAfterSeconds ? ` — try again in about ${Math.ceil(outcome.retryAfterSeconds / 60)} minute(s)` : ''}.`
+      : outcome.reason === 'not_configured' ? 'The review service is not configured on this server.'
+      : 'The review service did not respond. Try again later.'
+    return { ok: false, error: why }
+  }
+  return { ok: true, status: outcome.status }
 }

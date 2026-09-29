@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import Header from '@/components/dashboard/Header'
 import ReviewHistory from '@/components/contributions/ReviewHistory'
 import DecisionPanel from './DecisionPanel'
+import RetryReview from './RetryReview'
 import { requireStaff } from '@/lib/contributions/auth'
 import { getMemberDirectory } from '@/lib/contributions/members'
 import { sanitizeBrief } from '@/lib/contributions/sanitize'
@@ -99,6 +100,7 @@ export default async function ReviewDetailPage({ params }: Props) {
               {c.review_score !== null && <div className="mt-kv"><span>Automated score</span><span>{Math.round(Number(c.review_score))}/100</span></div>}
               {c.final_points !== null && <div className="mt-kv"><span>Points awarded</span><span>{c.final_points}</span></div>}
             </div>
+            {c.status === 'review_failed' && <RetryReview contributionId={c.id} />}
             {['needs_human', 'ai_approved', 'review_failed', 'changes_requested'].includes(c.status) && (
               <DecisionPanel contributionId={c.id} min={task.point_range_min} max={task.point_range_max}
                 timingMultiplier={multiplier !== null ? Number(multiplier) : null} />
