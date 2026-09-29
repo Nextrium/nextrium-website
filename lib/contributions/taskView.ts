@@ -1,6 +1,6 @@
 // Display helpers for tasks. Pure, so the list, editor and member pages all
 // agree on what "overdue" and "effective deadline" mean.
-import type { TaskStatus } from './constants'
+import type { ContributionStatus, TaskStatus } from './constants'
 
 export interface DeadlineFields {
   status: TaskStatus
@@ -40,4 +40,16 @@ export function deadlineLabel(t: DeadlineFields, now: Date = new Date()): string
   const amount = hours >= 48 ? `${Math.round(hours / 24)} days` : `${hours} hour${hours === 1 ? '' : 's'}`
   if (!OPEN_STATUSES.includes(t.status)) return d.toISOString().slice(0, 10)
   return diffMs >= 0 ? `in ${amount}` : `${amount} overdue`
+}
+
+
+/** How a contribution's status reads to the member who submitted it. */
+export const CONTRIBUTION_STATUS_MEMBER_LABELS: Record<ContributionStatus, string> = {
+  pending_review: 'Submitted — being reviewed',
+  review_failed: 'Submitted — waiting for the team to review',
+  changes_requested: 'Changes requested',
+  needs_human: 'Submitted — with the team for review',
+  ai_approved: 'Passed review — awaiting team verification',
+  verified: 'Verified',
+  rejected: 'Not accepted',
 }

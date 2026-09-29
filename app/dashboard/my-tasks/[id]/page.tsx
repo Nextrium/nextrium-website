@@ -3,10 +3,11 @@ import { createServiceClient } from '@/lib/supabase/server'
 import Header from '@/components/dashboard/Header'
 import { requireMember } from '@/lib/contributions/auth'
 import { CATEGORY_LABELS, COMPLEXITY_LABELS, EXTENSION_DAYS } from '@/lib/contributions/constants'
-import { TASK_STATUS_LABELS, deadlineLabel, effectiveDeadline, isOverdue } from '@/lib/contributions/taskView'
+import { CONTRIBUTION_STATUS_MEMBER_LABELS, TASK_STATUS_LABELS, deadlineLabel, effectiveDeadline, isOverdue } from '@/lib/contributions/taskView'
 import ExtensionRequest from './ExtensionRequest'
+import SubmissionForm from './SubmissionForm'
 import { sanitizeBrief } from '@/lib/contributions/sanitize'
-import type { Task } from '@/lib/types/database'
+import type { Contribution, Task } from '@/lib/types/database'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Task' }
@@ -27,10 +28,15 @@ export default async function MyTaskPage({ params }: Props) {
   const task: Task | null = data
   if (!task || task.status === 'draft' || task.status === 'cancelled') notFound()
 
+  const { data: contributionRow } = await supabase.from('contributions')
+    .select('*').eq('task_id', task.id).eq('contributor_id', auth.caller.userId).maybeSingle()
+  const contribution: Contribution | null = contributionRow
+
   const now = new Date()
   const deadline = effectiveDeadline(task)
   const open = task.status === 'assigned' || task.status === 'changes_requested'
   const canRequestExtension = open && task.extension_status === 'none' && !!deadline && now < deadline
+  const canSubmit = open && (!contribution || contribution.status === 'changes_requested')
 
   return (
     <>
@@ -68,6 +74,22 @@ export default async function MyTaskPage({ params }: Props) {
                   so a brief that reached the database any other way can't run script. */}
               <div className="mt-brief" dangerouslySetInnerHTML={{ __html: sanitizeBrief(task.description) }} />
             </div>
+            {canSubmit && (
+              <SubmissionForm
+                taskId={task.id}
+                isResubmission={!!contribution}
+                initial={contribution ? { title: contribution.title, description: contribution.description, evidenceUrl: contribution.evidence_url ?? '' } : null}
+              />
+            )}
+            {contribution && !canSubmit && (
+              <div className="mt-panel">
+                <div className="mt-panel-title">Your submission</div>
+                <div className="mt-kv"><span>Status</span><span>{CONTRIBUTION_STATUS_MEMBER_LABELS[contribution.status]}</span></div>
+                <div className="mt-kv"><span>Submission</span><span>#{contribution.submission_count}</span></div>
+                {contribution.final_points !== null && <div className="mt-kv"><span>Points awarded</span><span>{contribution.final_points}</span></div>}
+                {contribution.evidence_url && <a className="mt-hint" href={contribution.evidence_url} target="_blank" rel="noopener noreferrer">{contribution.evidence_url}</a>}
+              </div>
+            )}
             {task.links.length > 0 && (
               <div className="mt-panel mt-links">
                 <div className="mt-panel-title">Links</div>

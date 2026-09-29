@@ -13,6 +13,7 @@ const MESSAGES: Record<string, string> = {
   deadline_passed: 'The deadline has passed.',
   no_extension_requested: 'There is no pending extension request.',
   contribution_not_found: 'That submission could not be found.',
+  already_submitted: 'This task already has a submission waiting for review.',
 }
 
 export function describeDbError(error: { message?: string } | null | undefined, fallback = 'Something went wrong. Please try again.'): string {
