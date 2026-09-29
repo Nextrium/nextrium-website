@@ -618,6 +618,188 @@ export type Database = {
           detail?: Json
         }
       }
+      contributor_profiles: {
+        Row: {
+          user_id: string
+          categories: ('technical' | 'design' | 'research' | 'operations' | 'community')[]
+          skills: string[]
+          availability_hours_per_week: number | null
+          notify_email: boolean
+          total_points: number
+          verified_contributions: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          user_id: string
+          categories?: ('technical' | 'design' | 'research' | 'operations' | 'community')[]
+          skills?: string[]
+          availability_hours_per_week?: number | null
+          notify_email?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          categories?: ('technical' | 'design' | 'research' | 'operations' | 'community')[]
+          skills?: string[]
+          availability_hours_per_week?: number | null
+          notify_email?: boolean
+          updated_at?: string
+        }
+      }
+      tasks: {
+        Row: {
+          id: string
+          title: string
+          description: string
+          category: 'technical' | 'design' | 'research' | 'operations' | 'community'
+          complexity: 'small' | 'medium' | 'large'
+          point_range_min: number
+          point_range_max: number
+          deadline_days: number
+          status: 'draft' | 'assigned' | 'submitted' | 'changes_requested' | 'completed' | 'cancelled'
+          assigned_to: string | null
+          assigned_by: string | null
+          assigned_at: string | null
+          deadline_at: string | null
+          extension_status: 'none' | 'requested' | 'granted' | 'denied'
+          extension_requested_at: string | null
+          extension_reason: string | null
+          extended_deadline_at: string | null
+          links: { label: string; url: string }[]
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          description?: string
+          category: 'technical' | 'design' | 'research' | 'operations' | 'community'
+          complexity: 'small' | 'medium' | 'large'
+          point_range_min: number
+          point_range_max: number
+          deadline_days: number
+          status?: 'draft' | 'assigned' | 'submitted' | 'changes_requested' | 'completed' | 'cancelled'
+          links?: { label: string; url: string }[]
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          title?: string
+          description?: string
+          category?: 'technical' | 'design' | 'research' | 'operations' | 'community'
+          complexity?: 'small' | 'medium' | 'large'
+          point_range_min?: number
+          point_range_max?: number
+          deadline_days?: number
+          status?: 'draft' | 'assigned' | 'submitted' | 'changes_requested' | 'completed' | 'cancelled'
+          links?: { label: string; url: string }[]
+          updated_at?: string
+        }
+      }
+      contributions: {
+        Row: {
+          id: string
+          task_id: string
+          contributor_id: string
+          title: string
+          description: string
+          evidence_url: string | null
+          submission_count: number
+          status: 'pending_review' | 'review_failed' | 'changes_requested' | 'needs_human' | 'ai_approved' | 'verified' | 'rejected'
+          latest_review_id: string | null
+          review_decision: 'approved' | 'rejected' | 'human_required' | null
+          review_score: number | null
+          base_points: number | null
+          timing_multiplier: number | null
+          final_points: number | null
+          staff_notes: string | null
+          verified_by: string | null
+          verified_at: string | null
+          submitted_at: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          task_id: string
+          contributor_id: string
+          title: string
+          description: string
+          evidence_url?: string | null
+          submission_count?: number
+          status?: 'pending_review' | 'review_failed' | 'changes_requested' | 'needs_human' | 'ai_approved' | 'verified' | 'rejected'
+          submitted_at?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          title?: string
+          description?: string
+          evidence_url?: string | null
+          submission_count?: number
+          status?: 'pending_review' | 'review_failed' | 'changes_requested' | 'needs_human' | 'ai_approved' | 'verified' | 'rejected'
+          latest_review_id?: string | null
+          review_decision?: 'approved' | 'rejected' | 'human_required' | null
+          review_score?: number | null
+          staff_notes?: string | null
+          submitted_at?: string
+          updated_at?: string
+        }
+      }
+      contribution_reviews: {
+        Row: {
+          id: string
+          contribution_id: string
+          submission_number: number
+          source: 'service' | 'staff'
+          decision: string
+          overall_score: number | null
+          checks: Json | null
+          feedback: Json | null
+          code_audit: Json | null
+          model_used: string | null
+          reviewer_user_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          contribution_id: string
+          submission_number: number
+          source: 'service' | 'staff'
+          decision: string
+          overall_score?: number | null
+          checks?: Json | null
+          feedback?: Json | null
+          code_audit?: Json | null
+          model_used?: string | null
+          reviewer_user_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          [_ in never]: never
+        }
+      }
+      points_ledger: {
+        Row: {
+          id: string
+          contributor_id: string
+          contribution_id: string
+          base_points: number
+          timing_multiplier: number
+          final_points: number
+          awarded_by: string | null
+          created_at: string
+        }
+        Insert: {
+          [_ in never]: never
+        }
+        Update: {
+          [_ in never]: never
+        }
+      }
       agent_screening_results: {
         Row: {
           id: string
@@ -700,7 +882,28 @@ export type Database = {
       }
     }
     Views: { [_ in never]: never }
-    Functions: { [_ in never]: never }
+    Functions: {
+      assign_contribution_task: {
+        Args: { p_task_id: string; p_assignee: string; p_actor: string; p_deadline_at?: string | null }
+        Returns: Database['public']['Tables']['tasks']['Row']
+      }
+      unassign_contribution_task: {
+        Args: { p_task_id: string }
+        Returns: Database['public']['Tables']['tasks']['Row']
+      }
+      request_task_extension: {
+        Args: { p_task_id: string; p_member: string; p_reason: string }
+        Returns: Database['public']['Tables']['tasks']['Row']
+      }
+      decide_task_extension: {
+        Args: { p_task_id: string; p_approve: boolean }
+        Returns: Database['public']['Tables']['tasks']['Row']
+      }
+      verify_contribution: {
+        Args: { p_contribution_id: string; p_actor: string; p_base_points: number; p_notes?: string | null }
+        Returns: Database['public']['Tables']['contributions']['Row']
+      }
+    }
     Enums: { [_ in never]: never }
   }
 }
@@ -723,6 +926,11 @@ export type AutomationRule       = Database['public']['Tables']['automation_rule
 export type AutomationLog        = Database['public']['Tables']['automation_log']['Row']
 export type AgentScreeningResult = Database['public']['Tables']['agent_screening_results']['Row']
 export type ScreeningReport      = Database['public']['Tables']['screening_reports']['Row']
+export type ContributorProfile   = Database['public']['Tables']['contributor_profiles']['Row']
+export type Task                 = Database['public']['Tables']['tasks']['Row']
+export type Contribution         = Database['public']['Tables']['contributions']['Row']
+export type ContributionReview   = Database['public']['Tables']['contribution_reviews']['Row']
+export type PointsLedgerEntry    = Database['public']['Tables']['points_ledger']['Row']
 
 export interface CommunityProject {
   id:          string
