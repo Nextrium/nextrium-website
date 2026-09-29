@@ -899,6 +899,22 @@ export type Database = {
         Args: { p_task_id: string; p_approve: boolean }
         Returns: Database['public']['Tables']['tasks']['Row']
       }
+      submit_contribution: {
+        Args: { p_task_id: string; p_member: string; p_title: string; p_description: string; p_evidence_url: string }
+        Returns: Database['public']['Tables']['contributions']['Row']
+      }
+      apply_contribution_review: {
+        Args: {
+          p_contribution_id: string; p_submission_number: number; p_decision: string; p_score: number | null
+          p_checks: Json | null; p_feedback: Json | null; p_code_audit: Json | null; p_model: string | null
+          p_status: 'changes_requested' | 'needs_human' | 'ai_approved'
+        }
+        Returns: Database['public']['Tables']['contributions']['Row']
+      }
+      mark_contribution_review_failed: {
+        Args: { p_contribution_id: string; p_submission_number: number }
+        Returns: Database['public']['Tables']['contributions']['Row']
+      }
       verify_contribution: {
         Args: { p_contribution_id: string; p_actor: string; p_base_points: number; p_notes?: string | null }
         Returns: Database['public']['Tables']['contributions']['Row']
