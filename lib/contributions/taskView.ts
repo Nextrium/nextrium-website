@@ -53,3 +53,14 @@ export const CONTRIBUTION_STATUS_MEMBER_LABELS: Record<ContributionStatus, strin
   verified: 'Verified',
   rejected: 'Not accepted',
 }
+
+/** Review queue tabs, in display order. The first is the default. */
+export const QUEUE_TABS: { key: ContributionStatus; label: string; hint: string }[] = [
+  { key: 'needs_human', label: 'Needs a human', hint: 'Escalated by the service, or approved with a security finding' },
+  { key: 'ai_approved', label: 'AI approved', hint: 'Passed the automated review — verify to award points' },
+  { key: 'review_failed', label: 'Review failed', hint: 'The service timed out, was rate limited or errored — retry' },
+  { key: 'changes_requested', label: 'Changes requested', hint: 'Waiting for the member to resubmit' },
+  { key: 'pending_review', label: 'Reviewing', hint: 'The automated review is running' },
+  { key: 'verified', label: 'Verified', hint: 'Points awarded' },
+  { key: 'rejected', label: 'Rejected', hint: 'Final, no points' },
+]

@@ -14,6 +14,9 @@ const MESSAGES: Record<string, string> = {
   no_extension_requested: 'There is no pending extension request.',
   contribution_not_found: 'That submission could not be found.',
   already_submitted: 'This task already has a submission waiting for review.',
+  review_in_progress: 'The automated review is still running for this submission. Try again in a minute.',
+  contribution_final: 'This submission has already been decided.',
+  notes_required: 'Add a note for the member explaining the decision.',
 }
 
 export function describeDbError(error: { message?: string } | null | undefined, fallback = 'Something went wrong. Please try again.'): string {
