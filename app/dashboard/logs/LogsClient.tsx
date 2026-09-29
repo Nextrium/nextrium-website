@@ -49,6 +49,9 @@ const ACTION_LABELS: Record<string, string> = {
   team_member_removed: 'Removed team member (public page)',
   contact_status_updated: 'Updated contact status',
   email_sent: 'Sent email',
+  task_created: 'Created task',
+  task_updated: 'Updated task',
+  task_cancelled: 'Cancelled task',
 }
 
 const ACTION_COLORS: Record<string, string> = {
@@ -89,6 +92,9 @@ const ACTION_COLORS: Record<string, string> = {
   team_member_removed: 'var(--error)',
   contact_status_updated: 'var(--slate)',
   email_sent: 'var(--orange)',
+  task_created: 'var(--slate)',
+  task_updated: 'var(--slate)',
+  task_cancelled: 'var(--error)',
 }
 
 const LEVEL_COLORS: Record<string, string> = {
@@ -163,6 +169,10 @@ function summarizeDetails(log: TeamActivityLog): string {
       return (d.name as string) || '—'
     case 'contact_status_updated':
       return `→ ${d.newStatus ?? '—'}`
+    case 'task_created':
+    case 'task_updated':
+    case 'task_cancelled':
+      return (d.title as string) || '—'
     case 'email_sent':
       return [d.subject, d.recipientCount !== undefined ? `${d.recipientCount} recipient(s)` : null].filter(Boolean).join(' · ') || '—'
     default:
