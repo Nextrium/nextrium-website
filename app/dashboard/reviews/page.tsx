@@ -60,7 +60,11 @@ export default async function ReviewQueuePage({ searchParams }: Props) {
         .rq-muted { color: var(--grey-mid); font-size: 12px; }
         .rq-empty { padding: 48px 32px; text-align: center; background: var(--navy); border: 1px solid rgba(255,255,255,0.06); color: var(--grey-mid); }
       `}</style>
-      <Header title="Review queue" description="Verify contributions, request changes, or reject" />
+      <Header
+        title="Review queue"
+        description="Verify contributions, request changes, or reject"
+        action={<Link href="/dashboard/reviews/analytics" className="rq-tab">Analytics</Link>}
+      />
       <div className="dash-content">
         <div className="rq-tabs">
           {QUEUE_TABS.map((t) => (
