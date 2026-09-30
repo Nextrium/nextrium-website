@@ -33,3 +33,24 @@ test('an unknown role is denied outright', () => {
   assert.equal(isRestricted('/dashboard', 'superuser'), true)
   assert.equal(isRestricted('/dashboard/posts', ''), true)
 })
+
+test('members reach their contributor pages but not the staff ones', () => {
+  assert.equal(isRestricted('/dashboard/my-tasks', 'member'), false)
+  assert.equal(isRestricted('/dashboard/my-tasks/abc', 'member'), false)
+  assert.equal(isRestricted('/dashboard/leaderboard', 'member'), false)
+  assert.equal(isRestricted('/dashboard/tasks', 'member'), true)
+  assert.equal(isRestricted('/dashboard/tasks/abc', 'member'), true)
+  assert.equal(isRestricted('/dashboard/reviews', 'member'), true)
+  assert.equal(isRestricted('/dashboard/reviews/analytics', 'member'), true)
+})
+
+test('tasks and reviews are staff-only (admin, moderator)', () => {
+  for (const role of ['content', 'community']) {
+    assert.equal(isRestricted('/dashboard/tasks', role), true, role)
+    assert.equal(isRestricted('/dashboard/reviews/abc', role), true, role)
+  }
+  for (const role of ['admin', 'moderator']) {
+    assert.equal(isRestricted('/dashboard/tasks', role), false, role)
+    assert.equal(isRestricted('/dashboard/reviews', role), false, role)
+  }
+})
