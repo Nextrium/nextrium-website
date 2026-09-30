@@ -61,6 +61,15 @@ const ALL_NAV_GROUPS = [
     ],
   },
   {
+    // Contributor program: members see their own assigned tasks.
+    label: 'Contributing',
+    roles: ['member'] as DashboardRole[],
+    items: [
+      { label: 'My tasks', href: '/dashboard/my-tasks', icon: '◇', roles: ['member'] as DashboardRole[] },
+      { label: 'Leaderboard', href: '/dashboard/leaderboard', icon: '▲', roles: ['member'] as DashboardRole[] },
+    ],
+  },
+  {
     label: 'Inbox',
     roles: ['admin', 'moderator'] as DashboardRole[],
     items: [
