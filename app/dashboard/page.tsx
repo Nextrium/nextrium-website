@@ -57,7 +57,7 @@ async function getRecentApplications(role: DashboardRole): Promise<Pick<Applicat
 export default async function DashboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/dashboard/login')
+  if (!user) redirect('/login')
 
   const role = await getDashboardRole()
 
