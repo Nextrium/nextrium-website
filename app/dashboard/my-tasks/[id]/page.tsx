@@ -6,7 +6,7 @@ import { CATEGORY_LABELS, COMPLEXITY_LABELS, EXTENSION_DAYS } from '@/lib/contri
 import { CONTRIBUTION_STATUS_MEMBER_LABELS, TASK_STATUS_LABELS, deadlineLabel, effectiveDeadline, isOverdue } from '@/lib/contributions/taskView'
 import ExtensionRequest from './ExtensionRequest'
 import SubmissionForm from './SubmissionForm'
-import ReviewHistory from './ReviewHistory'
+import ReviewHistory from '@/components/contributions/ReviewHistory'
 import { sanitizeBrief } from '@/lib/contributions/sanitize'
 import type { Contribution, ContributionReview, Task } from '@/lib/types/database'
 

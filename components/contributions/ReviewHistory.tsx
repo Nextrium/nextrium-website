@@ -33,7 +33,9 @@ interface Feedback {
   }
 }
 
-export default function ReviewHistory({ reviews }: { reviews: ContributionReview[] }) {
+interface SecurityIssue { severity?: string; description?: string; location?: string | null }
+
+export default function ReviewHistory({ reviews, showSecurity = false }: { reviews: ContributionReview[]; showSecurity?: boolean }) {
   if (reviews.length === 0) return null
   return (
     <div className="mt-panel">
@@ -61,6 +63,14 @@ export default function ReviewHistory({ reviews }: { reviews: ContributionReview
               </ul>
             )}
             {f.what_to_do && <div className="mt-hint" style={{ whiteSpace: 'pre-wrap', color: 'var(--off-white)' }}><strong>What to do: </strong>{f.what_to_do}</div>}
+            {showSecurity && Array.isArray((r.code_audit as any)?.security_issues) && (r.code_audit as any).security_issues.length > 0 && (
+              <div className="mt-hint">
+                <strong style={{ color: 'var(--error)' }}>Security findings</strong>
+                {((r.code_audit as any).security_issues as SecurityIssue[]).map((i, n) => (
+                  <div key={n}>[{(i.severity ?? 'unknown').toUpperCase()}] {i.description}{i.location ? ` (${i.location})` : ''}</div>
+                ))}
+              </div>
+            )}
             {f.resubmission_assessment?.summary && (
               <div className="mt-hint">
                 <strong>Compared with your last submission: </strong>{f.resubmission_assessment.summary}

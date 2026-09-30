@@ -59,6 +59,10 @@ const ACTION_LABELS: Record<string, string> = {
   task_extension_requested: 'Requested task extension',
   contribution_submitted: 'Submitted contribution',
   contribution_resubmitted: 'Resubmitted contribution',
+  contribution_verified: 'Verified contribution',
+  contribution_changes_requested: 'Requested changes',
+  contribution_rejected: 'Rejected contribution',
+  contribution_review_retried: 'Retried automated review',
 }
 
 const ACTION_COLORS: Record<string, string> = {
@@ -109,6 +113,10 @@ const ACTION_COLORS: Record<string, string> = {
   task_extension_requested: 'var(--orange)',
   contribution_submitted: 'var(--success)',
   contribution_resubmitted: 'var(--success)',
+  contribution_verified: 'var(--success)',
+  contribution_changes_requested: 'var(--orange)',
+  contribution_rejected: 'var(--error)',
+  contribution_review_retried: 'var(--slate)',
 }
 
 const LEVEL_COLORS: Record<string, string> = {
@@ -193,6 +201,10 @@ function summarizeDetails(log: TeamActivityLog): string {
     case 'task_extension_requested':
     case 'contribution_submitted':
     case 'contribution_resubmitted':
+    case 'contribution_verified':
+    case 'contribution_changes_requested':
+    case 'contribution_rejected':
+    case 'contribution_review_retried':
       return (d.title as string) || '—'
     case 'email_sent':
       return [d.subject, d.recipientCount !== undefined ? `${d.recipientCount} recipient(s)` : null].filter(Boolean).join(' · ') || '—'
