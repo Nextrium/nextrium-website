@@ -712,6 +712,7 @@ export type Database = {
           latest_review_id: string | null
           review_decision: 'approved' | 'rejected' | 'human_required' | null
           review_score: number | null
+          review_failure_count: number
           base_points: number | null
           timing_multiplier: number | null
           final_points: number | null
@@ -898,6 +899,30 @@ export type Database = {
       decide_task_extension: {
         Args: { p_task_id: string; p_approve: boolean }
         Returns: Database['public']['Tables']['tasks']['Row']
+      }
+      submit_contribution: {
+        Args: { p_task_id: string; p_member: string; p_title: string; p_description: string; p_evidence_url: string }
+        Returns: Database['public']['Tables']['contributions']['Row']
+      }
+      apply_contribution_review: {
+        Args: {
+          p_contribution_id: string; p_submission_number: number; p_decision: string; p_score: number | null
+          p_checks: Json | null; p_feedback: Json | null; p_code_audit: Json | null; p_model: string | null
+          p_status: 'changes_requested' | 'needs_human' | 'ai_approved'
+        }
+        Returns: Database['public']['Tables']['contributions']['Row']
+      }
+      mark_contribution_review_failed: {
+        Args: { p_contribution_id: string; p_submission_number: number }
+        Returns: Database['public']['Tables']['contributions']['Row']
+      }
+      request_contribution_changes: {
+        Args: { p_contribution_id: string; p_actor: string; p_notes: string }
+        Returns: Database['public']['Tables']['contributions']['Row']
+      }
+      reject_contribution: {
+        Args: { p_contribution_id: string; p_actor: string; p_notes: string }
+        Returns: Database['public']['Tables']['contributions']['Row']
       }
       verify_contribution: {
         Args: { p_contribution_id: string; p_actor: string; p_base_points: number; p_notes?: string | null }

@@ -19,6 +19,7 @@ export default function LoginClient({ message, error: initialError }: { message?
     const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
     if (authError) {
       setError(authError.message || 'Invalid email or password.')
+      setLoading(false)
       return
     }
     // Wait for the log call, then do a full page load. A full load sends the

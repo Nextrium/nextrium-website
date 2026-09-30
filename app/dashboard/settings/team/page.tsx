@@ -27,16 +27,13 @@ async function getDashboardUsers(): Promise<DashboardUserRow[]> {
 
   const userIds = dashboardUsers.map((u: any) => u.user_id)
 
-  const { data: authUsers } = await supabase.auth.admin.listUsers()
-
+  // listUsers() only returns the first page (50) of ALL auth users, so staff
+  // past that showed as "Unknown". Look up just the staff users directly.
   const emailMap: Record<string, string> = {}
-  if (authUsers?.users) {
-    authUsers.users.forEach((u) => {
-      if (userIds.includes(u.id)) {
-        emailMap[u.id] = u.email ?? 'No email'
-      }
-    })
-  }
+  await Promise.all(userIds.map(async (id: string) => {
+    const { data } = await supabase.auth.admin.getUserById(id)
+    if (data?.user) emailMap[id] = data.user.email ?? 'No email'
+  }))
 
   const { data: trackRows } = await (supabase.from('staff_tracks') as any).select('id, name')
   const trackNames: Record<string, string> = {}
