@@ -23,10 +23,21 @@ async function getPeople(): Promise<PersonCard[]> {
 
   if (!dashboardUsers || dashboardUsers.length === 0) return []
 
-  const [{ data: authUsers }, { data: tracks }] = await Promise.all([
+  const memberIds = dashboardUsers.filter((u: any) => u.role === 'member').map((u: any) => u.user_id)
+  const [{ data: authUsers }, { data: tracks }, { data: profiles }, { data: openTasks }] = await Promise.all([
     supabase.auth.admin.listUsers(),
     (supabase.from('staff_tracks') as any).select('id, name'),
+    // Contributor program stats for members (points are maintained by the database).
+    memberIds.length
+      ? (supabase.from('contributor_profiles') as any).select('user_id, categories, total_points, verified_contributions').in('user_id', memberIds)
+      : Promise.resolve({ data: [] }),
+    memberIds.length
+      ? (supabase.from('tasks') as any).select('assigned_to').in('assigned_to', memberIds).in('status', ['assigned', 'changes_requested', 'submitted'])
+      : Promise.resolve({ data: [] }),
   ])
+  const profileMap = new Map<string, any>((profiles ?? []).map((p: any) => [p.user_id, p]))
+  const openCount = new Map<string, number>()
+  ;(openTasks ?? []).forEach((t: any) => openCount.set(t.assigned_to, (openCount.get(t.assigned_to) ?? 0) + 1))
 
   const emailMap: Record<string, string> = {}
   authUsers?.users.forEach((u) => { emailMap[u.id] = u.email ?? 'No email' })
@@ -44,6 +55,14 @@ async function getPeople(): Promise<PersonCard[]> {
     discordLinked:   !!u.discord_linked_at,
     trackName:       u.staff_track_id ? (trackNameMap[u.staff_track_id] ?? null) : null,
     isTeamMember:    !!u.is_team_member || u.role === 'member',
+    contribution: u.role === 'member' ? {
+      points:     profileMap.get(u.user_id)?.total_points ?? 0,
+      verified:   profileMap.get(u.user_id)?.verified_contributions ?? 0,
+      openTasks:  openCount.get(u.user_id) ?? 0,
+      categories: profileMap.get(u.user_id)?.categories ?? [],
+      // Derived, never stored: invited = not onboarded yet (archived people aren't listed here).
+      status:     u.onboarding_completed_at ? 'active' : 'invited',
+    } : null,
   }))
 }
 

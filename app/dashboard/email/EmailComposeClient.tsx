@@ -186,7 +186,13 @@ export default function EmailComposeClient({
       logActivityAction({
         action: 'email_sent',
         targetType: 'email',
-        details: { subject, recipientCount: recipients.length },
+        details: {
+          subject,
+          recipientCount: recipients.length,
+          sentCount: data.results.filter((r: SendResult) => r.success).length,
+          recipients: recipients.map((r) => r.email),
+          notSent: data.results.filter((r: SendResult) => !r.success).map((r: SendResult) => ({ email: r.email, reason: r.error })),
+        },
       }).catch(() => {})
       setSubject('')
       setMessage('')
@@ -313,8 +319,8 @@ export default function EmailComposeClient({
                       <div className="recipient-email">{a.email} · {a.role_title ?? 'Open application'}</div>
                     </div>
                     {alreadyEmailedThisResult(screeningSendInfo[a.id]) && (
-                      <span className="recipient-already-sent" title="Already sent this result — uncheck to exclude">
-                        ✉ Sent
+                      <span className="recipient-already-sent" title="Already emailed their screening result. This message is separate.">
+                        ✉ Result sent
                       </span>
                     )}
                   </label>
@@ -422,12 +428,12 @@ export default function EmailComposeClient({
                 <div className="send-preview-title">Confirm send</div>
                 <div className="send-preview-summary">
                   Sending to <strong>{recipients.length}</strong> recipient{recipients.length !== 1 ? 's' : ''}
-                  {selectedApplicantDuplicates.length > 0 && <> — <strong style={{ color: 'var(--warning)' }}>{selectedApplicantDuplicates.length}</strong> already received this exact result</>}.
+                  {selectedApplicantDuplicates.length > 0 && <> — <strong style={{ color: 'var(--warning)' }}>{selectedApplicantDuplicates.length}</strong> were already emailed their screening result earlier (this is a different message)</>}.
                 </div>
 
                 {selectedApplicantDuplicates.length > 0 && (
                   <div className="send-preview-duplicates">
-                    <div className="send-preview-duplicates-title">⚠ Already sent this result — still included:</div>
+                    <div className="send-preview-duplicates-title">ℹ Already emailed their screening result — this message is separate:</div>
                     {selectedApplicantDuplicates.map((a) => (
                       <div key={a.id} className="send-preview-duplicate-row">
                         <span>{a.name} · {a.email}</span>

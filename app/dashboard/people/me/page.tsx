@@ -14,11 +14,20 @@ export default async function MyProfilePage({ searchParams }: { searchParams: Pr
 
   const serviceClient = createServiceClient()
   const { data: dashboardUser } = await (serviceClient.from('dashboard_users') as any)
-    .select('bio, social_handles, onboarding_completed_at, discord_username, discord_linked_at')
+    .select('bio, social_handles, onboarding_completed_at, discord_username, discord_linked_at, role')
     .eq('user_id', user.id)
     .maybeSingle()
 
   const isFirstTime = !dashboardUser?.onboarding_completed_at
+
+  // Members are contributors: they also set the areas they want tasks in.
+  const isMember = dashboardUser?.role === 'member'
+  const { data: contributorProfile } = isMember
+    ? await (serviceClient.from('contributor_profiles') as any)
+        .select('categories, skills, availability_hours_per_week, notify_email')
+        .eq('user_id', user.id)
+        .maybeSingle()
+    : { data: null }
   const { discord: discordNotice } = await searchParams
 
   return (
@@ -37,6 +46,12 @@ export default async function MyProfilePage({ searchParams }: { searchParams: Pr
           discordUsername={dashboardUser?.discord_linked_at ? (dashboardUser?.discord_username ?? null) : null}
           discordAvailable={!!readDiscordConfig()}
           discordNotice={discordNotice ?? null}
+          contributor={isMember ? {
+            categories: contributorProfile?.categories ?? [],
+            skillsText: (contributorProfile?.skills ?? []).join(', '),
+            availability: contributorProfile?.availability_hours_per_week?.toString() ?? '',
+            notifyEmail: contributorProfile?.notify_email ?? true,
+          } : null}
         />
       </div>
     </>
