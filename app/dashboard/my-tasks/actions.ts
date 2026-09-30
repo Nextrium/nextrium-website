@@ -7,6 +7,7 @@ import { requireMember } from '@/lib/contributions/auth'
 import { describeDbError } from '@/lib/contributions/errors'
 import { parseSubmission } from '@/lib/contributions/submission'
 import { reviewContribution } from '@/lib/contributions/reviewService'
+import { notifyReviewResult } from '@/lib/contributions/notify'
 
 type Result = { ok: true } | { ok: false; error: string }
 
@@ -77,6 +78,7 @@ export async function submitContribution(taskId: string, raw: unknown): Promise<
   // The submission is committed above; now review it on the server. A
   // failed review leaves it 'review_failed' for staff to retry.
   const outcome = await reviewContribution(data.id)
+  if (outcome.kind === 'reviewed') await notifyReviewResult(data.id, outcome.status)
 
   revalidatePath('/dashboard/my-tasks')
   revalidatePath(`/dashboard/my-tasks/${taskId}`)

@@ -6,6 +6,8 @@ import { logActivity } from '@/lib/activityLog'
 import { requireStaff } from '@/lib/contributions/auth'
 import { parseTaskInput } from '@/lib/contributions/taskInput'
 import { describeDbError } from '@/lib/contributions/errors'
+import { extensionDecidedEmail, taskAssignedEmail } from '@/lib/contributions/emails'
+import { notifyMember, siteUrl } from '@/lib/contributions/notify'
 import type { Task } from '@/lib/types/database'
 
 // The generated Database type doesn't satisfy supabase-js's schema shape
@@ -138,6 +140,12 @@ export async function assignTask(taskId: string, assigneeId: string, deadlineAt?
     details: { title: data?.title, assignee: assigneeId, deadline: data?.deadline_at },
     actorId: auth.caller.userId, actorEmail: auth.caller.email ?? undefined,
   })
+  await notifyMember(assigneeId, taskAssignedEmail({
+    taskTitle: data?.title ?? 'a task',
+    points: `${data?.point_range_min}–${data?.point_range_max}`,
+    deadlineAt: data?.deadline_at ?? null,
+    url: siteUrl(`/dashboard/my-tasks/${taskId}`),
+  }))
   revalidatePath('/dashboard/tasks')
   revalidatePath(`/dashboard/tasks/${taskId}`)
   return { ok: true }
@@ -175,6 +183,12 @@ export async function decideExtension(taskId: string, approve: boolean): Promise
     details: { title: data?.title, extendedTo: data?.extended_deadline_at },
     actorId: auth.caller.userId, actorEmail: auth.caller.email ?? undefined,
   })
+  await notifyMember(data?.assigned_to, extensionDecidedEmail({
+    taskTitle: data?.title ?? 'your task',
+    granted: approve === true,
+    deadlineAt: (approve ? data?.extended_deadline_at : data?.deadline_at) ?? null,
+    url: siteUrl(`/dashboard/my-tasks/${taskId}`),
+  }))
   revalidatePath('/dashboard/tasks')
   revalidatePath(`/dashboard/tasks/${taskId}`)
   return { ok: true }

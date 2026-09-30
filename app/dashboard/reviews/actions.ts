@@ -6,6 +6,19 @@ import { logActivity } from '@/lib/activityLog'
 import { requireStaff } from '@/lib/contributions/auth'
 import { describeDbError } from '@/lib/contributions/errors'
 import { reviewContribution } from '@/lib/contributions/reviewService'
+import { changesRequestedEmail, rejectedEmail, verifiedEmail } from '@/lib/contributions/emails'
+import { notifyMember, notifyReviewResult, siteUrl } from '@/lib/contributions/notify'
+
+/** True when the contribution is already in `status` — a repeated click, so no second log or email. */
+async function alreadyIn(contributionId: string, status: string): Promise<boolean> {
+  const { data } = await db().from('contributions').select('status').eq('id', contributionId).maybeSingle()
+  return data?.status === status
+}
+
+async function taskTitle(taskId: string): Promise<string> {
+  const { data } = await db().from('tasks').select('title').eq('id', taskId).maybeSingle()
+  return data?.title ?? 'your task'
+}
 
 type Result = { ok: true } | { ok: false; error: string }
 
@@ -37,6 +50,7 @@ export async function verifyContribution(contributionId: string, basePoints: num
   if ('error' in auth) return { ok: false, error: auth.error }
   if (!UUID.test(contributionId)) return { ok: false, error: 'That submission could not be found.' }
   if (!Number.isInteger(basePoints) || basePoints < 0) return { ok: false, error: 'Choose the base points to award.' }
+  if (await alreadyIn(contributionId, 'verified')) return { ok: true }
 
   const { data, error } = await db().rpc('verify_contribution', {
     p_contribution_id: contributionId, p_actor: auth.caller.userId, p_base_points: basePoints,
@@ -45,6 +59,9 @@ export async function verifyContribution(contributionId: string, basePoints: num
   if (error || !data) return { ok: false, error: describeDbError(error, 'Could not verify the submission.') }
 
   await log('contribution_verified', contributionId, { title: data.title, points: data.final_points }, auth.caller)
+  await notifyMember(data.contributor_id, verifiedEmail({
+    taskTitle: await taskTitle(data.task_id), points: data.final_points ?? 0, url: siteUrl('/dashboard/leaderboard'),
+  }))
   revalidate(contributionId)
   return { ok: true }
 }
@@ -54,6 +71,7 @@ export async function requestChanges(contributionId: string, notes: string): Pro
   const auth = await requireStaff()
   if ('error' in auth) return { ok: false, error: auth.error }
   if (!UUID.test(contributionId)) return { ok: false, error: 'That submission could not be found.' }
+  if (await alreadyIn(contributionId, 'changes_requested')) return { ok: true }
 
   const { data, error } = await db().rpc('request_contribution_changes', {
     p_contribution_id: contributionId, p_actor: auth.caller.userId, p_notes: (notes ?? '').slice(0, NOTES_MAX),
@@ -61,6 +79,9 @@ export async function requestChanges(contributionId: string, notes: string): Pro
   if (error || !data) return { ok: false, error: describeDbError(error, 'Could not request changes.') }
 
   await log('contribution_changes_requested', contributionId, { title: data.title }, auth.caller)
+  await notifyMember(data.contributor_id, changesRequestedEmail({
+    taskTitle: await taskTitle(data.task_id), notes: data.staff_notes ?? notes, url: siteUrl(`/dashboard/my-tasks/${data.task_id}`),
+  }))
   revalidate(contributionId)
   return { ok: true }
 }
@@ -70,6 +91,7 @@ export async function rejectContribution(contributionId: string, notes: string):
   const auth = await requireStaff()
   if ('error' in auth) return { ok: false, error: auth.error }
   if (!UUID.test(contributionId)) return { ok: false, error: 'That submission could not be found.' }
+  if (await alreadyIn(contributionId, 'rejected')) return { ok: true }
 
   const { data, error } = await db().rpc('reject_contribution', {
     p_contribution_id: contributionId, p_actor: auth.caller.userId, p_notes: (notes ?? '').slice(0, NOTES_MAX),
@@ -77,6 +99,9 @@ export async function rejectContribution(contributionId: string, notes: string):
   if (error || !data) return { ok: false, error: describeDbError(error, 'Could not reject the submission.') }
 
   await log('contribution_rejected', contributionId, { title: data.title }, auth.caller)
+  await notifyMember(data.contributor_id, rejectedEmail({
+    taskTitle: await taskTitle(data.task_id), notes: data.staff_notes ?? notes, url: siteUrl(`/dashboard/my-tasks/${data.task_id}`),
+  }))
   revalidate(contributionId)
   return { ok: true }
 }
@@ -106,5 +131,6 @@ export async function retryReview(contributionId: string): Promise<Result & { st
       : 'The review service did not respond. Try again later.'
     return { ok: false, error: why }
   }
+  await notifyReviewResult(contributionId, outcome.status)
   return { ok: true, status: outcome.status }
 }
