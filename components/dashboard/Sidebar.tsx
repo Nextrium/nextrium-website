@@ -54,6 +54,10 @@ const ALL_NAV_GROUPS = [
         roles: ['admin', 'moderator'] as DashboardRole[],
         subItems: PEOPLE_SUB_ITEMS, subQueryKey: 'view',
       },
+      // Contributor program: staff create and assign tasks to members.
+      { label: 'Tasks', href: '/dashboard/tasks', icon: '◇', roles: ['admin', 'moderator'] as DashboardRole[] },
+      { label: 'Review queue', href: '/dashboard/reviews', icon: '◆', roles: ['admin', 'moderator'] as DashboardRole[] },
+      { label: 'Leaderboard', href: '/dashboard/leaderboard', icon: '▲', roles: ['admin', 'moderator'] as DashboardRole[] },
     ],
   },
   {
