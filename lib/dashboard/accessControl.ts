@@ -16,6 +16,8 @@ export const BLOCKED_PATHS: Record<string, string[]> = {
     '/dashboard/settings',
     '/dashboard/logs',
     '/dashboard/ai-engine',
+    '/dashboard/tasks',
+    '/dashboard/reviews',
   ],
   community: [
     '/dashboard/applications',
@@ -28,6 +30,8 @@ export const BLOCKED_PATHS: Record<string, string[]> = {
     '/dashboard/products',
     '/dashboard/logs',
     '/dashboard/ai-engine',
+    '/dashboard/tasks',
+    '/dashboard/reviews',
   ],
   // Full access except the two pages that would let a moderator change
   // their own (or anyone's) access level, or see internal processing logs.
@@ -51,7 +55,9 @@ export const BLOCKED_PATHS: Record<string, string[]> = {
 // new page added later. Listed here, isRestricted treats the role as
 // allowlisted instead of falling through to BLOCKED_PATHS.
 export const ALLOWED_PATHS: Record<string, string[]> = {
-  member: ['/dashboard/people'],
+  // /dashboard/my-tasks and /dashboard/leaderboard: contributor program. No member path
+  // may be a prefix of a staff path (matching is by prefix).
+  member: ['/dashboard/people', '/dashboard/my-tasks', '/dashboard/leaderboard'],
 }
 
 export function isRestricted(pathname: string, role: string): boolean {
