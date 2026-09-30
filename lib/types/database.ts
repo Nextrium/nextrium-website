@@ -712,6 +712,7 @@ export type Database = {
           latest_review_id: string | null
           review_decision: 'approved' | 'rejected' | 'human_required' | null
           review_score: number | null
+          review_failure_count: number
           base_points: number | null
           timing_multiplier: number | null
           final_points: number | null
