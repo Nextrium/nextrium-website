@@ -18,7 +18,7 @@ export async function notifyMember(userId: string | null | undefined, content: E
     const supabase = createServiceClient() as any
     const [{ data: du }, { data: profile }, { data: auth }] = await Promise.all([
       supabase.from('dashboard_users').select('archived, role').eq('user_id', userId).maybeSingle(),
-      supabase.from('contributor_profiles').select('notify_email').eq('user_id', userId).maybeSingle(),
+      supabase.from('contributor_profiles').select('notify_email, display_name').eq('user_id', userId).maybeSingle(),
       supabase.auth.admin.getUserById(userId),
     ])
     if (!du || du.archived) return false
@@ -29,7 +29,7 @@ export async function notifyMember(userId: string | null | undefined, content: E
     const { results } = await sendEmail({
       subject: content.subject,
       message: content.html,
-      recipients: [{ email, name: displayNameFromEmail(email) }],
+      recipients: [{ email, name: profile?.display_name?.trim() || displayNameFromEmail(email) }],
       sentBy: 'contributor_program',
     })
     return results.some((r) => r.success)

@@ -30,6 +30,7 @@ export default function ProfileEditClient({
   discordAvailable,
   discordNotice,
   contributor = null,
+  contributorOptional = false,
 }: {
   isFirstTime: boolean
   initialBio: string
@@ -37,8 +38,10 @@ export default function ProfileEditClient({
   discordUsername: string | null
   discordAvailable: boolean
   discordNotice: string | null
-  /** Contributor preferences, shown only for members. */
+  /** Contributor preferences, shown to everyone who can contribute. */
   contributor?: ContributorFieldsValue | null
+  /** Staff may leave the contributor section empty; members must fill it in. */
+  contributorOptional?: boolean
 }) {
   const router = useRouter()
   const [disconnecting, setDisconnecting] = useState(false)
@@ -77,8 +80,11 @@ export default function ProfileEditClient({
     setError('')
     // Contributor preferences first, so onboarding (completed by saveProfile)
     // only finishes once they are valid.
-    if (contrib) {
+    // The display name may be pre-filled from an application, so it alone doesn't opt staff in.
+    const contribFilled = !!contrib && (contrib.categories.length > 0 || contrib.skillsText.trim() !== '')
+    if (contrib && (!contributorOptional || contribFilled)) {
       const c = await saveContributorProfile({
+        displayName: contrib.displayName,
         categories: contrib.categories,
         skills: splitSkills(contrib.skillsText),
         availabilityHoursPerWeek: contrib.availability === '' ? null : Number(contrib.availability),
@@ -139,7 +145,7 @@ export default function ProfileEditClient({
             </div>
           ))}
 
-          {contrib && <ContributorFields value={contrib} onChange={setContrib} />}
+          {contrib && <ContributorFields value={contrib} onChange={setContrib} optional={contributorOptional} />}
 
           <div className="profile-form-section-title">Discord</div>
           {notice && (

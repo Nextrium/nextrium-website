@@ -30,7 +30,12 @@ export function rankLeaderboard(entries: LeaderboardEntry[]): RankedEntry[] {
   })
 }
 
-/** Display name used across the dashboard: the part of the email before "@". */
+/** Name shown on the leaderboard: the contributor's chosen display name, never derived from their email. */
+export function leaderboardName(displayName: string | null | undefined): string {
+  return displayName?.trim() || 'Unnamed contributor'
+}
+
+/** Greeting name for emails sent to the person themselves: the part of their email before "@". */
 export function displayNameFromEmail(email: string | null | undefined): string {
   const local = (email ?? '').split('@')[0]?.trim()
   return local || 'Member'

@@ -25,7 +25,7 @@ export default async function MyProfilePage({ searchParams }: { searchParams: Pr
   const isContributor = isContributorRole(dashboardUser?.role)
   const { data: contributorProfile } = isContributor
     ? await (serviceClient.from('contributor_profiles') as any)
-        .select('categories, skills, availability_hours_per_week, notify_email')
+        .select('display_name, categories, skills, availability_hours_per_week, notify_email')
         .eq('user_id', user.id)
         .maybeSingle()
     : { data: null }
@@ -47,7 +47,9 @@ export default async function MyProfilePage({ searchParams }: { searchParams: Pr
           discordUsername={dashboardUser?.discord_linked_at ? (dashboardUser?.discord_username ?? null) : null}
           discordAvailable={!!readDiscordConfig()}
           discordNotice={discordNotice ?? null}
+          contributorOptional={dashboardUser?.role !== 'member'}
           contributor={isContributor ? {
+            displayName: contributorProfile?.display_name ?? '',
             categories: contributorProfile?.categories ?? [],
             skillsText: (contributorProfile?.skills ?? []).join(', '),
             availability: contributorProfile?.availability_hours_per_week?.toString() ?? '',

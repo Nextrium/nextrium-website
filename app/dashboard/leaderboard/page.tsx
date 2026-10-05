@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation'
 import { createServiceClient } from '@/lib/supabase/server'
 import Header from '@/components/dashboard/Header'
 import { CONTRIBUTOR_ROLES, requireMember, requireStaff } from '@/lib/contributions/auth'
-import { displayNameFromEmail, rankLeaderboard, type LeaderboardEntry } from '@/lib/contributions/leaderboard'
+import { leaderboardName, rankLeaderboard, type LeaderboardEntry } from '@/lib/contributions/leaderboard'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Leaderboard' }
@@ -30,10 +30,11 @@ export default async function LeaderboardPage({ searchParams }: Props) {
 
   let entries: LeaderboardEntry[] = []
   if (ids.length) {
-    const names = new Map<string, string>(await Promise.all(ids.map(async (id) => {
-      const { data } = await supabase.auth.admin.getUserById(id)
-      return [id, displayNameFromEmail(data?.user?.email)] as [string, string]
-    })))
+    // Names come from the contributor's own display name, never their email.
+    const { data: profileRows } = await supabase.from('contributor_profiles')
+      .select('user_id, display_name, total_points, verified_contributions').in('user_id', ids)
+    const profiles = (profileRows ?? []) as { user_id: string; display_name: string | null; total_points: number; verified_contributions: number }[]
+    const names = new Map(profiles.map((p) => [p.user_id, leaderboardName(p.display_name)]))
     if (monthly) {
       const start = new Date(); start.setUTCDate(1); start.setUTCHours(0, 0, 0, 0)
       const { data: ledger } = await supabase.from('points_ledger')
@@ -43,12 +44,10 @@ export default async function LeaderboardPage({ searchParams }: Props) {
         const s = sums.get(l.contributor_id) ?? { points: 0, verified: 0 }
         sums.set(l.contributor_id, { points: s.points + l.final_points, verified: s.verified + 1 })
       }
-      entries = [...sums].map(([userId, s]) => ({ userId, name: names.get(userId) ?? 'Member', ...s }))
+      entries = [...sums].map(([userId, s]) => ({ userId, name: names.get(userId) ?? leaderboardName(null), ...s }))
     } else {
-      const { data: profiles } = await supabase.from('contributor_profiles')
-        .select('user_id, total_points, verified_contributions').in('user_id', ids)
-      entries = ((profiles ?? []) as any[]).map((p) => ({
-        userId: p.user_id, name: names.get(p.user_id) ?? 'Member', points: p.total_points, verified: p.verified_contributions,
+      entries = profiles.map((p) => ({
+        userId: p.user_id, name: names.get(p.user_id) ?? leaderboardName(null), points: p.total_points, verified: p.verified_contributions,
       }))
     }
   }

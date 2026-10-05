@@ -621,6 +621,7 @@ export type Database = {
       contributor_profiles: {
         Row: {
           user_id: string
+          display_name: string | null
           categories: ('technical' | 'design' | 'research' | 'operations' | 'community')[]
           skills: string[]
           availability_hours_per_week: number | null
@@ -632,6 +633,7 @@ export type Database = {
         }
         Insert: {
           user_id: string
+          display_name?: string | null
           categories?: ('technical' | 'design' | 'research' | 'operations' | 'community')[]
           skills?: string[]
           availability_hours_per_week?: number | null
@@ -640,6 +642,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          display_name?: string | null
           categories?: ('technical' | 'design' | 'research' | 'operations' | 'community')[]
           skills?: string[]
           availability_hours_per_week?: number | null

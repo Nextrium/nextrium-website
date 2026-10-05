@@ -23,6 +23,7 @@ export async function saveContributorProfile(raw: unknown): Promise<{ error?: st
   const { error } = await (createServiceClient().from('contributor_profiles') as any).upsert(
     {
       user_id: me.userId,
+      display_name: p.displayName,
       categories: p.categories,
       skills: p.skills,
       availability_hours_per_week: p.availabilityHoursPerWeek,
