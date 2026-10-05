@@ -3,6 +3,7 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { readDiscordConfig } from '@/lib/discordLink'
 import Header from '@/components/dashboard/Header'
 import ProfileEditClient from './ProfileEditClient'
+import { isContributorRole } from '@/lib/contributions/auth'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'My Profile' }
@@ -20,9 +21,9 @@ export default async function MyProfilePage({ searchParams }: { searchParams: Pr
 
   const isFirstTime = !dashboardUser?.onboarding_completed_at
 
-  // Members are contributors: they also set the areas they want tasks in.
-  const isMember = dashboardUser?.role === 'member'
-  const { data: contributorProfile } = isMember
+  // Anyone with dashboard access can contribute, so everyone sets the areas they want tasks in.
+  const isContributor = isContributorRole(dashboardUser?.role)
+  const { data: contributorProfile } = isContributor
     ? await (serviceClient.from('contributor_profiles') as any)
         .select('categories, skills, availability_hours_per_week, notify_email')
         .eq('user_id', user.id)
@@ -46,7 +47,7 @@ export default async function MyProfilePage({ searchParams }: { searchParams: Pr
           discordUsername={dashboardUser?.discord_linked_at ? (dashboardUser?.discord_username ?? null) : null}
           discordAvailable={!!readDiscordConfig()}
           discordNotice={discordNotice ?? null}
-          contributor={isMember ? {
+          contributor={isContributor ? {
             categories: contributorProfile?.categories ?? [],
             skillsText: (contributorProfile?.skills ?? []).join(', '),
             availability: contributorProfile?.availability_hours_per_week?.toString() ?? '',

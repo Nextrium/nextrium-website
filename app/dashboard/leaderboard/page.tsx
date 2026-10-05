@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createServiceClient } from '@/lib/supabase/server'
 import Header from '@/components/dashboard/Header'
-import { requireMember, requireStaff } from '@/lib/contributions/auth'
+import { CONTRIBUTOR_ROLES, requireMember, requireStaff } from '@/lib/contributions/auth'
 import { displayNameFromEmail, rankLeaderboard, type LeaderboardEntry } from '@/lib/contributions/leaderboard'
 
 export const dynamic = 'force-dynamic'
@@ -13,7 +13,7 @@ interface Props {
 }
 
 export default async function LeaderboardPage({ searchParams }: Props) {
-  // Active members and staff (admin, moderator).
+  // Active contributors (any role) and staff.
   const staff = await requireStaff()
   const member = 'error' in staff ? await requireMember() : null
   const caller = 'caller' in staff ? staff.caller : member && 'caller' in member ? member.caller : null
@@ -23,9 +23,9 @@ export default async function LeaderboardPage({ searchParams }: Props) {
   const monthly = period === 'month'
   const supabase = createServiceClient() as any
 
-  // Active members only: archived or not-yet-onboarded people are not listed.
+  // Active people only: archived or not-yet-onboarded people are not listed.
   const { data: members } = await supabase.from('dashboard_users')
-    .select('user_id').eq('role', 'member').eq('archived', false).not('onboarding_completed_at', 'is', null)
+    .select('user_id').in('role', CONTRIBUTOR_ROLES).eq('archived', false).not('onboarding_completed_at', 'is', null)
   const ids: string[] = (members ?? []).map((m: any) => m.user_id)
 
   let entries: LeaderboardEntry[] = []

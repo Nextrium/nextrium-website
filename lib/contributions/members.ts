@@ -1,5 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import type { Category } from './constants'
+import { CONTRIBUTOR_ROLES } from './auth'
 
 export interface MemberSummary {
   userId: string
@@ -11,16 +12,17 @@ export interface MemberSummary {
 }
 
 /**
- * Members (role 'member') with the fields staff need to pick an assignee.
- * Server-only (service role). Emails come from auth, looked up per member
- * rather than via listUsers(), which only returns its first page.
+ * Everyone who can be assigned a task (any dashboard role), with the fields
+ * staff need to pick an assignee. Server-only (service role). Emails come
+ * from auth, looked up per member rather than via listUsers(), which only
+ * returns its first page.
  */
 export async function getMemberDirectory(): Promise<MemberSummary[]> {
   const supabase = createServiceClient() as any
   const { data: members } = await supabase
     .from('dashboard_users')
     .select('user_id, archived, onboarding_completed_at')
-    .eq('role', 'member')
+    .in('role', CONTRIBUTOR_ROLES)
   const rows: { user_id: string; archived: boolean; onboarding_completed_at: string | null }[] = members ?? []
   if (rows.length === 0) return []
 
