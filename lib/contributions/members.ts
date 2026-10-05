@@ -1,6 +1,7 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import type { Category } from './constants'
 import { CONTRIBUTOR_ROLES } from './auth'
+import { getAuthEmails } from '@/lib/dashboard/authEmails'
 
 export interface MemberSummary {
   userId: string
@@ -13,9 +14,7 @@ export interface MemberSummary {
 
 /**
  * Everyone who can be assigned a task (any dashboard role), with the fields
- * staff need to pick an assignee. Server-only (service role). Emails come
- * from auth, looked up per member rather than via listUsers(), which only
- * returns its first page.
+ * staff need to pick an assignee. Server-only (service role).
  */
 export async function getMemberDirectory(): Promise<MemberSummary[]> {
   const supabase = createServiceClient() as any
@@ -36,16 +35,12 @@ export async function getMemberDirectory(): Promise<MemberSummary[]> {
   const openCount = new Map<string, number>()
   for (const t of open ?? []) openCount.set(t.assigned_to, (openCount.get(t.assigned_to) ?? 0) + 1)
 
-  const emails = await Promise.all(ids.map(async (id) => {
-    const { data } = await supabase.auth.admin.getUserById(id)
-    return [id, data?.user?.email ?? 'Unknown'] as const
-  }))
-  const emailMap = new Map(emails)
+  const emailMap = await getAuthEmails(supabase, ids)
 
   return rows
     .map((r) => ({
       userId: r.user_id,
-      email: emailMap.get(r.user_id) ?? 'Unknown',
+      email: emailMap.get(r.user_id) || 'Unknown',
       active: !r.archived && !!r.onboarding_completed_at,
       categories: profileMap.get(r.user_id)?.categories ?? [],
       skills: profileMap.get(r.user_id)?.skills ?? [],

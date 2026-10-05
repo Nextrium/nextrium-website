@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getVerifiedIdentity } from '@/lib/dashboard/getRole'
 import { canSeeDirectory, canViewPerson } from '@/lib/dashboard/peopleVisibility'
+import { getAuthEmails } from '@/lib/dashboard/authEmails'
 import Header from '@/components/dashboard/Header'
 import PeopleClient, { type PersonCard } from './PeopleClient'
 
@@ -24,8 +25,8 @@ async function getPeople(): Promise<PersonCard[]> {
   if (!dashboardUsers || dashboardUsers.length === 0) return []
 
   const memberIds = dashboardUsers.filter((u: any) => u.role === 'member').map((u: any) => u.user_id)
-  const [{ data: authUsers }, { data: tracks }, { data: profiles }, { data: openTasks }] = await Promise.all([
-    supabase.auth.admin.listUsers(),
+  const [emailMap, { data: tracks }, { data: profiles }, { data: openTasks }] = await Promise.all([
+    getAuthEmails(supabase, dashboardUsers.map((u: any) => u.user_id)),
     (supabase.from('staff_tracks') as any).select('id, name'),
     // Contributor program stats for members (points are maintained by the database).
     memberIds.length
@@ -39,15 +40,12 @@ async function getPeople(): Promise<PersonCard[]> {
   const openCount = new Map<string, number>()
   ;(openTasks ?? []).forEach((t: any) => openCount.set(t.assigned_to, (openCount.get(t.assigned_to) ?? 0) + 1))
 
-  const emailMap: Record<string, string> = {}
-  authUsers?.users.forEach((u) => { emailMap[u.id] = u.email ?? 'No email' })
-
   const trackNameMap: Record<string, string> = {}
   ;(tracks ?? []).forEach((t: any) => { trackNameMap[t.id] = t.name })
 
   return dashboardUsers.map((u: any) => ({
     userId:          u.user_id,
-    email:           emailMap[u.user_id] ?? 'Unknown',
+    email:           emailMap.has(u.user_id) ? (emailMap.get(u.user_id) || 'No email') : 'Unknown',
     role:            u.role,
     bio:             u.bio,
     socialHandles:   u.social_handles ?? {},

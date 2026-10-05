@@ -2,6 +2,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import Header from '@/components/dashboard/Header'
 import { APPLICATION_TRACKS } from '@/lib/automation/rulesAdmin'
 import TeamAccessClient from './TeamAccessClient'
+import { getAuthEmails } from '@/lib/dashboard/authEmails'
 
 export const metadata = { title: 'Team Access' }
 export const dynamic = 'force-dynamic'
@@ -27,13 +28,9 @@ async function getDashboardUsers(): Promise<DashboardUserRow[]> {
 
   const userIds = dashboardUsers.map((u: any) => u.user_id)
 
-  // listUsers() only returns the first page (50) of ALL auth users, so staff
-  // past that showed as "Unknown". Look up just the staff users directly.
+  const emails = await getAuthEmails(supabase, userIds)
   const emailMap: Record<string, string> = {}
-  await Promise.all(userIds.map(async (id: string) => {
-    const { data } = await supabase.auth.admin.getUserById(id)
-    if (data?.user) emailMap[id] = data.user.email ?? 'No email'
-  }))
+  emails.forEach((email, id) => { emailMap[id] = email || 'No email' })
 
   const { data: trackRows } = await (supabase.from('staff_tracks') as any).select('id, name')
   const trackNames: Record<string, string> = {}
