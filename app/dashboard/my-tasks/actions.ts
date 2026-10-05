@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { after } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { logActivity } from '@/lib/activityLog'
 import { requireMember } from '@/lib/contributions/auth'
@@ -75,13 +76,21 @@ export async function submitContribution(taskId: string, raw: unknown): Promise<
     details: { title: s.title, taskId, submission: data.submission_count },
     actorId: auth.caller.userId, actorEmail: auth.caller.email ?? undefined,
   })
-  // The submission is committed above; now review it on the server. A
-  // failed review leaves it 'review_failed' for staff to retry.
-  const outcome = await reviewContribution(data.id)
-  if (outcome.kind === 'reviewed') await notifyReviewResult(data.id, outcome.status)
+  // The submission is committed above. The review can take up to a minute,
+  // so it runs after the response is sent; the member's page refreshes until
+  // the result lands. A failed review leaves it 'review_failed' for staff to
+  // retry, and one cut off mid-call stays 'pending_review' until staff retry it.
+  const contributionId: string = data.id
+  after(async () => {
+    try {
+      const outcome = await reviewContribution(contributionId)
+      if (outcome.kind === 'reviewed') await notifyReviewResult(contributionId, outcome.status)
+    } catch (err) {
+      console.error('[review] background review failed:', err instanceof Error ? err.message : err)
+    }
+  })
 
   revalidatePath('/dashboard/my-tasks')
   revalidatePath(`/dashboard/my-tasks/${taskId}`)
-  const status = outcome.kind === 'reviewed' ? outcome.status : 'review_failed'
-  return { ok: true, contributionId: data.id, status, submissionCount: data.submission_count }
+  return { ok: true, contributionId, status: data.status, submissionCount: data.submission_count }
 }

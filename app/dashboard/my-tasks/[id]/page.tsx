@@ -7,11 +7,14 @@ import { CONTRIBUTION_STATUS_MEMBER_LABELS, TASK_STATUS_LABELS, deadlineLabel, e
 import ExtensionRequest from './ExtensionRequest'
 import SubmissionForm from './SubmissionForm'
 import ReviewHistory from '@/components/contributions/ReviewHistory'
+import ReviewPoller from '@/components/contributions/ReviewPoller'
 import { sanitizeBrief } from '@/lib/contributions/sanitize'
 import type { Contribution, ContributionReview, Task } from '@/lib/types/database'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Task' }
+// The submit action finishes its automated review after responding.
+export const maxDuration = 60
 
 interface Props {
   params: Promise<{ id: string }>
@@ -87,6 +90,7 @@ export default async function MyTaskPage({ params }: Props) {
                 initial={contribution ? { title: contribution.title, description: contribution.description, evidenceUrl: contribution.evidence_url ?? '' } : null}
               />
             )}
+            {contribution?.status === 'pending_review' && <ReviewPoller />}
             {contribution && !canSubmit && (
               <div className="mt-panel">
                 <div className="mt-panel-title">Your submission</div>

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { deadlineLabel, effectiveDeadline, isOverdue } from './taskView'
+import { deadlineLabel, effectiveDeadline, isOverdue, isReviewStale } from './taskView'
 
 const now = new Date('2026-10-01T12:00:00Z')
 
@@ -27,4 +27,11 @@ test('deadlineLabel describes time left or overdue', () => {
   assert.equal(deadlineLabel({ status: 'assigned', deadline_at: '2026-09-29T12:00:00Z', extended_deadline_at: null }, now), '2 days overdue')
   assert.equal(deadlineLabel({ status: 'completed', deadline_at: '2026-09-29T12:00:00Z', extended_deadline_at: null }, now), '2026-09-29')
   assert.equal(deadlineLabel({ status: 'draft', deadline_at: null, extended_deadline_at: null }, now), '—')
+})
+
+test('isReviewStale only for reviews pending longer than the stale window', () => {
+  assert.equal(isReviewStale({ status: 'pending_review', submitted_at: '2026-10-01T11:54:00Z' }, now), true)
+  assert.equal(isReviewStale({ status: 'pending_review', submitted_at: '2026-10-01T11:58:00Z' }, now), false)
+  assert.equal(isReviewStale({ status: 'review_failed', submitted_at: '2026-10-01T10:00:00Z' }, now), false)
+  assert.equal(isReviewStale({ status: 'needs_human', submitted_at: '2026-10-01T10:00:00Z' }, now), false)
 })

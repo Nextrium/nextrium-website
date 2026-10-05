@@ -9,11 +9,14 @@ import { requireStaff } from '@/lib/contributions/auth'
 import { getMemberDirectory } from '@/lib/contributions/members'
 import { sanitizeBrief } from '@/lib/contributions/sanitize'
 import { CATEGORY_LABELS, COMPLEXITY_LABELS } from '@/lib/contributions/constants'
-import { QUEUE_TABS, effectiveDeadline } from '@/lib/contributions/taskView'
+import { QUEUE_TABS, effectiveDeadline, isReviewStale } from '@/lib/contributions/taskView'
+import ReviewPoller from '@/components/contributions/ReviewPoller'
 import type { Contribution, ContributionReview, Task } from '@/lib/types/database'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Review' }
+// Retrying the automated review waits for the service.
+export const maxDuration = 60
 
 interface Props {
   params: Promise<{ id: string }>
@@ -36,6 +39,7 @@ export default async function ReviewDetailPage({ params }: Props) {
   const reviews: ContributionReview[] = reviewRows ?? []
   const member = members.find((m) => m.userId === c.contributor_id)
   const deadline = effectiveDeadline(task)
+  const stale = isReviewStale(c)
 
   const statusLabel = QUEUE_TABS.find((t) => t.key === c.status)?.label ?? c.status
   const fmt = (iso: string | null) => iso ? new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '—'
@@ -92,11 +96,13 @@ export default async function ReviewDetailPage({ params }: Props) {
               {c.review_score !== null && <div className="mt-kv"><span>Automated score</span><span>{Math.round(Number(c.review_score))}/100</span></div>}
               {c.final_points !== null && <div className="mt-kv"><span>Points awarded</span><span>{c.final_points}</span></div>}
             </div>
-            {c.status === 'review_failed' && <RetryReview contributionId={c.id} />}
+            {(c.status === 'review_failed' || stale) && <RetryReview contributionId={c.id} />}
             {['needs_human', 'ai_approved', 'review_failed', 'changes_requested'].includes(c.status) && (
               <DecisionPanel contributionId={c.id} min={task.point_range_min} max={task.point_range_max} />
             )}
-            {c.status === 'pending_review' && <div className="mt-panel"><span className="mt-hint">The automated review is running. Decisions open when it finishes.</span></div>}
+            {c.status === 'pending_review' && !stale && (
+              <div className="mt-panel"><ReviewPoller /><span className="mt-hint">The automated review is running. Decisions open when it finishes.</span></div>
+            )}
             {c.status === 'verified' && <div className="mt-panel"><span className="mt-hint">Verified{c.verified_at ? ` on ${fmt(c.verified_at)}` : ''}. {c.final_points} points awarded.</span></div>}
             {c.status === 'rejected' && <div className="mt-panel"><span className="mt-hint">Rejected. The task was cancelled.</span></div>}
           </div>
