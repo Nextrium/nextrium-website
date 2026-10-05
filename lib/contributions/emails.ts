@@ -41,7 +41,6 @@ export function taskAssignedEmail(p: { taskTitle: string; points: string; deadli
       `<p>Hi {{name}},</p>` +
       `<p>You've been assigned a new task: <strong>${escapeHtml(p.taskTitle)}</strong>.</p>` +
       `<p>Points: ${escapeHtml(p.points)}<br>Deadline: ${escapeHtml(formatDate(p.deadlineAt))}</p>` +
-      `<p>Finishing in the first half of the time window earns 1.2× points.</p>` +
       button(p.url, 'Open the task'),
   }
 }

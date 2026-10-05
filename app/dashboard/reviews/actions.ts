@@ -42,8 +42,8 @@ async function log(action: string, contributionId: string, details: Record<strin
 
 /**
  * Verifies a contribution and awards points. The database function clamps
- * the base points to the task's range, applies the timing multiplier on the
- * server clock, writes the ledger and completes the task — idempotently.
+ * the points to the task's range, writes the ledger and completes the task
+ * — idempotently.
  */
 export async function verifyContribution(contributionId: string, basePoints: number, notes?: string): Promise<Result> {
   const auth = await requireStaff()

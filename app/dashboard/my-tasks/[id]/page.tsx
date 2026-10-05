@@ -110,9 +110,7 @@ export default async function MyTaskPage({ params }: Props) {
               <div className="mt-panel-title">Details</div>
               <div className="mt-kv"><span>Points</span><span>{task.point_range_min}–{task.point_range_max}</span></div>
               <div className="mt-kv"><span>Deadline</span><span>{deadline ? deadline.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '—'}</span></div>
-              {open && <div className="mt-kv"><span>Time left</span><span className={isOverdue(task, now) ? 'bad' : ''}>{deadlineLabel(task, now)}</span></div>}
-              <span className="mt-hint">Finishing in the first half of the window earns 1.2× points; late work earns 0.8×.</span>
-            </div>
+              {open && <div className="mt-kv"><span>Time left</span><span className={isOverdue(task, now) ? 'bad' : ''}>{deadlineLabel(task, now)}</span></div>}            </div>
 
             {open && (
               <div className="mt-panel">
