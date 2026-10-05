@@ -64,12 +64,13 @@ export default async function LeaderboardPage({ searchParams }: Props) {
         .lb-row.me { border-color: rgba(219,103,39,0.45); }
         .lb-rank { font-family: var(--font-exo2); font-weight: 700; font-size: 18px; color: var(--grey-mid); }
         .lb-row:nth-child(-n+3) .lb-rank { color: var(--orange); }
-        .lb-name { color: var(--white); font-size: 14px; font-weight: 600; }
+        .lb-name { color: var(--white); font-size: 14px; font-weight: 600; text-decoration: none; }
+        .lb-name:hover { color: var(--orange); }
         .lb-points { color: var(--white); font-family: var(--font-exo2); font-size: 18px; font-weight: 700; }
         .lb-muted { color: var(--grey-mid); font-size: 12px; }
         .lb-empty { padding: 32px; background: var(--navy); border: 1px solid rgba(255,255,255,0.06); color: var(--grey-mid); max-width: 720px; }
       `}</style>
-      <Header title="Leaderboard" description="Points from verified contributions" />
+      <Header title="Leaderboard" description="Points from verified contributions — select a name to see what they delivered" />
       <div className="dash-content">
         <div className="lb-tabs">
           <Link href="/dashboard/leaderboard" className={`lb-tab ${!monthly ? 'active' : ''}`}>All time</Link>
@@ -82,7 +83,7 @@ export default async function LeaderboardPage({ searchParams }: Props) {
             {ranked.map((e) => (
               <div key={e.userId} className={`lb-row ${e.userId === caller.userId ? 'me' : ''}`}>
                 <span className="lb-rank">{e.rank}</span>
-                <span className="lb-name">{e.name}{e.userId === caller.userId ? ' (you)' : ''}</span>
+                <Link href={`/dashboard/leaderboard/${e.userId}`} className="lb-name">{e.name}{e.userId === caller.userId ? ' (you)' : ''}</Link>
                 <span className="lb-muted">{e.verified} verified</span>
                 <span className="lb-points">{e.points}</span>
               </div>
