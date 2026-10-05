@@ -38,12 +38,26 @@ export function defaultSender(senderEmail: string): SenderIdentity {
 }
 
 /**
+ * True when HTML has any non-whitespace character outside a tag. A single
+ * linear pass: this only answers "is it empty?" and never produces HTML.
+ */
+export function hasVisibleText(html: string): boolean {
+  let inTag = false
+  for (const ch of html) {
+    if (inTag) { if (ch === '>') inTag = false; continue }
+    if (ch === '<') { inTag = true; continue }
+    if (ch.trim()) return true
+  }
+  return false
+}
+
+/**
  * Returns the error message for invalid input, or null when it can be sent.
  * `message` may be rich HTML from the composer (e.g. `<p></p>` when "empty")
- * as well as plain text, so tags are stripped before checking for content.
+ * as well as plain text, so only text outside tags counts as content.
  */
 export function validateEmailInput(input: { subject?: unknown; message?: unknown; recipients?: unknown }): string | null {
-  const messageHasContent = typeof input.message === 'string' && input.message.replace(/<[^>]*>/g, '').trim().length > 0
+  const messageHasContent = typeof input.message === 'string' && hasVisibleText(input.message)
   if (typeof input.subject !== 'string' || !input.subject.trim()) return 'Subject is required.'
   if (!messageHasContent) return 'Message is required.'
   if (!Array.isArray(input.recipients) || input.recipients.length === 0) return 'At least one recipient is required.'

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {
   ARCHIVED_RECIPIENT_ERROR,
   defaultSender,
+  hasVisibleText,
   personalise,
   splitArchivedRecipients,
   toArchivedEmailSet,
@@ -24,6 +25,16 @@ test('validateEmailInput treats an empty rich-text editor as no message', () => 
   assert.equal(validateEmailInput({ subject: 's', message: '<p></p>', recipients }), 'Message is required.')
   assert.equal(validateEmailInput({ subject: 's', message: '<p>  <br></p>', recipients }), 'Message is required.')
   assert.equal(validateEmailInput({ subject: 's', message: '<p>Hello</p>', recipients }), null)
+})
+
+test('hasVisibleText ignores tags and whitespace, and is fast on hostile input', () => {
+  assert.equal(hasVisibleText('<p> <br/> </p>'), false)
+  assert.equal(hasVisibleText('<p>x</p>'), true)
+  assert.equal(hasVisibleText('plain'), true)
+  assert.equal(hasVisibleText('<p unclosed'), false)
+  const start = Date.now()
+  assert.equal(hasVisibleText('<'.repeat(200_000)), false)
+  assert.ok(Date.now() - start < 500)
 })
 
 test('validateEmailInput rejects wrong types instead of throwing', () => {
