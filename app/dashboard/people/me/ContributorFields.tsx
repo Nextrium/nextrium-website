@@ -3,26 +3,34 @@
 import { CATEGORIES, CATEGORY_LABELS, type Category } from '@/lib/contributions/constants'
 
 export interface ContributorFieldsValue {
+  displayName: string
   categories: Category[]
   skillsText: string
   availability: string
   notifyEmail: boolean
 }
 
-/** Contributor preferences section of the profile form (members only). */
+/** Contributor preferences section of the profile form. Optional for staff, required for members. */
 export default function ContributorFields({
   value,
   onChange,
+  optional = false,
 }: {
   value: ContributorFieldsValue
   onChange: (next: ContributorFieldsValue) => void
+  optional?: boolean
 }) {
   const toggle = (c: Category) =>
     onChange({ ...value, categories: value.categories.includes(c) ? value.categories.filter((x) => x !== c) : [...value.categories, c] })
 
   return (
     <>
-      <div className="profile-form-section-title">Contributing</div>
+      <div className="profile-form-section-title">Contributing{optional ? ' (optional)' : ''}</div>
+      {optional && <p className="profile-discord-name" style={{ margin: '-6px 0 14px' }}>Fill this in if you want to take on contributor tasks.</p>}
+      <label className="profile-form-label" htmlFor="contrib-name">Display name (shown on the leaderboard)</label>
+      <input id="contrib-name" className="profile-form-input" type="text" maxLength={60} placeholder="How other contributors see you"
+        value={value.displayName} onChange={(e) => onChange({ ...value, displayName: e.target.value })} />
+
       <label className="profile-form-label">Areas you want tasks in</label>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '18px' }}>
         {CATEGORIES.map((c) => (

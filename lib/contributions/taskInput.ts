@@ -1,5 +1,5 @@
 import { isCategory, isComplexity, taskDefaults, type Category, type Complexity } from './constants'
-import { sanitizeBrief } from './sanitize'
+import { briefToText, sanitizeBrief } from './sanitize'
 
 export const TITLE_MAX = 200
 export const BRIEF_MAX = 20_000
@@ -52,7 +52,7 @@ export function parseTaskInput(raw: unknown): { fields: TaskFields } | { error: 
   const rawBrief = typeof input.description === 'string' ? input.description : ''
   if (rawBrief.length > BRIEF_MAX) return { error: 'The brief is too long.' }
   const description = sanitizeBrief(rawBrief)
-  if (!description.replace(/<[^>]*>/g, '').trim()) return { error: 'A brief is required.' }
+  if (!briefToText(description)) return { error: 'A brief is required.' }
 
   const rawLinks = Array.isArray(input.links) ? input.links : []
   if (rawLinks.length > LINKS_MAX) return { error: `At most ${LINKS_MAX} links.` }

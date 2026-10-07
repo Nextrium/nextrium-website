@@ -7,7 +7,10 @@ import { mapReviewResponse } from './reviewMapping'
 import { signReviewBody } from './reviewSignature'
 import type { Contribution } from '@/lib/types/database'
 
-const TIMEOUT_MS = 90_000          // contract: typical 10–60 s, client timeout 90 s
+// The contract suggests 90 s, but callers run under a 60 s server limit
+// (maxDuration on the task and review pages); timing out first marks the
+// review failed instead of the function being killed mid-call.
+const TIMEOUT_MS = 55_000
 const TASK_BRIEF_MAX = 8_000       // contract limit
 
 export type ReviewOutcome =

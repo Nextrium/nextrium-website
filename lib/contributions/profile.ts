@@ -2,8 +2,11 @@ import { CATEGORIES, type Category } from './constants'
 
 export const SKILLS_MAX = 20
 export const SKILL_CHARS_MAX = 40
+export const DISPLAY_NAME_MIN = 2
+export const DISPLAY_NAME_MAX = 60
 
 export interface ContributorProfileInput {
+  displayName: string
   categories: Category[]
   skills: string[]
   availabilityHoursPerWeek: number | null
@@ -14,6 +17,13 @@ export interface ContributorProfileInput {
 export function parseContributorProfile(raw: unknown): { profile: ContributorProfileInput } | { error: string } {
   if (!raw || typeof raw !== 'object') return { error: 'Invalid profile.' }
   const r = raw as Record<string, unknown>
+
+  // Shown to other contributors on the leaderboard: printable text, single spaces.
+  const displayName = typeof r.displayName === 'string'
+    ? r.displayName.replace(/[\p{C}]/gu, '').replace(/\s+/g, ' ').trim()
+    : ''
+  if (displayName.length < DISPLAY_NAME_MIN) return { error: 'Add the name you want shown on the leaderboard.' }
+  if (displayName.length > DISPLAY_NAME_MAX) return { error: `Keep your display name under ${DISPLAY_NAME_MAX} characters.` }
 
   const categories = Array.isArray(r.categories)
     ? [...new Set(r.categories.filter((c): c is Category => (CATEGORIES as readonly unknown[]).includes(c)))]
@@ -33,7 +43,7 @@ export function parseContributorProfile(raw: unknown): { profile: ContributorPro
     availability = n
   }
 
-  return { profile: { categories, skills, availabilityHoursPerWeek: availability, notifyEmail: r.notifyEmail !== false } }
+  return { profile: { displayName, categories, skills, availabilityHoursPerWeek: availability, notifyEmail: r.notifyEmail !== false } }
 }
 
 /** Splits a comma-separated skills field into a list. */

@@ -7,11 +7,14 @@ import { CONTRIBUTION_STATUS_MEMBER_LABELS, TASK_STATUS_LABELS, deadlineLabel, e
 import ExtensionRequest from './ExtensionRequest'
 import SubmissionForm from './SubmissionForm'
 import ReviewHistory from '@/components/contributions/ReviewHistory'
+import ReviewPoller from '@/components/contributions/ReviewPoller'
 import { sanitizeBrief } from '@/lib/contributions/sanitize'
 import type { Contribution, ContributionReview, Task } from '@/lib/types/database'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Task' }
+// The submit action finishes its automated review after responding.
+export const maxDuration = 60
 
 interface Props {
   params: Promise<{ id: string }>
@@ -87,6 +90,7 @@ export default async function MyTaskPage({ params }: Props) {
                 initial={contribution ? { title: contribution.title, description: contribution.description, evidenceUrl: contribution.evidence_url ?? '' } : null}
               />
             )}
+            {contribution?.status === 'pending_review' && <ReviewPoller />}
             {contribution && !canSubmit && (
               <div className="mt-panel">
                 <div className="mt-panel-title">Your submission</div>
@@ -110,9 +114,7 @@ export default async function MyTaskPage({ params }: Props) {
               <div className="mt-panel-title">Details</div>
               <div className="mt-kv"><span>Points</span><span>{task.point_range_min}–{task.point_range_max}</span></div>
               <div className="mt-kv"><span>Deadline</span><span>{deadline ? deadline.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '—'}</span></div>
-              {open && <div className="mt-kv"><span>Time left</span><span className={isOverdue(task, now) ? 'bad' : ''}>{deadlineLabel(task, now)}</span></div>}
-              <span className="mt-hint">Finishing in the first half of the window earns 1.2× points; late work earns 0.8×.</span>
-            </div>
+              {open && <div className="mt-kv"><span>Time left</span><span className={isOverdue(task, now) ? 'bad' : ''}>{deadlineLabel(task, now)}</span></div>}            </div>
 
             {open && (
               <div className="mt-panel">
