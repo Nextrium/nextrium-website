@@ -42,6 +42,16 @@ export function deadlineLabel(t: DeadlineFields, now: Date = new Date()): string
   return diffMs >= 0 ? `in ${amount}` : `${amount} overdue`
 }
 
+/**
+ * Minutes after which a review still 'pending_review' is treated as lost (the
+ * background review was cut off) and staff may retry it. Well above the
+ * server's 60 s limit, so a review that is still running is never retried.
+ */
+export const REVIEW_STALE_MINUTES = 5
+
+export function isReviewStale(c: { status: string; submitted_at: string }, now: Date = new Date()): boolean {
+  return c.status === 'pending_review' && now.getTime() - new Date(c.submitted_at).getTime() > REVIEW_STALE_MINUTES * 60_000
+}
 
 /** How a contribution's status reads to the member who submitted it. */
 export const CONTRIBUTION_STATUS_MEMBER_LABELS: Record<ContributionStatus, string> = {

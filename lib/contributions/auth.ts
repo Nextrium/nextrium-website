@@ -8,6 +8,13 @@ export interface Caller {
   role: DashboardRole
 }
 
+/** Roles that can take on contributor tasks: every active dashboard role. */
+export const CONTRIBUTOR_ROLES: DashboardRole[] = ['admin', 'moderator', 'content', 'community', 'member']
+
+export function isContributorRole(role: string | null | undefined): boolean {
+  return CONTRIBUTOR_ROLES.includes(role as DashboardRole)
+}
+
 /**
  * Verified caller (checked with the auth server, role read fresh) when they
  * are staff (admin or moderator), otherwise an error. Every contributor
@@ -21,13 +28,13 @@ export async function requireStaff(): Promise<{ caller: Caller } | { error: stri
 }
 
 /**
- * Verified caller when they are an active member (role 'member', onboarded,
- * not archived), otherwise an error. Member-facing contributor actions and
+ * Verified caller when they can contribute: any active dashboard user
+ * (onboarded, not archived), whatever their role. Contributor actions and
  * pages call this themselves.
  */
 export async function requireMember(): Promise<{ caller: Caller } | { error: string }> {
   const me = await getVerifiedIdentity()
-  if (!me || me.role !== 'member') return { error: 'You do not have permission to do this.' }
+  if (!me || !isContributorRole(me.role)) return { error: 'You do not have permission to do this.' }
   const { data } = await (createServiceClient().from('dashboard_users') as any)
     .select('archived, onboarding_completed_at')
     .eq('user_id', me.userId)

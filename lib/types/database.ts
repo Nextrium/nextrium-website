@@ -621,6 +621,7 @@ export type Database = {
       contributor_profiles: {
         Row: {
           user_id: string
+          display_name: string | null
           categories: ('technical' | 'design' | 'research' | 'operations' | 'community')[]
           skills: string[]
           availability_hours_per_week: number | null
@@ -632,6 +633,7 @@ export type Database = {
         }
         Insert: {
           user_id: string
+          display_name?: string | null
           categories?: ('technical' | 'design' | 'research' | 'operations' | 'community')[]
           skills?: string[]
           availability_hours_per_week?: number | null
@@ -640,6 +642,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          display_name?: string | null
           categories?: ('technical' | 'design' | 'research' | 'operations' | 'community')[]
           skills?: string[]
           availability_hours_per_week?: number | null
@@ -714,7 +717,6 @@ export type Database = {
           review_score: number | null
           review_failure_count: number
           base_points: number | null
-          timing_multiplier: number | null
           final_points: number | null
           staff_notes: string | null
           verified_by: string | null
@@ -789,7 +791,6 @@ export type Database = {
           contributor_id: string
           contribution_id: string
           base_points: number
-          timing_multiplier: number
           final_points: number
           awarded_by: string | null
           created_at: string

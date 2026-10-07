@@ -3,15 +3,16 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import { getVerifiedIdentity } from '@/lib/dashboard/getRole'
 import { parseContributorProfile } from './profile'
+import { isContributorRole } from './auth'
 
 /**
- * Saves the calling member's contributor preferences. Always the caller's
- * own row (never a user id from the client), and only for members — the
- * contributor program is for people with the member role.
+ * Saves the caller's contributor preferences. Always the caller's own row
+ * (never a user id from the client); any active dashboard role can
+ * contribute.
  */
 export async function saveContributorProfile(raw: unknown): Promise<{ error?: string }> {
   const me = await getVerifiedIdentity()
-  if (!me || me.role !== 'member') return { error: 'Only members have contributor preferences.' }
+  if (!me || !isContributorRole(me.role)) return { error: 'You do not have permission to do this.' }
 
   const parsed = parseContributorProfile(raw)
   if ('error' in parsed) return { error: parsed.error }
@@ -22,6 +23,7 @@ export async function saveContributorProfile(raw: unknown): Promise<{ error?: st
   const { error } = await (createServiceClient().from('contributor_profiles') as any).upsert(
     {
       user_id: me.userId,
+      display_name: p.displayName,
       categories: p.categories,
       skills: p.skills,
       availability_hours_per_week: p.availabilityHoursPerWeek,

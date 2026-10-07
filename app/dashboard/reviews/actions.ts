@@ -8,6 +8,7 @@ import { describeDbError } from '@/lib/contributions/errors'
 import { reviewContribution } from '@/lib/contributions/reviewService'
 import { changesRequestedEmail, rejectedEmail, verifiedEmail } from '@/lib/contributions/emails'
 import { notifyMember, notifyReviewResult, siteUrl } from '@/lib/contributions/notify'
+import { isReviewStale } from '@/lib/contributions/taskView'
 
 /** True when the contribution is already in `status` — a repeated click, so no second log or email. */
 async function alreadyIn(contributionId: string, status: string): Promise<boolean> {
@@ -42,8 +43,8 @@ async function log(action: string, contributionId: string, details: Record<strin
 
 /**
  * Verifies a contribution and awards points. The database function clamps
- * the base points to the task's range, applies the timing multiplier on the
- * server clock, writes the ledger and completes the task — idempotently.
+ * the points to the task's range, writes the ledger and completes the task
+ * — idempotently.
  */
 export async function verifyContribution(contributionId: string, basePoints: number, notes?: string): Promise<Result> {
   const auth = await requireStaff()
@@ -108,18 +109,19 @@ export async function rejectContribution(contributionId: string, notes: string):
 
 /**
  * Re-runs the automated review for a submission whose review failed
- * (timeout, rate limit, service error). Staff-triggered only — there is no
- * automatic retry. Safe if two people click at once: the database stores at
- * most one service review per submission.
+ * (timeout, rate limit, service error) or was cut off and has been pending
+ * too long. Staff-triggered only — there is no automatic retry. Safe if two
+ * people click at once: the database stores at most one service review per
+ * submission.
  */
 export async function retryReview(contributionId: string): Promise<Result & { status?: string }> {
   const auth = await requireStaff()
   if ('error' in auth) return { ok: false, error: auth.error }
   if (!UUID.test(contributionId)) return { ok: false, error: 'That submission could not be found.' }
 
-  const { data: c } = await db().from('contributions').select('status, title').eq('id', contributionId).maybeSingle()
+  const { data: c } = await db().from('contributions').select('status, title, submitted_at').eq('id', contributionId).maybeSingle()
   if (!c) return { ok: false, error: 'That submission could not be found.' }
-  if (c.status !== 'review_failed') return { ok: false, error: 'Only submissions whose review failed can be retried.' }
+  if (c.status !== 'review_failed' && !isReviewStale(c)) return { ok: false, error: 'Only submissions whose review failed can be retried.' }
 
   const outcome = await reviewContribution(contributionId)
   await log('contribution_review_retried', contributionId, { title: c.title, result: outcome.kind === 'reviewed' ? outcome.status : outcome.reason }, auth.caller)

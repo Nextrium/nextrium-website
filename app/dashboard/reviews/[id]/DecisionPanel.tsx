@@ -8,10 +8,9 @@ interface Props {
   contributionId: string
   min: number
   max: number
-  timingMultiplier: number | null
 }
 
-export default function DecisionPanel({ contributionId, min, max, timingMultiplier }: Props) {
+export default function DecisionPanel({ contributionId, min, max }: Props) {
   const router = useRouter()
   const [points, setPoints] = useState(Math.round((min + max) / 2))
   const [notes, setNotes] = useState('')
@@ -32,11 +31,8 @@ export default function DecisionPanel({ contributionId, min, max, timingMultipli
       <div className="mt-panel-title">Decision</div>
       {error && <div className="mt-alert error">{error}</div>}
 
-      <label className="mt-hint" htmlFor="dec-points">Base points: <strong style={{ color: 'var(--white)' }}>{points}</strong> ({min}–{max})</label>
+      <label className="mt-hint" htmlFor="dec-points">Points to award: <strong style={{ color: 'var(--white)' }}>{points}</strong> ({min}–{max})</label>
       <input id="dec-points" type="range" min={min} max={max} step={1} value={points} onChange={(e) => setPoints(Number(e.target.value))} />
-      {timingMultiplier !== null && (
-        <span className="mt-hint">Timing ×{timingMultiplier.toFixed(1)} is applied on verification — about {Math.round(points * timingMultiplier)} points.</span>
-      )}
 
       <label className="mt-hint" htmlFor="dec-notes">Note for the member (required to request changes or reject)</label>
       <textarea id="dec-notes" className="mt-input mt-textarea" maxLength={4000} value={notes} onChange={(e) => setNotes(e.target.value)} />

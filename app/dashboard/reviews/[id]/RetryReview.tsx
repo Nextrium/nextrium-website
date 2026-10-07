@@ -20,7 +20,7 @@ export default function RetryReview({ contributionId }: { contributionId: string
       <div className="mt-panel-title">Automated review</div>
       {error && <div className="mt-alert error">{error}</div>}
       <span className="mt-hint">The last automated review didn’t complete. Retry it, or decide without it below.</span>
-      <button type="button" className="mt-btn" disabled={busy} onClick={retry}>{busy ? 'Reviewing… (up to 90s)' : 'Retry automated review'}</button>
+      <button type="button" className="mt-btn" disabled={busy} onClick={retry}>{busy ? 'Reviewing… (up to a minute)' : 'Retry automated review'}</button>
     </div>
   )
 }

@@ -9,11 +9,14 @@ import { requireStaff } from '@/lib/contributions/auth'
 import { getMemberDirectory } from '@/lib/contributions/members'
 import { sanitizeBrief } from '@/lib/contributions/sanitize'
 import { CATEGORY_LABELS, COMPLEXITY_LABELS } from '@/lib/contributions/constants'
-import { QUEUE_TABS, effectiveDeadline } from '@/lib/contributions/taskView'
+import { QUEUE_TABS, effectiveDeadline, isReviewStale } from '@/lib/contributions/taskView'
+import ReviewPoller from '@/components/contributions/ReviewPoller'
 import type { Contribution, ContributionReview, Task } from '@/lib/types/database'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Review' }
+// Retrying the automated review waits for the service.
+export const maxDuration = 60
 
 interface Props {
   params: Promise<{ id: string }>
@@ -35,14 +38,8 @@ export default async function ReviewDetailPage({ params }: Props) {
   ])
   const reviews: ContributionReview[] = reviewRows ?? []
   const member = members.find((m) => m.userId === c.contributor_id)
-
-  // Preview of the timing multiplier, from the same database function verify uses.
   const deadline = effectiveDeadline(task)
-  const { data: multiplier } = task.assigned_at && deadline
-    ? await supabase.rpc('contribution_timing_multiplier', {
-        p_assigned_at: task.assigned_at, p_deadline_at: deadline.toISOString(), p_submitted_at: c.submitted_at, p_category: task.category,
-      })
-    : { data: null }
+  const stale = isReviewStale(c)
 
   const statusLabel = QUEUE_TABS.find((t) => t.key === c.status)?.label ?? c.status
   const fmt = (iso: string | null) => iso ? new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '—'
@@ -96,16 +93,16 @@ export default async function ReviewDetailPage({ params }: Props) {
               <div className="mt-kv"><span>Points range</span><span>{task.point_range_min}–{task.point_range_max}</span></div>
               <div className="mt-kv"><span>Deadline</span><span>{fmt(deadline?.toISOString() ?? null)}</span></div>
               <div className="mt-kv"><span>Submitted</span><span>{fmt(c.submitted_at)}</span></div>
-              <div className="mt-kv"><span>Timing</span><span>{multiplier !== null ? `×${Number(multiplier).toFixed(1)}` : '—'}</span></div>
               {c.review_score !== null && <div className="mt-kv"><span>Automated score</span><span>{Math.round(Number(c.review_score))}/100</span></div>}
               {c.final_points !== null && <div className="mt-kv"><span>Points awarded</span><span>{c.final_points}</span></div>}
             </div>
-            {c.status === 'review_failed' && <RetryReview contributionId={c.id} />}
+            {(c.status === 'review_failed' || stale) && <RetryReview contributionId={c.id} />}
             {['needs_human', 'ai_approved', 'review_failed', 'changes_requested'].includes(c.status) && (
-              <DecisionPanel contributionId={c.id} min={task.point_range_min} max={task.point_range_max}
-                timingMultiplier={multiplier !== null ? Number(multiplier) : null} />
+              <DecisionPanel contributionId={c.id} min={task.point_range_min} max={task.point_range_max} />
             )}
-            {c.status === 'pending_review' && <div className="mt-panel"><span className="mt-hint">The automated review is running. Decisions open when it finishes.</span></div>}
+            {c.status === 'pending_review' && !stale && (
+              <div className="mt-panel"><ReviewPoller /><span className="mt-hint">The automated review is running. Decisions open when it finishes.</span></div>
+            )}
             {c.status === 'verified' && <div className="mt-panel"><span className="mt-hint">Verified{c.verified_at ? ` on ${fmt(c.verified_at)}` : ''}. {c.final_points} points awarded.</span></div>}
             {c.status === 'rejected' && <div className="mt-panel"><span className="mt-hint">Rejected. The task was cancelled.</span></div>}
           </div>

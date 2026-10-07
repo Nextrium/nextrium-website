@@ -44,6 +44,15 @@ test('members reach their contributor pages but not the staff ones', () => {
   assert.equal(isRestricted('/dashboard/reviews/analytics', 'member'), true)
 })
 
+test('every active role reaches its own tasks and the leaderboard', () => {
+  for (const role of ['admin', 'moderator', 'content', 'community', 'member']) {
+    assert.equal(isRestricted('/dashboard/my-tasks', role), false, role)
+    assert.equal(isRestricted('/dashboard/my-tasks/abc', role), false, role)
+    assert.equal(isRestricted('/dashboard/leaderboard', role), false, role)
+    assert.equal(isRestricted('/dashboard/leaderboard/abc', role), false, role)
+  }
+})
+
 test('tasks and reviews are staff-only (admin, moderator)', () => {
   for (const role of ['content', 'community']) {
     assert.equal(isRestricted('/dashboard/tasks', role), true, role)
