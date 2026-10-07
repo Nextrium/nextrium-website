@@ -2,6 +2,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import Header from '@/components/dashboard/Header'
 import { APPLICATION_TRACKS } from '@/lib/automation/rulesAdmin'
 import TeamAccessClient from './TeamAccessClient'
+import { getAuthEmails } from '@/lib/dashboard/authEmails'
 
 export const metadata = { title: 'Team Access' }
 export const dynamic = 'force-dynamic'
@@ -27,16 +28,9 @@ async function getDashboardUsers(): Promise<DashboardUserRow[]> {
 
   const userIds = dashboardUsers.map((u: any) => u.user_id)
 
-  const { data: authUsers } = await supabase.auth.admin.listUsers()
-
+  const emails = await getAuthEmails(supabase, userIds)
   const emailMap: Record<string, string> = {}
-  if (authUsers?.users) {
-    authUsers.users.forEach((u) => {
-      if (userIds.includes(u.id)) {
-        emailMap[u.id] = u.email ?? 'No email'
-      }
-    })
-  }
+  emails.forEach((email, id) => { emailMap[id] = email || 'No email' })
 
   const { data: trackRows } = await (supabase.from('staff_tracks') as any).select('id, name')
   const trackNames: Record<string, string> = {}
