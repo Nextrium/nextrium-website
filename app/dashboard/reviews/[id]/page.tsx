@@ -6,7 +6,7 @@ import ReviewHistory from '@/components/contributions/ReviewHistory'
 import DecisionPanel from './DecisionPanel'
 import RetryReview from './RetryReview'
 import AdjustComplexity from './AdjustComplexity'
-import { SCOPE_CHECK } from '@/lib/contributions/reviewMapping'
+import { SCOPE_CHECK, hasMemberFixableFailure } from '@/lib/contributions/reviewMapping'
 import { requireStaff } from '@/lib/contributions/auth'
 import { OWN_SUBMISSION_MESSAGE, canDecideOnSubmission } from '@/lib/contributions/decisionRules'
 import { getMemberDirectory } from '@/lib/contributions/members'
@@ -45,6 +45,10 @@ export default async function ReviewDetailPage({ params }: Props) {
   // Did the latest automated review flag the work as not matching the task's complexity?
   const latestReview = reviews.find((r) => r.id === c.latest_review_id) ?? reviews[0]
   const scopeFlagged = (latestReview?.checks as Record<string, unknown> | null)?.[SCOPE_CHECK] === false
+  // The service said "rejected" although nothing the member can fix failed.
+  const rejectedWithoutMemberFailure = ['needs_human', 'changes_requested'].includes(c.status)
+    && latestReview?.source === 'service' && latestReview.decision === 'rejected'
+    && !hasMemberFixableFailure(latestReview.checks as Record<string, unknown> | null)
   const member = members.find((m) => m.userId === c.contributor_id)
   const deadline = effectiveDeadline(task)
   const stale = isReviewStale(c)
@@ -107,6 +111,13 @@ export default async function ReviewDetailPage({ params }: Props) {
               {c.review_score !== null && <div className="mt-kv"><span>Automated score</span><span>{Math.round(Number(c.review_score))}/100</span></div>}
               {c.final_points !== null && <div className="mt-kv"><span>Points awarded</span><span>{c.final_points}</span></div>}
             </div>
+            {rejectedWithoutMemberFailure && (
+              <div className="mt-panel">
+                <div className="mt-alert warn">
+                  The automated review rejected this although every check the member can fix passed. Its reasons are in the review history: judge them yourself before deciding.
+                </div>
+              </div>
+            )}
             {(c.status === 'review_failed' || stale) && <RetryReview contributionId={c.id} />}
             {['needs_human', 'ai_approved', 'review_failed', 'changes_requested'].includes(c.status) && (
               canDecideOnSubmission(auth.caller, c.contributor_id)

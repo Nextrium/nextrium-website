@@ -3,8 +3,9 @@
 //
 //   service decision  condition                          contribution status
 //   ─────────────────────────────────────────────────────────────────────────
-//   rejected          only the scope/complexity check    needs_human (staff set complexity, not members)
-//   rejected          anything else                      changes_requested
+//   rejected          a check the member can fix failed  changes_requested
+//   rejected          anything else (all checks passed,  needs_human: only staff can act on scope
+//                     only scope, only security notes)   and security doubts, so members aren't blocked
 //   human_required    any (incl. the service's escalation
 //                     on the third submission)           needs_human
 //   approved          any code-audit security issue      needs_human
@@ -29,10 +30,15 @@ export interface MappedReview {
 /** The check that compares the work's size with the task's complexity. Staff own complexity, so a member can't fix it. */
 export const SCOPE_CHECK = 'complexity_proportionate'
 
-/** True when the scope check failed and every other check passed. */
-export function isScopeOnlyMismatch(checks: Record<string, unknown> | null | undefined): boolean {
-  if (!checks || typeof checks !== 'object' || checks[SCOPE_CHECK] !== false) return false
-  return Object.entries(checks).every(([k, v]) => k === SCOPE_CHECK || v !== false)
+/** Feedback items members never see: scope (staff set complexity) and security notes (staff judge them). */
+export function isStaffOnlyIssue(check: string | null | undefined): boolean {
+  return check === SCOPE_CHECK || (typeof check === 'string' && check.startsWith('security'))
+}
+
+/** True when the member failed at least one check they can fix themselves. */
+export function hasMemberFixableFailure(checks: Record<string, unknown> | null | undefined): boolean {
+  if (!checks || typeof checks !== 'object') return false
+  return Object.entries(checks).some(([k, v]) => v === false && !isStaffOnlyIssue(k))
 }
 
 function hasSecurityIssues(codeAudit: unknown): boolean {
@@ -49,7 +55,7 @@ export function mapReviewResponse(body: unknown): MappedReview | null {
   if (decision !== 'approved' && decision !== 'rejected' && decision !== 'human_required') return null
 
   let status: ReviewedStatus
-  if (decision === 'rejected') status = isScopeOnlyMismatch(r.checks) ? 'needs_human' : 'changes_requested'
+  if (decision === 'rejected') status = hasMemberFixableFailure(r.checks) ? 'changes_requested' : 'needs_human'
   else if (decision === 'human_required') status = 'needs_human'
   else status = hasSecurityIssues(r.code_audit) ? 'needs_human' : 'ai_approved'
 
