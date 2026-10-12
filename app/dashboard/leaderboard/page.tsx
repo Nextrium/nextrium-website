@@ -3,13 +3,32 @@ import { notFound } from 'next/navigation'
 import { createServiceClient } from '@/lib/supabase/server'
 import Header from '@/components/dashboard/Header'
 import { CONTRIBUTOR_ROLES, requireMember, requireStaff } from '@/lib/contributions/auth'
-import { leaderboardName, rankLeaderboard, type LeaderboardEntry } from '@/lib/contributions/leaderboard'
+import {
+  leaderboardName, leaderboardStats, pointsBarPercent, rankLeaderboard, type LeaderboardEntry,
+} from '@/lib/contributions/leaderboard'
+import { CATEGORIES, CATEGORY_LABELS, COMPLEXITY_LABELS, isCategory, type Category, type Complexity } from '@/lib/contributions/constants'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Leaderboard' }
 
 interface Props {
-  searchParams: Promise<{ period?: string }>
+  searchParams: Promise<{ period?: string; category?: string }>
+}
+
+interface Profile {
+  user_id: string
+  display_name: string | null
+  total_points: number
+  verified_contributions: number
+  categories: string[] | null
+}
+
+interface Delivered {
+  id: string
+  contributor_id: string
+  task_id: string
+  final_points: number | null
+  verified_at: string | null
 }
 
 export default async function LeaderboardPage({ searchParams }: Props) {
@@ -19,9 +38,11 @@ export default async function LeaderboardPage({ searchParams }: Props) {
   const caller = 'caller' in staff ? staff.caller : member && 'caller' in member ? member.caller : null
   if (!caller) notFound()
 
-  const { period } = await searchParams
+  const { period, category: rawCategory } = await searchParams
   const monthly = period === 'month'
+  const category: Category | null = isCategory(rawCategory) ? rawCategory : null
   const supabase = createServiceClient() as any
+  const monthStart = new Date(); monthStart.setUTCDate(1); monthStart.setUTCHours(0, 0, 0, 0)
 
   // Active people only: archived or not-yet-onboarded people are not listed.
   const { data: members } = await supabase.from('dashboard_users')
@@ -29,68 +50,218 @@ export default async function LeaderboardPage({ searchParams }: Props) {
   const ids: string[] = (members ?? []).map((m: any) => m.user_id)
 
   let entries: LeaderboardEntry[] = []
+  let profileMap = new Map<string, Profile>()
   if (ids.length) {
     // Names come from the contributor's own display name, never their email.
     const { data: profileRows } = await supabase.from('contributor_profiles')
-      .select('user_id, display_name, total_points, verified_contributions').in('user_id', ids)
-    const profiles = (profileRows ?? []) as { user_id: string; display_name: string | null; total_points: number; verified_contributions: number }[]
-    const names = new Map(profiles.map((p) => [p.user_id, leaderboardName(p.display_name)]))
+      .select('user_id, display_name, total_points, verified_contributions, categories').in('user_id', ids)
+    const profiles = (profileRows ?? []) as Profile[]
+    profileMap = new Map(profiles.map((p) => [p.user_id, p]))
+    const nameOf = (id: string) => leaderboardName(profileMap.get(id)?.display_name)
     if (monthly) {
-      const start = new Date(); start.setUTCDate(1); start.setUTCHours(0, 0, 0, 0)
       const { data: ledger } = await supabase.from('points_ledger')
-        .select('contributor_id, final_points').in('contributor_id', ids).gte('created_at', start.toISOString())
+        .select('contributor_id, final_points').in('contributor_id', ids).gte('created_at', monthStart.toISOString())
       const sums = new Map<string, { points: number; verified: number }>()
       for (const l of (ledger ?? []) as { contributor_id: string; final_points: number }[]) {
         const s = sums.get(l.contributor_id) ?? { points: 0, verified: 0 }
         sums.set(l.contributor_id, { points: s.points + l.final_points, verified: s.verified + 1 })
       }
-      entries = [...sums].map(([userId, s]) => ({ userId, name: names.get(userId) ?? leaderboardName(null), ...s }))
+      entries = [...sums].map(([userId, s]) => ({ userId, name: nameOf(userId), ...s }))
     } else {
-      entries = profiles.map((p) => ({
-        userId: p.user_id, name: names.get(p.user_id) ?? leaderboardName(null), points: p.total_points, verified: p.verified_contributions,
-      }))
+      entries = profiles.map((p) => ({ userId: p.user_id, name: nameOf(p.user_id), points: p.total_points, verified: p.verified_contributions }))
     }
   }
+
   const ranked = rankLeaderboard(entries)
+  const stats = leaderboardStats(ranked)
+  const areasOf = (id: string) => (profileMap.get(id)?.categories ?? []).filter(isCategory)
+  const shown = category ? ranked.filter((e) => areasOf(e.userId).includes(category)) : ranked
+  const leaderPoints = ranked[0]?.points ?? 0
+
+  // Verified work for everyone shown, for the expandable cards. Verified only;
+  // staff notes, review feedback and security findings are never selected.
+  const delivered = new Map<string, Delivered[]>()
+  const taskInfo = new Map<string, { title: string; category: Category; complexity: Complexity }>()
+  if (shown.length) {
+    let q = supabase.from('contributions')
+      .select('id, contributor_id, task_id, final_points, verified_at')
+      .in('contributor_id', shown.map((e) => e.userId)).eq('status', 'verified')
+      .order('verified_at', { ascending: false }).limit(1000)
+    if (monthly) q = q.gte('verified_at', monthStart.toISOString())
+    const { data: rows } = await q
+    for (const r of (rows ?? []) as Delivered[]) {
+      const list = delivered.get(r.contributor_id) ?? []
+      list.push(r)
+      delivered.set(r.contributor_id, list)
+    }
+    const taskIds = [...new Set(((rows ?? []) as Delivered[]).map((r) => r.task_id))]
+    if (taskIds.length) {
+      const { data: tasks } = await supabase.from('tasks').select('id, title, category, complexity').in('id', taskIds)
+      for (const t of tasks ?? []) taskInfo.set(t.id, { title: t.title, category: t.category, complexity: t.complexity })
+    }
+  }
+
+  const href = (next: { period?: string | null; category?: string | null }) => {
+    const p = next.period !== undefined ? next.period : (monthly ? 'month' : null)
+    const c = next.category !== undefined ? next.category : category
+    const qs = new URLSearchParams()
+    if (p) qs.set('period', p)
+    if (c) qs.set('category', c)
+    const s = qs.toString()
+    return `/dashboard/leaderboard${s ? `?${s}` : ''}`
+  }
+  const fmtDate = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString(undefined, { dateStyle: 'medium' }) : '—')
 
   return (
     <>
       <style>{`
-        .lb-tabs { display: flex; border: 1px solid rgba(255,255,255,0.08); width: fit-content; margin-bottom: 20px; }
+        .lb-wrap { max-width: 880px; }
+        .lb-controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+        .lb-tabs { display: flex; border: 1px solid rgba(255,255,255,0.08); width: fit-content; }
         .lb-tab { padding: 9px 18px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; text-decoration: none; color: var(--grey-mid); }
         .lb-tab.active { background: rgba(219,103,39,0.1); color: var(--orange); }
-        .lb-list { display: flex; flex-direction: column; gap: 6px; max-width: 720px; }
-        .lb-row { display: grid; grid-template-columns: 48px 1fr auto auto; gap: 16px; align-items: center; background: var(--navy); border: 1px solid rgba(255,255,255,0.06); padding: 14px 18px; }
-        .lb-row.me { border-color: rgba(219,103,39,0.45); }
-        .lb-rank { font-family: var(--font-exo2); font-weight: 700; font-size: 18px; color: var(--grey-mid); }
-        .lb-row:nth-child(-n+3) .lb-rank { color: var(--orange); }
-        .lb-name { color: var(--white); font-size: 14px; font-weight: 600; text-decoration: none; }
+
+        .lb-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 22px; }
+        .lb-stat { background: var(--navy); border: 1px solid rgba(255,255,255,0.06); border-top: 2px solid var(--orange); padding: 18px 20px; display: flex; flex-direction: column; gap: 6px; }
+        .lb-stat-value { font-family: var(--font-exo2); font-weight: 800; font-size: 28px; line-height: 1; color: var(--white); font-variant-numeric: tabular-nums; }
+        .lb-stat-label { font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--grey-mid); }
+
+        .lb-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px; }
+        .lb-chip { padding: 6px 12px; font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.12em; text-transform: uppercase; text-decoration: none; color: var(--grey-mid); border: 1px solid rgba(255,255,255,0.1); }
+        .lb-chip:hover { color: var(--off-white); border-color: rgba(255,255,255,0.2); }
+        .lb-chip.active { color: var(--orange); border-color: rgba(219,103,39,0.5); background: rgba(219,103,39,0.08); }
+
+        .lb-list { display: flex; flex-direction: column; gap: 8px; }
+        .lb-card { position: relative; background: var(--navy); border: 1px solid rgba(255,255,255,0.06); overflow: hidden; }
+        .lb-card.top { background: linear-gradient(135deg, var(--navy), rgba(219,103,39,0.06)); border-color: rgba(219,103,39,0.28); }
+        .lb-card.me { border-color: rgba(219,103,39,0.6); }
+        .lb-bar { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, rgba(219,103,39,0.10), transparent); pointer-events: none; }
+        .lb-main { position: relative; display: grid; grid-template-columns: 40px 40px 1fr auto; gap: 16px; align-items: center; padding: 16px 18px; }
+        .lb-rank { width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; font-family: var(--font-exo2); font-weight: 800; font-size: 15px; color: var(--grey-mid); border: 1px solid rgba(255,255,255,0.1); font-variant-numeric: tabular-nums; }
+        .lb-rank.r1 { background: var(--orange); border-color: var(--orange); color: var(--white); }
+        .lb-rank.r2, .lb-rank.r3 { color: var(--orange); border-color: rgba(219,103,39,0.55); }
+        .lb-avatar { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: rgba(219,103,39,0.12); border: 1px solid rgba(219,103,39,0.3); color: var(--orange); font-family: var(--font-exo2); font-weight: 800; font-size: 16px; text-transform: uppercase; }
+        .lb-who { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+        .lb-name { color: var(--white); font-size: 15px; font-weight: 600; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .lb-name:hover { color: var(--orange); }
-        .lb-points { color: var(--white); font-family: var(--font-exo2); font-size: 18px; font-weight: 700; }
-        .lb-muted { color: var(--grey-mid); font-size: 12px; }
-        .lb-empty { padding: 32px; background: var(--navy); border: 1px solid rgba(255,255,255,0.06); color: var(--grey-mid); max-width: 720px; }
+        .lb-you { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--orange); margin-left: 8px; }
+        .lb-tags { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+        .lb-tag { font-family: var(--font-mono); font-size: 7.5px; letter-spacing: 0.12em; text-transform: uppercase; padding: 3px 7px; border: 1px solid rgba(255,255,255,0.12); color: var(--grey-mid); }
+        .lb-tag.match { border-color: rgba(219,103,39,0.45); color: var(--orange); }
+        .lb-meta { font-size: 12px; color: var(--grey-mid); }
+        .lb-score { text-align: right; }
+        .lb-points { display: block; font-family: var(--font-exo2); font-size: 22px; font-weight: 800; color: var(--white); line-height: 1; font-variant-numeric: tabular-nums; }
+        .lb-points-label { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--grey-mid); }
+
+        .lb-more { position: relative; border-top: 1px solid rgba(255,255,255,0.05); }
+        .lb-more summary { cursor: pointer; list-style: none; padding: 10px 18px; font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--grey-mid); }
+        .lb-more summary::-webkit-details-marker { display: none; }
+        .lb-more summary::before { content: '+ '; color: var(--orange); }
+        .lb-more[open] summary::before { content: '− '; }
+        .lb-more summary:hover, .lb-more summary:focus-visible { color: var(--off-white); outline: none; }
+        .lb-work { list-style: none; margin: 0; padding: 0 18px 14px; display: flex; flex-direction: column; gap: 6px; }
+        .lb-work li { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; padding: 10px 12px; background: var(--navy-mid); border: 1px solid rgba(255,255,255,0.05); }
+        .lb-work-title { color: var(--off-white); font-size: 13px; }
+        .lb-work-sub { display: block; font-size: 11px; color: var(--grey-mid); margin-top: 2px; }
+        .lb-work-points { font-family: var(--font-exo2); font-weight: 700; color: var(--orange); white-space: nowrap; font-variant-numeric: tabular-nums; }
+        .lb-detail { display: inline-block; margin: 0 18px 14px; font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--orange); text-decoration: none; }
+
+        .lb-empty { padding: 40px 32px; text-align: center; background: var(--navy); border: 1px solid rgba(255,255,255,0.06); color: var(--grey-mid); }
+        .lb-note { color: var(--grey-mid); font-size: 12px; margin-top: 14px; }
+
+        @media (max-width: 640px) {
+          .lb-stats { grid-template-columns: 1fr; }
+          .lb-main { grid-template-columns: 34px 1fr auto; gap: 12px; padding: 14px; }
+          .lb-avatar { display: none; }
+          .lb-points { font-size: 18px; }
+          .lb-work li { grid-template-columns: 1fr; }
+        }
       `}</style>
-      <Header title="Leaderboard" description="Points from verified contributions — select a name to see what they delivered" />
+      <Header title="Leaderboard" description="Points from verified contributions — open a card to see the work behind them" />
       <div className="dash-content">
-        <div className="lb-tabs">
-          <Link href="/dashboard/leaderboard" className={`lb-tab ${!monthly ? 'active' : ''}`}>All time</Link>
-          <Link href="/dashboard/leaderboard?period=month" className={`lb-tab ${monthly ? 'active' : ''}`}>This month</Link>
-        </div>
-        {ranked.length === 0 ? (
-          <div className="lb-empty">No points yet{monthly ? ' this month' : ''}. Verified contributions appear here.</div>
-        ) : (
-          <div className="lb-list">
-            {ranked.map((e) => (
-              <div key={e.userId} className={`lb-row ${e.userId === caller.userId ? 'me' : ''}`}>
-                <span className="lb-rank">{e.rank}</span>
-                <Link href={`/dashboard/leaderboard/${e.userId}`} className="lb-name">{e.name}{e.userId === caller.userId ? ' (you)' : ''}</Link>
-                <span className="lb-muted">{e.verified} verified</span>
-                <span className="lb-points">{e.points}</span>
-              </div>
+        <div className="lb-wrap">
+          <div className="lb-controls">
+            <div className="lb-tabs">
+              <Link href={href({ period: null })} className={`lb-tab ${!monthly ? 'active' : ''}`}>All time</Link>
+              <Link href={href({ period: 'month' })} className={`lb-tab ${monthly ? 'active' : ''}`}>This month</Link>
+            </div>
+          </div>
+
+          <div className="lb-stats">
+            <div className="lb-stat"><span className="lb-stat-value">{stats.contributors}</span><span className="lb-stat-label">Contributors with points</span></div>
+            <div className="lb-stat"><span className="lb-stat-value">{stats.points.toLocaleString()}</span><span className="lb-stat-label">Points awarded</span></div>
+            <div className="lb-stat"><span className="lb-stat-value">{stats.verified}</span><span className="lb-stat-label">Verified contributions</span></div>
+          </div>
+
+          <div className="lb-chips">
+            <Link href={href({ category: null })} className={`lb-chip ${!category ? 'active' : ''}`}>All</Link>
+            {CATEGORIES.map((c) => (
+              <Link key={c} href={href({ category: c })} className={`lb-chip ${category === c ? 'active' : ''}`}>{CATEGORY_LABELS[c]}</Link>
             ))}
           </div>
-        )}
-        {!monthly && <p className="lb-muted" style={{ marginTop: 14 }}>All-time totals include the 1.2× consistency bonus from five verified contributions.</p>}
+
+          {shown.length === 0 ? (
+            <div className="lb-empty">
+              {ranked.length === 0
+                ? `No points yet${monthly ? ' this month' : ''}. Verified contributions appear here.`
+                : `No one with points works in ${category ? CATEGORY_LABELS[category] : 'this area'} yet.`}
+            </div>
+          ) : (
+            <div className="lb-list">
+              {shown.map((e) => {
+                const isMe = e.userId === caller.userId
+                const work = delivered.get(e.userId) ?? []
+                const areas = areasOf(e.userId)
+                return (
+                  <div key={e.userId} className={`lb-card ${e.rank <= 3 ? 'top' : ''} ${isMe ? 'me' : ''}`}>
+                    <div className="lb-bar" style={{ width: `${pointsBarPercent(e.points, leaderPoints)}%` }} />
+                    <div className="lb-main">
+                      <span className={`lb-rank ${e.rank <= 3 ? `r${e.rank}` : ''}`} aria-label={`Rank ${e.rank}`}>{e.rank}</span>
+                      <span className="lb-avatar" aria-hidden="true">{e.name.charAt(0)}</span>
+                      <div className="lb-who">
+                        <span>
+                          <Link href={`/dashboard/leaderboard/${e.userId}`} className="lb-name">{e.name}</Link>
+                          {isMe && <span className="lb-you">You</span>}
+                        </span>
+                        <span className="lb-tags">
+                          {areas.map((c) => <span key={c} className={`lb-tag ${c === category ? 'match' : ''}`}>{CATEGORY_LABELS[c]}</span>)}
+                          <span className="lb-meta">{e.verified} verified</span>
+                        </span>
+                      </div>
+                      <div className="lb-score">
+                        <span className="lb-points">{e.points.toLocaleString()}</span>
+                        <span className="lb-points-label">points</span>
+                      </div>
+                    </div>
+                    {work.length > 0 && (
+                      <details className="lb-more">
+                        <summary>Verified work ({work.length})</summary>
+                        <ul className="lb-work">
+                          {work.map((w) => {
+                            const t = taskInfo.get(w.task_id)
+                            return (
+                              <li key={w.id}>
+                                <span>
+                                  <span className="lb-work-title">{t?.title ?? 'Task'}</span>
+                                  <span className="lb-work-sub">
+                                    {t ? `${CATEGORY_LABELS[t.category]} · ${COMPLEXITY_LABELS[t.complexity]} · ` : ''}Verified {fmtDate(w.verified_at)}
+                                  </span>
+                                </span>
+                                <span className="lb-work-points">{w.final_points ?? 0} pts</span>
+                              </li>
+                            )
+                          })}
+                        </ul>
+                        <Link href={`/dashboard/leaderboard/${e.userId}`} className="lb-detail">See full details →</Link>
+                      </details>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+          {!monthly && <p className="lb-note">All-time totals include the 1.2× consistency bonus from five verified contributions, so a total can be higher than the points listed for each task.</p>}
+        </div>
       </div>
     </>
   )

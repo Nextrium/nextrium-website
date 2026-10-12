@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { displayNameFromEmail, leaderboardName, rankLeaderboard } from './leaderboard'
+import { displayNameFromEmail, leaderboardName, leaderboardStats, pointsBarPercent, rankLeaderboard } from './leaderboard'
 
 test('ranks by points, ties share a rank', () => {
   const ranked = rankLeaderboard([
@@ -26,4 +26,18 @@ test('displayNameFromEmail uses the local part', () => {
   assert.equal(displayNameFromEmail('ada.lovelace@example.com'), 'ada.lovelace')
   assert.equal(displayNameFromEmail(null), 'Member')
   assert.equal(displayNameFromEmail('@x.com'), 'Member')
+})
+
+test('leaderboardStats totals the people shown', () => {
+  assert.deepEqual(leaderboardStats([]), { contributors: 0, points: 0, verified: 0 })
+  assert.deepEqual(leaderboardStats([{ points: 120, verified: 2 }, { points: 30, verified: 1 }]), { contributors: 2, points: 150, verified: 3 })
+})
+
+test('pointsBarPercent scales to the leader and stays visible', () => {
+  assert.equal(pointsBarPercent(200, 200), 100)
+  assert.equal(pointsBarPercent(100, 200), 50)
+  assert.equal(pointsBarPercent(1, 1000), 4)
+  assert.equal(pointsBarPercent(0, 200), 4)
+  assert.equal(pointsBarPercent(50, 0), 4)
+  assert.equal(pointsBarPercent(300, 200), 100)
 })
