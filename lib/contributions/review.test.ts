@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { isScopeOnlyMismatch, mapReviewResponse } from './reviewMapping'
+import { hasMemberFixableFailure, isStaffOnlyIssue, mapReviewResponse } from './reviewMapping'
 import { signReviewBody } from './reviewSignature'
 
 const base = {
@@ -17,8 +17,8 @@ test('signature matches the review service contract test vector', () => {
   )
 })
 
-test('rejected maps to changes_requested', () => {
-  assert.equal(mapReviewResponse({ ...base, decision: 'rejected' })?.status, 'changes_requested')
+test('rejected with a failed member check maps to changes_requested', () => {
+  assert.equal(mapReviewResponse({ ...base, decision: 'rejected', checks: { title_descriptive: false } })?.status, 'changes_requested')
 })
 
 test('human_required maps to needs_human', () => {
@@ -62,18 +62,30 @@ test('a rejection for scope alone goes to staff, not back to the member', () => 
   assert.equal(mapReviewResponse(body)?.status, 'needs_human')
 })
 
-test('a rejection with any other failed check still goes back to the member', () => {
-  const body = { decision: 'rejected', checks: { complexity_proportionate: false, description_substance: false } }
-  assert.equal(mapReviewResponse(body)?.status, 'changes_requested')
-  assert.equal(mapReviewResponse({ decision: 'rejected', checks: { description_substance: false } })?.status, 'changes_requested')
-  assert.equal(mapReviewResponse({ decision: 'rejected' })?.status, 'changes_requested')
+test('a rejection with every check passing goes to staff', () => {
+  const body = { decision: 'rejected', overall_score: 100, checks: { title_descriptive: true, complexity_proportionate: true },
+    feedback: { summary: 'Excellent', issues: [{ check: 'security_high', message: '[HIGH] ...' }], what_to_do: '' } }
+  assert.equal(mapReviewResponse(body)?.status, 'needs_human')
 })
 
-test('isScopeOnlyMismatch needs the scope check to have failed alone', () => {
-  assert.equal(isScopeOnlyMismatch({ complexity_proportionate: false }), true)
-  assert.equal(isScopeOnlyMismatch({ complexity_proportionate: false, a: true }), true)
-  assert.equal(isScopeOnlyMismatch({ complexity_proportionate: false, a: false }), false)
-  assert.equal(isScopeOnlyMismatch({ complexity_proportionate: true }), false)
-  assert.equal(isScopeOnlyMismatch(null), false)
-  assert.equal(isScopeOnlyMismatch({}), false)
+test('a rejection with no checks reported goes to staff', () => {
+  assert.equal(mapReviewResponse({ decision: 'rejected' })?.status, 'needs_human')
+})
+
+test('a rejection with any member-fixable failure goes back to the member', () => {
+  assert.equal(mapReviewResponse({ decision: 'rejected', checks: { complexity_proportionate: false, description_substance: false } })?.status, 'changes_requested')
+  assert.equal(mapReviewResponse({ decision: 'rejected', checks: { description_substance: false } })?.status, 'changes_requested')
+})
+
+test('hasMemberFixableFailure ignores scope and security checks', () => {
+  assert.equal(hasMemberFixableFailure({ description_substance: false }), true)
+  assert.equal(hasMemberFixableFailure({ complexity_proportionate: false }), false)
+  assert.equal(hasMemberFixableFailure({ security_high: false }), false)
+  assert.equal(hasMemberFixableFailure({ a: true }), false)
+  assert.equal(hasMemberFixableFailure(null), false)
+})
+
+test('isStaffOnlyIssue covers scope and every security note', () => {
+  for (const c of ['complexity_proportionate', 'security_high', 'security_medium', 'security']) assert.equal(isStaffOnlyIssue(c), true, c)
+  for (const c of ['title_descriptive', 'description_substance', '', null, undefined]) assert.equal(isStaffOnlyIssue(c), false, String(c))
 })

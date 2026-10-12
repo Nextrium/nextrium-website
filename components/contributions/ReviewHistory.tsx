@@ -1,5 +1,5 @@
 import type { ContributionReview } from '@/lib/types/database'
-import { SCOPE_CHECK, isScopeOnlyMismatch } from '@/lib/contributions/reviewMapping'
+import { hasMemberFixableFailure, isStaffOnlyIssue } from '@/lib/contributions/reviewMapping'
 
 // Review feedback comes from the review service (or staff), so every value is
 // rendered as text by React — never as HTML.
@@ -44,12 +44,11 @@ export default function ReviewHistory({ reviews, showSecurity = false }: { revie
       {reviews.map((r) => {
         const f = (r.feedback ?? {}) as Feedback
         const allChecks = (r.checks ?? {}) as Record<string, boolean>
-        // Complexity is set by staff, so members never see the scope check or advice about it;
-        // when scope was the only problem, the advice was about complexity and is hidden too.
-        const scopeOnly = isScopeOnlyMismatch(allChecks)
-        const checks = showSecurity ? allChecks : Object.fromEntries(Object.entries(allChecks).filter(([k]) => k !== SCOPE_CHECK))
-        const issues = showSecurity ? f.issues : f.issues?.filter((i) => i.check !== SCOPE_CHECK)
-        const whatToDo = showSecurity || !scopeOnly ? f.what_to_do : undefined
+        // Scope and security notes are for staff to judge, so members never see them. When the
+        // member had nothing of their own to fix, the advice was about those and is hidden too.
+        const checks = showSecurity ? allChecks : Object.fromEntries(Object.entries(allChecks).filter(([k]) => !isStaffOnlyIssue(k)))
+        const issues = showSecurity ? f.issues : f.issues?.filter((i) => !isStaffOnlyIssue(i.check))
+        const whatToDo = showSecurity || hasMemberFixableFailure(allChecks) ? f.what_to_do : undefined
         return (
           <div key={r.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div className="mt-kv">
