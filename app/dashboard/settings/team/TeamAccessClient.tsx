@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useServerData } from '@/components/dashboard/useServerData'
 import { inviteUser, updateRole, removeUser, archiveUser, unarchiveUser, setTeamMember, setStaffTrack, syncPersonAccess, sendPasswordSetupLink } from './actions'
 
 interface DashboardUserRow {
@@ -30,6 +31,7 @@ const ROLE_OPTIONS = [
 
 export default function TeamAccessClient({ users: initial, tracks }: { users: DashboardUserRow[]; tracks: string[] }) {
   const [users,          setUsers]          = useState(initial)
+  useServerData(initial, setUsers)
   const [inviteEmail,    setInviteEmail]    = useState('')
   const [inviteRole,     setInviteRole]     = useState('content')
   const [inviting,       setInviting]       = useState(false)
