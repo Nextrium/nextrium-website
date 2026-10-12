@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import Header from '@/components/dashboard/Header'
 import { requireStaff } from '@/lib/contributions/auth'
 import { getMemberDirectory } from '@/lib/contributions/members'
+import { loadSubmissionNumbers } from '@/lib/contributions/submissionNumber'
 import { CATEGORY_LABELS } from '@/lib/contributions/constants'
 import { QUEUE_TABS } from '@/lib/contributions/taskView'
 import type { Contribution, Task } from '@/lib/types/database'
@@ -41,6 +42,7 @@ export default async function ReviewQueuePage({ searchParams }: Props) {
     : { data: [] }
   const taskOf = new Map((taskRows as Pick<Task, 'id' | 'title' | 'category' | 'complexity'>[] ?? []).map((t) => [t.id, t]))
   const nameOf = new Map((await getMemberDirectory()).map((m) => [m.userId, m.name]))
+  const numberOf = await loadSubmissionNumbers(supabase)
   const now = new Date()
 
   return (
@@ -81,17 +83,17 @@ export default async function ReviewQueuePage({ searchParams }: Props) {
           <div className="rq-wrap">
             <table className="rq-table">
               <thead>
-                <tr><th>Submission</th><th>Task</th><th>Member</th><th>Round</th><th>Score</th><th>Submitted</th></tr>
+                <tr><th>Submission</th><th>Task</th><th>Member</th><th>Attempt</th><th>Score</th><th>Submitted</th></tr>
               </thead>
               <tbody>
                 {contributions.map((c) => {
                   const t = taskOf.get(c.task_id)
                   return (
                     <tr key={c.id}>
-                      <td><Link href={`/dashboard/reviews/${c.id}`}>{c.title}</Link></td>
+                      <td><Link href={`/dashboard/reviews/${c.id}`}>{c.title}</Link>{numberOf.get(c.id) ? <span className="rq-muted"> · #{numberOf.get(c.id)}</span> : null}</td>
                       <td>{t ? t.title : '—'} <span className="rq-muted">{t ? `· ${CATEGORY_LABELS[t.category]}` : ''}</span></td>
                       <td className="rq-muted">{nameOf.get(c.contributor_id) ?? 'Unknown'}</td>
-                      <td className="rq-muted">#{c.submission_count}</td>
+                      <td className="rq-muted">{c.submission_count}</td>
                       <td>{c.review_score !== null ? Math.round(Number(c.review_score)) : '—'}</td>
                       <td className="rq-muted">{ago(c.submitted_at, now)}</td>
                     </tr>

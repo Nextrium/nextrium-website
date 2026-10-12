@@ -9,6 +9,7 @@ import { reviewContribution } from '@/lib/contributions/reviewService'
 import { changesRequestedEmail, rejectedEmail, verifiedEmail } from '@/lib/contributions/emails'
 import { notifyMember, notifyReviewResult, siteUrl } from '@/lib/contributions/notify'
 import { isReviewStale } from '@/lib/contributions/taskView'
+import { POINT_RANGES, isComplexity } from '@/lib/contributions/constants'
 import { OWN_SUBMISSION_MESSAGE, canDecideOnSubmission } from '@/lib/contributions/decisionRules'
 
 /** Null when the caller may decide on this submission, otherwise the reason they can't. */
@@ -149,4 +150,47 @@ export async function retryReview(contributionId: string): Promise<Result & { st
   }
   await notifyReviewResult(contributionId, outcome.status)
   return { ok: true, status: outcome.status }
+}
+
+const ADJUSTABLE_STATUSES = ['needs_human', 'ai_approved', 'review_failed', 'changes_requested']
+
+/**
+ * Changes the task's complexity (and so its points range) while its submission
+ * waits for a staff decision. Complexity is otherwise fixed once a task is
+ * assigned; this is the reviewer's correction when the work turned out bigger
+ * or smaller than planned. The deadline is left as it is.
+ */
+export async function adjustTaskComplexity(contributionId: string, complexity: string): Promise<Result & { min?: number; max?: number }> {
+  const auth = await requireStaff()
+  if ('error' in auth) return { ok: false, error: auth.error }
+  if (!UUID.test(contributionId)) return { ok: false, error: 'That submission could not be found.' }
+  if (!isComplexity(complexity)) return { ok: false, error: 'Choose a complexity.' }
+  const denied = await decisionDenial(auth.caller, contributionId)
+  if (denied) return { ok: false, error: denied }
+
+  const { data: c } = await db().from('contributions').select('status, task_id, title').eq('id', contributionId).maybeSingle()
+  if (!c) return { ok: false, error: 'That submission could not be found.' }
+  if (!ADJUSTABLE_STATUSES.includes(c.status)) return { ok: false, error: 'Complexity can only be adjusted while the submission is waiting for a decision.' }
+
+  const { data: task } = await db().from('tasks').select('id, title, category, complexity, status').eq('id', c.task_id).maybeSingle()
+  if (!task) return { ok: false, error: 'That task could not be found.' }
+  if (task.status === 'completed' || task.status === 'cancelled') return { ok: false, error: 'This task is already closed.' }
+  if (task.complexity === complexity) return { ok: true }
+
+  const range = POINT_RANGES[task.category as keyof typeof POINT_RANGES]?.[complexity]
+  if (!range) return { ok: false, error: 'That task has an unknown category.' }
+
+  const { data: updated, error } = await db().from('tasks')
+    .update({ complexity, point_range_min: range.min, point_range_max: range.max })
+    .eq('id', task.id).eq('complexity', task.complexity).not('status', 'in', '(completed,cancelled)')
+    .select('id')
+  if (error) {
+    console.error('[reviews] complexity adjust failed:', error.message)
+    return { ok: false, error: 'Could not change the complexity.' }
+  }
+  if (!updated || updated.length === 0) return { ok: false, error: 'This task changed in the meantime. Reload and try again.' }
+
+  await log('task_complexity_adjusted', contributionId, { title: task.title, from: task.complexity, to: complexity, points: `${range.min}–${range.max}` }, auth.caller)
+  revalidate(contributionId)
+  return { ok: true, min: range.min, max: range.max }
 }
