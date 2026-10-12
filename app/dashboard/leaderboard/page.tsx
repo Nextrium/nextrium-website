@@ -11,6 +11,16 @@ import { CATEGORIES, CATEGORY_LABELS, COMPLEXITY_LABELS, isCategory, type Catego
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Leaderboard' }
 
+// Soft per-area tints for avatars and tags, chosen to read on navy beside the orange accent.
+const AREA_TINT: Record<string, string> = {
+  technical: '#7CC4F2',
+  design: '#C9A3F0',
+  research: '#F0CB6E',
+  operations: '#8ED9B8',
+  community: '#F2A27A',
+  default: '#DB6727',
+}
+
 interface Props {
   searchParams: Promise<{ period?: string; category?: string }>
 }
@@ -115,69 +125,80 @@ export default async function LeaderboardPage({ searchParams }: Props) {
   return (
     <>
       <style>{`
-        .lb-wrap { max-width: 880px; }
-        .lb-controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 18px; }
-        .lb-tabs { display: flex; border: 1px solid rgba(255,255,255,0.08); width: fit-content; }
-        .lb-tab { padding: 9px 18px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; text-decoration: none; color: var(--grey-mid); }
-        .lb-tab.active { background: rgba(219,103,39,0.1); color: var(--orange); }
+        .lb-wrap { max-width: 960px; }
+        .lb-controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+        .lb-tabs { display: inline-flex; padding: 3px; gap: 3px; background: var(--navy); border: 1px solid rgba(255,255,255,0.07); border-radius: 999px; }
+        .lb-tab { padding: 7px 16px; border-radius: 999px; font-size: 12px; font-weight: 500; text-decoration: none; color: var(--grey-mid); transition: background .15s ease, color .15s ease; }
+        .lb-tab:hover { color: var(--off-white); }
+        .lb-tab.active { background: rgba(219,103,39,0.16); color: var(--orange); }
 
-        .lb-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 22px; }
-        .lb-stat { background: var(--navy); border: 1px solid rgba(255,255,255,0.06); border-top: 2px solid var(--orange); padding: 18px 20px; display: flex; flex-direction: column; gap: 6px; }
-        .lb-stat-value { font-family: var(--font-exo2); font-weight: 800; font-size: 28px; line-height: 1; color: var(--white); font-variant-numeric: tabular-nums; }
-        .lb-stat-label { font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--grey-mid); }
+        .lb-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 26px; }
+        .lb-stat { background: linear-gradient(160deg, var(--navy), rgba(219,103,39,0.04)); border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; padding: 22px 24px; display: flex; flex-direction: column; gap: 8px; }
+        .lb-stat-value { font-family: var(--font-exo2); font-weight: 800; font-size: 30px; line-height: 1; color: var(--orange); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+        .lb-stat-label { font-size: 13px; color: var(--grey-mid); }
 
-        .lb-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px; }
-        .lb-chip { padding: 6px 12px; font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.12em; text-transform: uppercase; text-decoration: none; color: var(--grey-mid); border: 1px solid rgba(255,255,255,0.1); }
-        .lb-chip:hover { color: var(--off-white); border-color: rgba(255,255,255,0.2); }
-        .lb-chip.active { color: var(--orange); border-color: rgba(219,103,39,0.5); background: rgba(219,103,39,0.08); }
+        .lb-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+        .lb-chip { padding: 7px 16px; border-radius: 999px; font-size: 13px; text-decoration: none; color: var(--grey-mid); border: 1px solid rgba(255,255,255,0.1); transition: border-color .15s ease, color .15s ease; }
+        .lb-chip:hover { color: var(--off-white); border-color: rgba(255,255,255,0.22); }
+        .lb-chip.active { color: var(--orange); border-color: rgba(219,103,39,0.6); background: rgba(219,103,39,0.1); }
 
-        .lb-list { display: flex; flex-direction: column; gap: 8px; }
-        .lb-card { position: relative; background: var(--navy); border: 1px solid rgba(255,255,255,0.06); overflow: hidden; }
-        .lb-card.top { background: linear-gradient(135deg, var(--navy), rgba(219,103,39,0.06)); border-color: rgba(219,103,39,0.28); }
-        .lb-card.me { border-color: rgba(219,103,39,0.6); }
-        .lb-bar { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, rgba(219,103,39,0.10), transparent); pointer-events: none; }
-        .lb-main { position: relative; display: grid; grid-template-columns: 40px 40px 1fr auto; gap: 16px; align-items: center; padding: 16px 18px; }
-        .lb-rank { width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; font-family: var(--font-exo2); font-weight: 800; font-size: 15px; color: var(--grey-mid); border: 1px solid rgba(255,255,255,0.1); font-variant-numeric: tabular-nums; }
-        .lb-rank.r1 { background: var(--orange); border-color: var(--orange); color: var(--white); }
-        .lb-rank.r2, .lb-rank.r3 { color: var(--orange); border-color: rgba(219,103,39,0.55); }
-        .lb-avatar { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: rgba(219,103,39,0.12); border: 1px solid rgba(219,103,39,0.3); color: var(--orange); font-family: var(--font-exo2); font-weight: 800; font-size: 16px; text-transform: uppercase; }
+        .lb-list { display: flex; flex-direction: column; gap: 12px; }
+        .lb-card { position: relative; background: var(--navy); border: 1px solid rgba(255,255,255,0.07); border-radius: 18px; overflow: hidden; }
+        .lb-card.top { background: linear-gradient(135deg, var(--navy) 55%, rgba(219,103,39,0.07)); border-color: rgba(219,103,39,0.22); }
+        .lb-card.me { box-shadow: inset 0 0 0 1px rgba(219,103,39,0.55); }
+        .lb-bar { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, rgba(219,103,39,0.08), transparent); pointer-events: none; }
+
+        .lb-card > summary { list-style: none; cursor: pointer; }
+        .lb-card > summary::-webkit-details-marker { display: none; }
+        .lb-card > summary:focus-visible { outline: 2px solid var(--orange); outline-offset: -2px; border-radius: 18px; }
+        .lb-main { position: relative; display: grid; grid-template-columns: 44px 48px 1fr auto 34px; gap: 18px; align-items: center; padding: 20px 22px; }
+
+        .lb-rank { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: var(--font-exo2); font-weight: 800; font-size: 14px; color: var(--grey-mid); font-variant-numeric: tabular-nums; }
+        .lb-rank.medal { color: var(--navy-deep); box-shadow: 0 0 0 3px rgba(255,255,255,0.06); }
+        .lb-rank.r1 { background: radial-gradient(circle at 35% 30%, #FFD9A8, #DB6727 70%); }
+        .lb-rank.r2 { background: radial-gradient(circle at 35% 30%, #F2F4F7, #9AA6B5 70%); }
+        .lb-rank.r3 { background: radial-gradient(circle at 35% 30%, #F1C9A3, #A86A3D 70%); }
+
+        .lb-avatar { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: var(--font-exo2); font-weight: 800; font-size: 18px; text-transform: uppercase; }
         .lb-who { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
-        .lb-name { color: var(--white); font-size: 15px; font-weight: 600; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .lb-headline { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
+        .lb-name { color: var(--white); font-family: var(--font-exo2); font-size: 16px; font-weight: 700; text-decoration: none; letter-spacing: -0.01em; }
         .lb-name:hover { color: var(--orange); }
-        .lb-you { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--orange); margin-left: 8px; }
-        .lb-tags { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
-        .lb-tag { font-family: var(--font-mono); font-size: 7.5px; letter-spacing: 0.12em; text-transform: uppercase; padding: 3px 7px; border: 1px solid rgba(255,255,255,0.12); color: var(--grey-mid); }
-        .lb-tag.match { border-color: rgba(219,103,39,0.45); color: var(--orange); }
-        .lb-meta { font-size: 12px; color: var(--grey-mid); }
+        .lb-tag { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.12em; text-transform: uppercase; padding: 3px 9px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
+        .lb-sub { font-size: 12.5px; color: var(--grey-mid); }
+        .lb-you { color: var(--orange); font-weight: 600; }
+
         .lb-score { text-align: right; }
-        .lb-points { display: block; font-family: var(--font-exo2); font-size: 22px; font-weight: 800; color: var(--white); line-height: 1; font-variant-numeric: tabular-nums; }
-        .lb-points-label { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--grey-mid); }
+        .lb-points { display: block; font-family: var(--font-exo2); font-size: 24px; font-weight: 800; color: var(--orange); line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+        .lb-points-label { font-size: 11px; color: var(--grey-mid); }
+        .lb-chevron { width: 32px; height: 32px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; color: var(--grey-mid); transition: transform .2s ease, border-color .15s ease, color .15s ease; }
+        .lb-card > summary:hover .lb-chevron { border-color: rgba(219,103,39,0.5); color: var(--orange); }
+        .lb-card[open] .lb-chevron { transform: rotate(180deg); }
+        .lb-chevron.empty { visibility: hidden; }
 
-        .lb-more { position: relative; border-top: 1px solid rgba(255,255,255,0.05); }
-        .lb-more summary { cursor: pointer; list-style: none; padding: 10px 18px; font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--grey-mid); }
-        .lb-more summary::-webkit-details-marker { display: none; }
-        .lb-more summary::before { content: '+ '; color: var(--orange); }
-        .lb-more[open] summary::before { content: '− '; }
-        .lb-more summary:hover, .lb-more summary:focus-visible { color: var(--off-white); outline: none; }
-        .lb-work { list-style: none; margin: 0; padding: 0 18px 14px; display: flex; flex-direction: column; gap: 6px; }
-        .lb-work li { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; padding: 10px 12px; background: var(--navy-mid); border: 1px solid rgba(255,255,255,0.05); }
-        .lb-work-title { color: var(--off-white); font-size: 13px; }
-        .lb-work-sub { display: block; font-size: 11px; color: var(--grey-mid); margin-top: 2px; }
+        .lb-work { position: relative; list-style: none; margin: 0; padding: 0 22px 18px; display: flex; flex-direction: column; gap: 8px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 16px; }
+        .lb-work li { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; padding: 12px 14px; background: var(--navy-mid); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; }
+        .lb-work-title { color: var(--off-white); font-size: 13.5px; }
+        .lb-work-sub { display: block; font-size: 11.5px; color: var(--grey-mid); margin-top: 3px; }
         .lb-work-points { font-family: var(--font-exo2); font-weight: 700; color: var(--orange); white-space: nowrap; font-variant-numeric: tabular-nums; }
-        .lb-detail { display: inline-block; margin: 0 18px 14px; font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--orange); text-decoration: none; }
+        .lb-detail { position: relative; display: inline-block; margin: 0 22px 18px; font-size: 12.5px; color: var(--orange); text-decoration: none; }
+        .lb-detail:hover { text-decoration: underline; }
 
-        .lb-empty { padding: 40px 32px; text-align: center; background: var(--navy); border: 1px solid rgba(255,255,255,0.06); color: var(--grey-mid); }
-        .lb-note { color: var(--grey-mid); font-size: 12px; margin-top: 14px; }
+        .lb-empty { padding: 48px 32px; text-align: center; background: var(--navy); border: 1px solid rgba(255,255,255,0.07); border-radius: 18px; color: var(--grey-mid); }
+        .lb-note { color: var(--grey-mid); font-size: 12px; margin-top: 16px; }
 
+        @media (prefers-reduced-motion: reduce) { .lb-chevron, .lb-tab, .lb-chip { transition: none; } }
         @media (max-width: 640px) {
           .lb-stats { grid-template-columns: 1fr; }
-          .lb-main { grid-template-columns: 34px 1fr auto; gap: 12px; padding: 14px; }
+          .lb-main { grid-template-columns: 34px 1fr auto 30px; gap: 12px; padding: 16px; }
           .lb-avatar { display: none; }
-          .lb-points { font-size: 18px; }
+          .lb-points { font-size: 19px; }
+          .lb-work { padding-left: 16px; padding-right: 16px; }
           .lb-work li { grid-template-columns: 1fr; }
+          .lb-detail { margin-left: 16px; }
         }
       `}</style>
-      <Header title="Leaderboard" description="Points from verified contributions — open a card to see the work behind them" />
+      <Header title="Leaderboard" description="Points from verified work" />
       <div className="dash-content">
         <div className="lb-wrap">
           <div className="lb-controls">
@@ -188,7 +209,7 @@ export default async function LeaderboardPage({ searchParams }: Props) {
           </div>
 
           <div className="lb-stats">
-            <div className="lb-stat"><span className="lb-stat-value">{stats.contributors}</span><span className="lb-stat-label">Contributors with points</span></div>
+            <div className="lb-stat"><span className="lb-stat-value">{stats.contributors}</span><span className="lb-stat-label">Contributors</span></div>
             <div className="lb-stat"><span className="lb-stat-value">{stats.points.toLocaleString()}</span><span className="lb-stat-label">Points awarded</span></div>
             <div className="lb-stat"><span className="lb-stat-value">{stats.verified}</span><span className="lb-stat-label">Verified contributions</span></div>
           </div>
@@ -203,8 +224,8 @@ export default async function LeaderboardPage({ searchParams }: Props) {
           {shown.length === 0 ? (
             <div className="lb-empty">
               {ranked.length === 0
-                ? `No points yet${monthly ? ' this month' : ''}. Verified contributions appear here.`
-                : `No one with points works in ${category ? CATEGORY_LABELS[category] : 'this area'} yet.`}
+                ? `No points yet${monthly ? ' this month' : ''}.`
+                : `No one in ${category ? CATEGORY_LABELS[category] : 'this area'} has points yet.`}
             </div>
           ) : (
             <div className="lb-list">
@@ -212,30 +233,40 @@ export default async function LeaderboardPage({ searchParams }: Props) {
                 const isMe = e.userId === caller.userId
                 const work = delivered.get(e.userId) ?? []
                 const areas = areasOf(e.userId)
+                const tint = AREA_TINT[areas[0] ?? ''] ?? AREA_TINT.default
+                const shownAreas = areas.slice(0, 2)
                 return (
-                  <div key={e.userId} className={`lb-card ${e.rank <= 3 ? 'top' : ''} ${isMe ? 'me' : ''}`}>
-                    <div className="lb-bar" style={{ width: `${pointsBarPercent(e.points, leaderPoints)}%` }} />
-                    <div className="lb-main">
-                      <span className={`lb-rank ${e.rank <= 3 ? `r${e.rank}` : ''}`} aria-label={`Rank ${e.rank}`}>{e.rank}</span>
-                      <span className="lb-avatar" aria-hidden="true">{e.name.charAt(0)}</span>
-                      <div className="lb-who">
-                        <span>
-                          <Link href={`/dashboard/leaderboard/${e.userId}`} className="lb-name">{e.name}</Link>
-                          {isMe && <span className="lb-you">You</span>}
-                        </span>
-                        <span className="lb-tags">
-                          {areas.map((c) => <span key={c} className={`lb-tag ${c === category ? 'match' : ''}`}>{CATEGORY_LABELS[c]}</span>)}
-                          <span className="lb-meta">{e.verified} verified</span>
+                  <details key={e.userId} className={`lb-card ${e.rank <= 3 ? 'top' : ''} ${isMe ? 'me' : ''}`}>
+                    <summary>
+                      <div className="lb-bar" style={{ width: `${pointsBarPercent(e.points, leaderPoints)}%` }} />
+                      <div className="lb-main">
+                        <span className={`lb-rank ${e.rank <= 3 ? `medal r${e.rank}` : ''}`} aria-label={`Rank ${e.rank}`}>{e.rank}</span>
+                        <span className="lb-avatar" aria-hidden="true" style={{ background: `${tint}1f`, border: `1px solid ${tint}55`, color: tint }}>{e.name.charAt(0)}</span>
+                        <div className="lb-who">
+                          <div className="lb-headline">
+                            <Link href={`/dashboard/leaderboard/${e.userId}`} className="lb-name">{e.name}</Link>
+                            {shownAreas.map((c) => {
+                              const t = AREA_TINT[c] ?? AREA_TINT.default
+                              return <span key={c} className="lb-tag" style={{ color: t, borderColor: `${t}55`, background: `${t}14` }}>{CATEGORY_LABELS[c]}</span>
+                            })}
+                            {areas.length > shownAreas.length && <span className="lb-sub">+{areas.length - shownAreas.length}</span>}
+                          </div>
+                          <span className="lb-sub">
+                            {isMe && <span className="lb-you">You · </span>}
+                            {e.verified} contribution{e.verified === 1 ? '' : 's'}
+                          </span>
+                        </div>
+                        <div className="lb-score">
+                          <span className="lb-points">{e.points.toLocaleString()}</span>
+                          <span className="lb-points-label">points</span>
+                        </div>
+                        <span className={`lb-chevron ${work.length ? '' : 'empty'}`} aria-hidden="true">
+                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 4.5 6 8l3.5-3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
                         </span>
                       </div>
-                      <div className="lb-score">
-                        <span className="lb-points">{e.points.toLocaleString()}</span>
-                        <span className="lb-points-label">points</span>
-                      </div>
-                    </div>
+                    </summary>
                     {work.length > 0 && (
-                      <details className="lb-more">
-                        <summary>Verified work ({work.length})</summary>
+                      <>
                         <ul className="lb-work">
                           {work.map((w) => {
                             const t = taskInfo.get(w.task_id)
@@ -244,7 +275,7 @@ export default async function LeaderboardPage({ searchParams }: Props) {
                                 <span>
                                   <span className="lb-work-title">{t?.title ?? 'Task'}</span>
                                   <span className="lb-work-sub">
-                                    {t ? `${CATEGORY_LABELS[t.category]} · ${COMPLEXITY_LABELS[t.complexity]} · ` : ''}Verified {fmtDate(w.verified_at)}
+                                    {t ? `${CATEGORY_LABELS[t.category]} · ${COMPLEXITY_LABELS[t.complexity]} · ` : ''}{fmtDate(w.verified_at)}
                                   </span>
                                 </span>
                                 <span className="lb-work-points">{w.final_points ?? 0} pts</span>
@@ -253,14 +284,14 @@ export default async function LeaderboardPage({ searchParams }: Props) {
                           })}
                         </ul>
                         <Link href={`/dashboard/leaderboard/${e.userId}`} className="lb-detail">See full details →</Link>
-                      </details>
+                      </>
                     )}
-                  </div>
+                  </details>
                 )
               })}
             </div>
           )}
-          {!monthly && <p className="lb-note">All-time totals include the 1.2× consistency bonus from five verified contributions, so a total can be higher than the points listed for each task.</p>}
+          {!monthly && <p className="lb-note">All-time totals include a 1.2× bonus after five verified contributions.</p>}
         </div>
       </div>
     </>
