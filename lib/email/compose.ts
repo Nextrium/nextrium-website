@@ -32,8 +32,9 @@ export function defaultSender(senderEmail: string): SenderIdentity {
   return {
     name: 'Nextrium Global Innovations Ltd',
     email: senderEmail,
-    signatureName: 'Abdulbasit Adigun Abdulrahman',
-    signatureTitle: 'Founder and Chief Executive Officer, Nextrium Global Innovations Ltd',
+    // Used only when no sender row is found; a brand address signs as the team, not a person.
+    signatureName: 'The Nextrium Team',
+    signatureTitle: 'Nextrium Global Innovations Ltd',
   }
 }
 

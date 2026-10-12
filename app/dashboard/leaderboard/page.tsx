@@ -291,7 +291,6 @@ export default async function LeaderboardPage({ searchParams }: Props) {
               })}
             </div>
           )}
-          {!monthly && <p className="lb-note">All-time totals include a 1.2× bonus after five verified contributions.</p>}
         </div>
       </div>
     </>
