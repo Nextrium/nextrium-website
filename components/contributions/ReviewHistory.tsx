@@ -1,5 +1,5 @@
 import type { ContributionReview } from '@/lib/types/database'
-import { hasMemberFixableFailure, isStaffOnlyIssue } from '@/lib/contributions/reviewMapping'
+import { hasMemberFixableFailure, isStaffOnlyIssue, memberResubmissionView } from '@/lib/contributions/reviewMapping'
 
 // Review feedback comes from the review service (or staff), so every value is
 // rendered as text by React — never as HTML.
@@ -49,6 +49,7 @@ export default function ReviewHistory({ reviews, showSecurity = false }: { revie
         const checks = showSecurity ? allChecks : Object.fromEntries(Object.entries(allChecks).filter(([k]) => !isStaffOnlyIssue(k)))
         const issues = showSecurity ? f.issues : f.issues?.filter((i) => !isStaffOnlyIssue(i.check))
         const whatToDo = showSecurity || hasMemberFixableFailure(allChecks) ? f.what_to_do : undefined
+        const comparison = showSecurity ? (f.resubmission_assessment ?? null) : memberResubmissionView(f.resubmission_assessment)
         return (
           <div key={r.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div className="mt-kv">
@@ -77,10 +78,10 @@ export default function ReviewHistory({ reviews, showSecurity = false }: { revie
                 ))}
               </div>
             )}
-            {f.resubmission_assessment?.summary && (
+            {comparison && (comparison.summary || (comparison.previous_issues_resolved ?? []).length > 0) && (
               <div className="mt-hint">
-                <strong>Compared with your last submission: </strong>{f.resubmission_assessment.summary}
-                {(f.resubmission_assessment.previous_issues_resolved ?? []).map((p, n) => (
+                <strong>Compared with your last submission: </strong>{comparison.summary}
+                {(comparison.previous_issues_resolved ?? []).map((p, n) => (
                   <div key={n}>{p.status === 'resolved' ? '✓' : p.status === 'partially_resolved' ? '◐' : '✕'} {CHECK_LABELS[p.check] ?? p.check} — {p.explanation}</div>
                 ))}
               </div>

@@ -81,3 +81,24 @@ export function mapReviewResponse(body: unknown): MappedReview | null {
     modelUsed: typeof r.review_metadata?.model_used === 'string' ? r.review_metadata.model_used : null,
   }
 }
+
+export interface ResubmissionAssessment {
+  summary?: string
+  previous_issues_resolved?: { check: string; status: string; explanation: string }[]
+}
+
+/**
+ * The "compared with your last submission" section as a member may see it:
+ * staff-only items (scope, security notes) are removed, and the free-text
+ * summary is dropped whenever it was written about any of them, since it
+ * can't be cleaned line by line. Staff see the assessment unchanged.
+ */
+export function memberResubmissionView(a: ResubmissionAssessment | null | undefined): ResubmissionAssessment | null {
+  if (!a) return null
+  const all = Array.isArray(a.previous_issues_resolved) ? a.previous_issues_resolved : []
+  const items = all.filter((p) => !isStaffOnlyIssue(p?.check))
+  const touchedStaffOnly = items.length !== all.length
+  const summary = touchedStaffOnly ? undefined : a.summary
+  if (!summary && items.length === 0) return null
+  return { summary, previous_issues_resolved: items }
+}
