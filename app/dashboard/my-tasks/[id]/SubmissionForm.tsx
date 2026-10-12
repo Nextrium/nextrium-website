@@ -3,17 +3,18 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { submitContribution } from '../actions'
-import { SUBMISSION_MIN_WORDS, wordCount } from '@/lib/contributions/submission'
+import { SUBMISSION_MIN_WORDS, initialSubmissionTitle, wordCount } from '@/lib/contributions/submission'
 
 interface Props {
   taskId: string
+  taskTitle: string
   initial: { title: string; description: string; evidenceUrl: string } | null
   isResubmission: boolean
 }
 
-export default function SubmissionForm({ taskId, initial, isResubmission }: Props) {
+export default function SubmissionForm({ taskId, taskTitle, initial, isResubmission }: Props) {
   const router = useRouter()
-  const [title, setTitle] = useState(initial?.title ?? '')
+  const [title, setTitle] = useState(() => initialSubmissionTitle(taskTitle, initial?.title))
   const [description, setDescription] = useState(initial?.description ?? '')
   const [evidenceUrl, setEvidenceUrl] = useState(initial?.evidenceUrl ?? '')
   const [busy, setBusy] = useState(false)

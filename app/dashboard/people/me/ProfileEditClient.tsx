@@ -6,6 +6,8 @@ import { saveProfile, unlinkDiscord, syncMyDiscordAccess, type AccessCheckResult
 import { saveContributorProfile } from '@/lib/contributions/profileActions'
 import { splitSkills } from '@/lib/contributions/profile'
 import ContributorFields, { type ContributorFieldsValue } from './ContributorFields'
+import { profileHasChanges, type ProfileValues } from '@/lib/dashboard/profileForm'
+import { CATEGORY_LABELS, isCategory } from '@/lib/contributions/constants'
 
 const DISCORD_NOTICES: Record<string, { text: string; ok: boolean }> = {
   linked:      { text: 'Discord connected.', ok: true },
@@ -73,6 +75,26 @@ export default function ProfileEditClient({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [contrib, setContrib] = useState<ContributorFieldsValue | null>(contributor)
+  // Onboarding opens straight into the form; afterwards the profile is shown read-only until Edit.
+  const [editing, setEditing] = useState(isFirstTime)
+  const [saved, setSaved] = useState<ProfileValues>({ bio: initialBio, handles: initialHandles, contributor })
+  const [success, setSuccess] = useState('')
+  const current: ProfileValues = { bio, handles, contributor: contrib }
+  const dirty = profileHasChanges(saved, current)
+
+  function startEditing() {
+    setSuccess('')
+    setError('')
+    setEditing(true)
+  }
+
+  function cancelEditing() {
+    setBio(saved.bio)
+    setHandles(saved.handles)
+    setContrib(saved.contributor as ContributorFieldsValue | null)
+    setError('')
+    setEditing(false)
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -95,7 +117,14 @@ export default function ProfileEditClient({
     const res = await saveProfile({ bio, socialHandles: handles })
     setSaving(false)
     if (res.error) { setError(res.error); return }
-    router.push('/dashboard/people')
+    if (isFirstTime) {
+      router.push('/dashboard/people')
+      router.refresh()
+      return
+    }
+    setSaved(current)
+    setEditing(false)
+    setSuccess('Profile updated.')
     router.refresh()
   }
 
@@ -116,38 +145,102 @@ export default function ProfileEditClient({
         .profile-discord-name { font-size: 13px; color: var(--off-white); line-height: 1.5; max-width: 60ch; }
         .profile-discord-btn { padding: 9px 16px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; cursor: pointer; border: 1px solid rgba(219,103,39,0.4); background: none; color: var(--orange); text-decoration: none; white-space: nowrap; }
         .profile-discord-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .profile-form-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+        .profile-form-cancel { padding: 12px 20px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase; cursor: pointer; border: 1px solid rgba(255,255,255,0.15); background: none; color: var(--off-white); }
+        .profile-form-cancel:disabled { opacity: 0.5; cursor: not-allowed; }
+        .profile-view-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+        .profile-view-text { font-size: 13px; color: var(--off-white); line-height: 1.6; margin: 0 0 4px; white-space: pre-wrap; }
+        .profile-view-list { margin: 0; display: grid; gap: 10px; }
+        .profile-view-list > div { display: grid; grid-template-columns: 130px 1fr; gap: 12px; }
+        .profile-view-list dt { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--grey-mid); padding-top: 3px; }
+        .profile-view-list dd { margin: 0; font-size: 13px; color: var(--off-white); overflow-wrap: anywhere; }
+        @media (max-width: 480px) { .profile-view-list > div { grid-template-columns: 1fr; gap: 2px; } }
         .profile-access-list { display: flex; flex-direction: column; gap: 6px; margin: -10px 0 22px; padding: 12px 14px; border: 1px solid rgba(255,255,255,0.06); background: var(--navy-mid); }
       `}</style>
 
       <div className="profile-form-wrap">
-        <form className="profile-form-card" onSubmit={handleSubmit}>
-          {error && <div className="profile-form-error">{error}</div>}
+        {success && <div className="profile-form-ok">{success}</div>}
 
-          <label className="profile-form-label">Bio</label>
-          <textarea
-            className="profile-form-textarea"
-            placeholder="A short intro — what you work on, what you're into."
-            value={bio}
-            onChange={(e) => setBio(e.target.value)}
-          />
+        {editing ? (
+          <form className="profile-form-card" onSubmit={handleSubmit}>
+            {error && <div className="profile-form-error">{error}</div>}
 
-          <div className="profile-form-section-title">Social handles (optional)</div>
-          {HANDLE_FIELDS.map((f) => (
-            <div key={f.key}>
-              <label className="profile-form-label">{f.label}</label>
-              <input
-                className="profile-form-input"
-                type="text"
-                placeholder={f.placeholder}
-                value={handles[f.key] ?? ''}
-                onChange={(e) => setHandles((prev) => ({ ...prev, [f.key]: e.target.value }))}
-              />
+            <label className="profile-form-label" htmlFor="profile-bio">Bio</label>
+            <textarea
+              id="profile-bio"
+              className="profile-form-textarea"
+              placeholder="A short intro — what you work on, what you're into."
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+            />
+
+            <div className="profile-form-section-title">Social handles (optional)</div>
+            {HANDLE_FIELDS.map((f) => (
+              <div key={f.key}>
+                <label className="profile-form-label" htmlFor={`profile-${f.key}`}>{f.label}</label>
+                <input
+                  id={`profile-${f.key}`}
+                  className="profile-form-input"
+                  type="text"
+                  placeholder={f.placeholder}
+                  value={handles[f.key] ?? ''}
+                  onChange={(e) => setHandles((prev) => ({ ...prev, [f.key]: e.target.value }))}
+                />
+              </div>
+            ))}
+
+            {contrib && <ContributorFields value={contrib} onChange={setContrib} optional={contributorOptional} />}
+
+            <div className="profile-form-actions">
+              {/* Onboarding can always continue (a profile may stay empty); later edits need a real change. */}
+              <button type="submit" className="profile-form-submit" disabled={saving || (!isFirstTime && !dirty)}>
+                {saving ? 'Saving...' : isFirstTime ? 'Save & continue' : 'Save changes'}
+              </button>
+              {!isFirstTime && (
+                <button type="button" className="profile-form-cancel" onClick={cancelEditing} disabled={saving}>Cancel</button>
+              )}
             </div>
-          ))}
+          </form>
+        ) : (
+          <div className="profile-form-card">
+            <div className="profile-view-head">
+              <span className="profile-form-label" style={{ margin: 0 }}>Your profile</span>
+              <button type="button" className="profile-discord-btn" onClick={startEditing}>Edit profile</button>
+            </div>
 
-          {contrib && <ContributorFields value={contrib} onChange={setContrib} optional={contributorOptional} />}
+            <span className="profile-form-label">Bio</span>
+            <p className="profile-view-text">{saved.bio.trim() || 'No bio yet.'}</p>
 
-          <div className="profile-form-section-title">Discord</div>
+            <div className="profile-form-section-title">Social handles</div>
+            {HANDLE_FIELDS.some((f) => saved.handles[f.key]?.trim()) ? (
+              <dl className="profile-view-list">
+                {HANDLE_FIELDS.filter((f) => saved.handles[f.key]?.trim()).map((f) => (
+                  <div key={f.key}><dt>{f.label}</dt><dd>{saved.handles[f.key]}</dd></div>
+                ))}
+              </dl>
+            ) : (
+              <p className="profile-view-text">None added.</p>
+            )}
+
+            {saved.contributor && (
+              <>
+                <div className="profile-form-section-title">Contributing</div>
+                <dl className="profile-view-list">
+                  <div><dt>Display name</dt><dd>{saved.contributor.displayName.trim() || 'Not set'}</dd></div>
+                  <div><dt>Areas</dt><dd>{saved.contributor.categories.length
+                    ? saved.contributor.categories.map((c) => (isCategory(c) ? CATEGORY_LABELS[c] : c)).join(', ')
+                    : 'None chosen'}</dd></div>
+                  <div><dt>Skills</dt><dd>{saved.contributor.skillsText.trim() || 'None added'}</dd></div>
+                  <div><dt>Hours per week</dt><dd>{saved.contributor.availability.trim() || 'Not set'}</dd></div>
+                  <div><dt>Task emails</dt><dd>{saved.contributor.notifyEmail ? 'On' : 'Off'}</dd></div>
+                </dl>
+              </>
+            )}
+          </div>
+        )}
+
+        <div className="profile-form-card" style={{ marginTop: 16 }}>
+          <div className="profile-form-section-title" style={{ marginTop: 0, paddingTop: 0, borderTop: 'none' }}>Discord</div>
           {notice && (
             <div className={notice.ok ? 'profile-form-ok' : 'profile-form-error'}>{notice.text}</div>
           )}
@@ -191,10 +284,7 @@ export default function ProfileEditClient({
             </div>
           )}
 
-          <button type="submit" className="profile-form-submit" disabled={saving}>
-            {saving ? 'Saving...' : isFirstTime ? 'Save & continue' : 'Save changes'}
-          </button>
-        </form>
+        </div>
       </div>
     </>
   )

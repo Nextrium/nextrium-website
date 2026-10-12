@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { parseSubmission, wordCount, SUBMISSION_MIN_WORDS } from './submission'
+import { parseSubmission, wordCount, initialSubmissionTitle, SUBMISSION_MIN_WORDS, SUBMISSION_TITLE_MAX } from './submission'
 
 const words = (n: number) => Array.from({ length: n }, (_, i) => `word${i}`).join(' ')
 const valid = { title: ' Leaderboard page ', description: words(SUBMISSION_MIN_WORDS), evidenceUrl: 'https://github.com/org/repo/pull/1' }
@@ -30,4 +30,20 @@ test('parseSubmission requires an https evidence link', () => {
 test('wordCount counts whitespace-separated words', () => {
   assert.equal(wordCount('  one two\n three\tfour  '), 4)
   assert.equal(wordCount(''), 0)
+})
+
+test('initialSubmissionTitle prefills the task title on a first submission', () => {
+  assert.equal(initialSubmissionTitle(' Fix the sidebar badge '), 'Fix the sidebar badge')
+  assert.equal(initialSubmissionTitle('Task', null), 'Task')
+  assert.equal(initialSubmissionTitle('Task', '   '), 'Task')
+})
+
+test('initialSubmissionTitle keeps the previous title on a resubmission', () => {
+  assert.equal(initialSubmissionTitle('Task', 'My earlier title'), 'My earlier title')
+})
+
+test('initialSubmissionTitle fits the length limit and handles missing titles', () => {
+  assert.equal(initialSubmissionTitle('x'.repeat(SUBMISSION_TITLE_MAX + 50)).length, SUBMISSION_TITLE_MAX)
+  assert.equal(initialSubmissionTitle(null), '')
+  assert.equal(initialSubmissionTitle(undefined, undefined), '')
 })

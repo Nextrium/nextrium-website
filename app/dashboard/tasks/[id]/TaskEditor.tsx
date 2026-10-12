@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Header from '@/components/dashboard/Header'
 import RichTextEditor from '@/components/editor/RichTextEditor'
-import { cancelTask, createTask, updateTask } from '../actions'
+import { cancelTask, createAndAssignTask, createTask, updateTask } from '../actions'
+import { taskHasChanges, type TaskFormValues } from '@/lib/contributions/taskInput'
 import AssignmentPanel from './AssignmentPanel'
 import {
   CATEGORIES,
@@ -43,6 +44,22 @@ export default function TaskEditor({ task, members, hasSubmission }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
+  // New tasks are assigned in the same pass as they are created.
+  const [assignee, setAssignee] = useState('')
+  const [deadline, setDeadline] = useState('')
+  const [strandedDraftId, setStrandedDraftId] = useState<string | null>(null)
+  const activeMembers = useMemo(
+    () => members.filter((m) => m.active)
+      .sort((a, b) => Number(b.categories.includes(category)) - Number(a.categories.includes(category)) || a.openTasks - b.openTasks),
+    [members, category],
+  )
+  const picked = activeMembers.find((m) => m.userId === assignee) ?? null
+
+  const current: TaskFormValues = { title, description, category, complexity, links }
+  const [saved, setSaved] = useState<TaskFormValues>(current)
+  const dirty = taskHasChanges(saved, current)
+  const canSubmitNew = !!title.trim() && !saving && !strandedDraftId
+
   const defaults = taskDefaults(category, complexity)
 
   async function handleSave() {
@@ -52,8 +69,23 @@ export default function TaskEditor({ task, members, hasSubmission }: Props) {
     setSaving(false)
     if (!res.ok) { setError(res.error); return }
     setSuccess(isNew ? 'Task created as a draft.' : 'Task saved.')
+    setSaved(current)
     if (isNew && 'id' in res) router.push(`/dashboard/tasks/${res.id}`)
     router.refresh()
+  }
+
+  async function handleCreateAndAssign() {
+    setError(null); setSuccess(null); setSaving(true)
+    const res = await createAndAssignTask(current, assignee, deadline ? new Date(deadline).toISOString() : null)
+    setSaving(false)
+    if (res.ok) {
+      router.push(`/dashboard/tasks/${res.id}`)
+      router.refresh()
+      return
+    }
+    setError(res.error)
+    // The task now exists as a draft; stop a second click from creating another.
+    if ('draftId' in res) setStrandedDraftId(res.draftId)
   }
 
   async function handleCancel() {
@@ -79,9 +111,18 @@ export default function TaskEditor({ task, members, hasSubmission }: Props) {
           <button type="button" className="task-btn ghost" onClick={() => setConfirmCancel(false)}>Keep</button>
         </>
       )}
-      {!isClosed && (
-        <button type="button" className="task-btn" onClick={handleSave} disabled={saving}>
-          {saving ? 'Saving…' : isNew ? 'Create task' : 'Save changes'}
+      {isNew ? (
+        <>
+          <button type="button" className="task-btn ghost" onClick={handleSave} disabled={!canSubmitNew}>
+            {saving ? 'Saving…' : 'Save as draft'}
+          </button>
+          <button type="button" className="task-btn" onClick={handleCreateAndAssign} disabled={!canSubmitNew || !assignee}>
+            {saving ? 'Creating…' : 'Create & assign'}
+          </button>
+        </>
+      ) : !isClosed && (
+        <button type="button" className="task-btn" onClick={handleSave} disabled={saving || !dirty}>
+          {saving ? 'Saving…' : 'Save changes'}
         </button>
       )}
     </div>
@@ -174,11 +215,41 @@ export default function TaskEditor({ task, members, hasSubmission }: Props) {
                   {COMPLEXITIES.map((c) => <option key={c} value={c}>{COMPLEXITY_LABELS[c]}</option>)}
                 </select>
               </div>
-              {!isDraft && <span className="task-hint">Category and complexity are fixed once a task is assigned.</span>}
+              {!isDraft && !isClosed && <span className="task-hint">Category and complexity set the points, so they are fixed once a task is assigned. Unassign it to return it to draft and change them.</span>}
               <div className="task-kv"><span>Points</span><span>{defaults.pointRangeMin}–{defaults.pointRangeMax}</span></div>
               <div className="task-kv"><span>Deadline</span><span>{defaults.deadlineDays} days after assignment</span></div>
             </div>
 
+            {isNew && (
+              <div className="task-panel">
+                <div className="task-panel-title">Assignment</div>
+                <div className="task-field">
+                  <label className="task-label" htmlFor="new-task-assignee">Assign to</label>
+                  <select id="new-task-assignee" className="task-select" value={assignee} onChange={(e) => setAssignee(e.target.value)}>
+                    <option value="">Choose a member…</option>
+                    {activeMembers.map((m) => (
+                      <option key={m.userId} value={m.userId}>
+                        {m.name} · {m.openTasks} open{m.categories.includes(category) ? ' · ✓ ' + CATEGORY_LABELS[category] : ''}
+                      </option>
+                    ))}
+                  </select>
+                  {activeMembers.length === 0 && <span className="task-hint">No active members yet. Members appear once they finish onboarding.</span>}
+                  {picked && (picked.skills.length > 0 || picked.categories.length > 0) && (
+                    <span className="task-hint">
+                      {picked.categories.map((c) => CATEGORY_LABELS[c]).join(', ')}{picked.skills.length ? ` · ${picked.skills.join(', ')}` : ''}
+                    </span>
+                  )}
+                </div>
+                <div className="task-field">
+                  <label className="task-label" htmlFor="new-task-deadline">Custom deadline (optional)</label>
+                  <input id="new-task-deadline" type="datetime-local" className="task-input" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
+                  <span className="task-hint">Leave empty for {defaults.deadlineDays} days from assignment.</span>
+                </div>
+                {strandedDraftId && (
+                  <a className="task-btn ghost" href={`/dashboard/tasks/${strandedDraftId}`} style={{ textDecoration: 'none', width: 'fit-content' }}>Open the draft to assign it</a>
+                )}
+              </div>
+            )}
             {!isNew && !isClosed && <AssignmentPanel task={task} members={members} hasSubmission={hasSubmission} />}
             {!isNew && members.length === 0 && (
               <div className="task-panel"><span className="task-hint">No members yet. Invite people from Applications → Invite to Team.</span></div>

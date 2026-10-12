@@ -79,3 +79,40 @@ export function parseTaskInput(raw: unknown): { fields: TaskFields } | { error: 
     },
   }
 }
+
+const ASSIGNEE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** Checks the assignee and optional custom deadline before anything is written. */
+export function parseAssignment(
+  assigneeId: unknown,
+  deadlineAt: unknown,
+  now: Date = new Date(),
+): { assigneeId: string; deadline: string | null } | { error: string } {
+  if (typeof assigneeId !== 'string' || !ASSIGNEE_ID.test(assigneeId)) return { error: 'Choose a member to assign.' }
+  if (deadlineAt === null || deadlineAt === undefined || deadlineAt === '') return { assigneeId, deadline: null }
+  if (typeof deadlineAt !== 'string') return { error: 'That deadline is not a valid date.' }
+  const d = new Date(deadlineAt)
+  if (Number.isNaN(d.getTime())) return { error: 'That deadline is not a valid date.' }
+  if (d.getTime() <= now.getTime()) return { error: 'The deadline must be in the future.' }
+  return { assigneeId, deadline: d.toISOString() }
+}
+
+export interface TaskFormValues {
+  title: string
+  description: string
+  category: string
+  complexity: string
+  links: TaskLink[]
+}
+
+function normaliseTaskForm(v: TaskFormValues): string {
+  const links = v.links
+    .map((l) => ({ label: (l.label ?? '').trim(), url: (l.url ?? '').trim() }))
+    .filter((l) => l.label || l.url)
+  return JSON.stringify([v.title.trim(), v.description.trim(), v.category, v.complexity, links])
+}
+
+/** True when the editor differs from the last saved version of the task. */
+export function taskHasChanges(saved: TaskFormValues, current: TaskFormValues): boolean {
+  return normaliseTaskForm(saved) !== normaliseTaskForm(current)
+}

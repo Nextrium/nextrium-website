@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { parseTaskInput, TITLE_MAX, LINKS_MAX } from './taskInput'
+import { parseTaskInput, parseAssignment, taskHasChanges, TITLE_MAX, LINKS_MAX } from './taskInput'
 import { sanitizeBrief, briefToText } from './sanitize'
 import { describeDbError } from './errors'
 
@@ -75,4 +75,31 @@ test('describeDbError maps known codes and hides unknown errors', () => {
   assert.match(describeDbError({ message: 'assignee_not_active_member' }), /active members/)
   assert.equal(describeDbError({ message: 'duplicate key value violates…' }), 'Something went wrong. Please try again.')
   assert.equal(describeDbError(null, 'fallback'), 'fallback')
+})
+
+const MEMBER = '11111111-2222-3333-4444-555555555555'
+const NOW = new Date('2026-10-12T12:00:00Z')
+
+test('parseAssignment needs a real member id', () => {
+  for (const bad of [undefined, null, '', 'abc', 42]) assert.ok('error' in parseAssignment(bad, null, NOW), String(bad))
+  assert.deepEqual(parseAssignment(MEMBER, null, NOW), { assigneeId: MEMBER, deadline: null })
+  assert.deepEqual(parseAssignment(MEMBER, '', NOW), { assigneeId: MEMBER, deadline: null })
+})
+
+test('parseAssignment accepts only a valid future deadline', () => {
+  const ok = parseAssignment(MEMBER, '2026-10-20T09:00:00Z', NOW)
+  assert.ok('deadline' in ok && ok.deadline === '2026-10-20T09:00:00.000Z')
+  assert.ok('error' in parseAssignment(MEMBER, '2026-10-01T09:00:00Z', NOW))
+  assert.ok('error' in parseAssignment(MEMBER, NOW.toISOString(), NOW))
+  assert.ok('error' in parseAssignment(MEMBER, 'not a date', NOW))
+  assert.ok('error' in parseAssignment(MEMBER, 12345, NOW))
+})
+
+test('taskHasChanges ignores whitespace and empty link rows', () => {
+  const saved = { title: 'Build it', description: '<p>Brief</p>', category: 'technical', complexity: 'small', links: [{ label: 'Repo', url: 'https://x.dev' }] }
+  assert.equal(taskHasChanges(saved, { ...saved, title: ' Build it ', links: [...saved.links, { label: '', url: ' ' }] }), false)
+  assert.equal(taskHasChanges(saved, { ...saved, title: 'Build it now' }), true)
+  assert.equal(taskHasChanges(saved, { ...saved, description: '<p>Brief!</p>' }), true)
+  assert.equal(taskHasChanges(saved, { ...saved, complexity: 'medium' }), true)
+  assert.equal(taskHasChanges(saved, { ...saved, links: [] }), true)
 })

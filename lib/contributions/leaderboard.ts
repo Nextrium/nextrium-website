@@ -40,3 +40,23 @@ export function displayNameFromEmail(email: string | null | undefined): string {
   const local = (email ?? '').split('@')[0]?.trim()
   return local || 'Member'
 }
+
+export interface LeaderboardStats {
+  contributors: number
+  points: number
+  verified: number
+}
+
+/** Totals for the stats strip, over the people shown on the board. */
+export function leaderboardStats(entries: Pick<LeaderboardEntry, 'points' | 'verified'>[]): LeaderboardStats {
+  return entries.reduce<LeaderboardStats>(
+    (acc, e) => ({ contributors: acc.contributors + 1, points: acc.points + e.points, verified: acc.verified + e.verified }),
+    { contributors: 0, points: 0, verified: 0 },
+  )
+}
+
+/** Width of a card's points bar, as a percentage of the leader's points (never below 4%, so it stays visible). */
+export function pointsBarPercent(points: number, leaderPoints: number): number {
+  if (!(leaderPoints > 0) || !(points > 0)) return 4
+  return Math.max(4, Math.min(100, Math.round((points / leaderPoints) * 100)))
+}
