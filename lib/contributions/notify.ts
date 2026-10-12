@@ -7,6 +7,8 @@ import { sendEmail } from '@/lib/email/send'
 import { displayNameFromEmail } from './leaderboard'
 import { reviewResultEmail, type EmailContent } from './emails'
 
+const CONTRIBUTORS_SENDER_EMAIL = 'contributors@nextrium.org'
+
 export function siteUrl(path: string): string {
   const base = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://nextrium.org').replace(/\/+$/, '')
   return `${base}${path}`
@@ -27,6 +29,8 @@ export async function notifyMember(userId: string | null | undefined, content: E
     if (!email) return false
 
     const { results } = await sendEmail({
+      // The contributor program's own sender, found by address in email_senders.
+      senderEmail: CONTRIBUTORS_SENDER_EMAIL,
       subject: content.subject,
       message: content.html,
       recipients: [{ email, name: profile?.display_name?.trim() || displayNameFromEmail(email) }],

@@ -25,6 +25,8 @@ export interface SendEmailInput {
   recipients: EmailRecipient[]
   /** email_senders row to send as; the default sender when omitted. */
   senderId?: string | null
+  /** Or the sender's address, looked up in email_senders; used when no senderId is given. */
+  senderEmail?: string | null
   fileAttachments?: EmailAttachment[]
   /** Recorded in email_logs.sent_by. */
   sentBy?: string
@@ -36,10 +38,12 @@ export interface SendEmailOutcome {
 
 type Db = ReturnType<typeof createServiceClient>
 
-async function resolveSender(supabase: Db, senderId?: string | null): Promise<SenderIdentity> {
+async function resolveSender(supabase: Db, senderId?: string | null, senderEmail?: string | null): Promise<SenderIdentity> {
   const sender = defaultSender(process.env.BREVO_SENDER_EMAIL!)
   const query = supabase.from('email_senders').select('name, email, signature_name, signature_title')
-  const { data } = await (senderId ? query.eq('id', senderId) : query.eq('is_default', true)).single()
+  const { data } = await (senderId
+    ? query.eq('id', senderId)
+    : senderEmail ? query.eq('email', senderEmail) : query.eq('is_default', true)).maybeSingle()
   if (data) {
     const row = data as { name: string; email: string; signature_name: string | null; signature_title: string | null }
     sender.name = row.name
@@ -59,9 +63,9 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailOutcome
   const invalid = validateEmailInput(input)
   if (invalid) throw new Error(invalid)
 
-  const { subject, message, recipients, senderId, fileAttachments, sentBy = 'dashboard' } = input
+  const { subject, message, recipients, senderId, senderEmail, fileAttachments, sentBy = 'dashboard' } = input
   const supabase = createServiceClient()
-  const sender = await resolveSender(supabase, senderId)
+  const sender = await resolveSender(supabase, senderId, senderEmail)
 
   const { data: archivedRows } = await supabase.from('applications').select('email').eq('archived', true)
   const { sendable, blocked } = splitArchivedRecipients(recipients, toArchivedEmailSet((archivedRows ?? []) as any[]))

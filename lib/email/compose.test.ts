@@ -79,3 +79,9 @@ test('wrapBrandedHtml places the body and the sender signature', () => {
 test('defaultSender uses the configured address', () => {
   assert.equal(defaultSender('ops@example.com').email, 'ops@example.com')
 })
+
+test('defaultSender signs as the team, never a named person', () => {
+  const s = defaultSender('hello@example.com')
+  assert.equal(s.signatureName, 'The Nextrium Team')
+  assert.equal(s.signatureTitle, 'Nextrium Global Innovations Ltd')
+})
