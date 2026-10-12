@@ -86,6 +86,7 @@ export default async function MyTaskPage({ params }: Props) {
             {canSubmit && (
               <SubmissionForm
                 taskId={task.id}
+                taskTitle={task.title}
                 isResubmission={!!contribution}
                 initial={contribution ? { title: contribution.title, description: contribution.description, evidenceUrl: contribution.evidence_url ?? '' } : null}
               />

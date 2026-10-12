@@ -38,3 +38,9 @@ export function parseSubmission(raw: unknown): { submission: SubmissionInput } |
 
   return { submission: { title, description, evidenceUrl: url.toString() } }
 }
+
+/** Starting title for the submission form: the previous attempt's title on a resubmission, otherwise the task's title. */
+export function initialSubmissionTitle(taskTitle: string | null | undefined, previousTitle?: string | null): string {
+  const source = previousTitle?.trim() || taskTitle?.trim() || ''
+  return source.slice(0, SUBMISSION_TITLE_MAX)
+}
