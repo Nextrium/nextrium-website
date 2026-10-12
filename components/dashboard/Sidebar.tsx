@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react'
 import NTMark from '@/components/shared/NTMark'
 import { useDashboard } from './DashboardContext'
 import type { DashboardRole } from '@/lib/dashboard/getRole'
+import { roleBadgeLabel } from '@/lib/dashboard/roleBadge'
 
 // Sub-navigation shown under a nav item while on that page — real links
 // (a query param) rather than in-page tab state, so a specific view is
@@ -93,6 +94,7 @@ export default function Sidebar({ role }: { role: DashboardRole }) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const { sidebarOpen, closeSidebar } = useDashboard()
+  const badge = roleBadgeLabel(role)
 
   // Which sub-nav'd item (by href) is currently expanded — generalized from
   // a single Applications-only boolean so any item can carry sub-items.
@@ -179,7 +181,7 @@ export default function Sidebar({ role }: { role: DashboardRole }) {
         <Link href="/dashboard" className="sidebar-logo">
           <NTMark size={28} />
           <span className="sidebar-wordmark">Nex<span>T</span>rium</span>
-          <span className="sidebar-badge">Admin</span>
+          {badge && <span className="sidebar-badge">{badge}</span>}
         </Link>
 
         <nav className="sidebar-nav">
