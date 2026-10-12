@@ -6,6 +6,7 @@ import type { ContactSubmission } from '@/lib/types/database'
 import { useDashboardSearch } from '@/lib/dashboard/useDashboardSearch'
 import DashboardSearchBox from '@/components/dashboard/DashboardSearchBox'
 import { logActivityAction } from '@/app/actions/activityLog'
+import { useServerData } from '@/components/dashboard/useServerData'
 
 interface ContactClientProps {
   submissions: ContactSubmission[]
@@ -33,6 +34,12 @@ export default function ContactClient({ submissions: initial }: ContactClientPro
   const [selected,    setSelected]    = useState<ContactSubmission | null>(null)
   const [updating,    setUpdating]    = useState(false)
   const [updateError, setUpdateError] = useState<string | null>(null)
+
+  // Fresh data from a soft refresh replaces the list, and the open item if it is still there.
+  useServerData(initial, (fresh) => {
+    setSubmissions(fresh)
+    setSelected((prev) => (prev ? fresh.find((s) => s.id === prev.id) ?? prev : prev))
+  })
 
   async function updateStatus(id: string, status: ContactSubmission['status']) {
     setUpdating(true)
