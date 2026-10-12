@@ -3,6 +3,9 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { saveProfile, unlinkDiscord, syncMyDiscordAccess, type AccessCheckResult } from '../actions'
+import { saveContributorProfile } from '@/lib/contributions/profileActions'
+import { splitSkills } from '@/lib/contributions/profile'
+import ContributorFields, { type ContributorFieldsValue } from './ContributorFields'
 
 const DISCORD_NOTICES: Record<string, { text: string; ok: boolean }> = {
   linked:      { text: 'Discord connected.', ok: true },
@@ -26,6 +29,8 @@ export default function ProfileEditClient({
   discordUsername,
   discordAvailable,
   discordNotice,
+  contributor = null,
+  contributorOptional = false,
 }: {
   isFirstTime: boolean
   initialBio: string
@@ -33,6 +38,10 @@ export default function ProfileEditClient({
   discordUsername: string | null
   discordAvailable: boolean
   discordNotice: string | null
+  /** Contributor preferences, shown to everyone who can contribute. */
+  contributor?: ContributorFieldsValue | null
+  /** Staff may leave the contributor section empty; members must fill it in. */
+  contributorOptional?: boolean
 }) {
   const router = useRouter()
   const [disconnecting, setDisconnecting] = useState(false)
@@ -63,11 +72,26 @@ export default function ProfileEditClient({
   const [handles, setHandles] = useState<Record<string, string>>(initialHandles)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [contrib, setContrib] = useState<ContributorFieldsValue | null>(contributor)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
     setError('')
+    // Contributor preferences first, so onboarding (completed by saveProfile)
+    // only finishes once they are valid.
+    // The display name may be pre-filled from an application, so it alone doesn't opt staff in.
+    const contribFilled = !!contrib && (contrib.categories.length > 0 || contrib.skillsText.trim() !== '')
+    if (contrib && (!contributorOptional || contribFilled)) {
+      const c = await saveContributorProfile({
+        displayName: contrib.displayName,
+        categories: contrib.categories,
+        skills: splitSkills(contrib.skillsText),
+        availabilityHoursPerWeek: contrib.availability === '' ? null : Number(contrib.availability),
+        notifyEmail: contrib.notifyEmail,
+      })
+      if (c.error) { setSaving(false); setError(c.error); return }
+    }
     const res = await saveProfile({ bio, socialHandles: handles })
     setSaving(false)
     if (res.error) { setError(res.error); return }
@@ -120,6 +144,8 @@ export default function ProfileEditClient({
               />
             </div>
           ))}
+
+          {contrib && <ContributorFields value={contrib} onChange={setContrib} optional={contributorOptional} />}
 
           <div className="profile-form-section-title">Discord</div>
           {notice && (

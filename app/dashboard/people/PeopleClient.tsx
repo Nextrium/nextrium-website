@@ -13,7 +13,17 @@ export interface PersonCard {
   discordLinked:   boolean
   trackName:       string | null
   isTeamMember:    boolean
+  /** Contributor program stats, for members only. */
+  contribution?: {
+    points: number
+    verified: number
+    openTasks: number
+    categories: string[]
+    status: 'active' | 'invited'
+  } | null
 }
+
+const CONTRIB_CATEGORIES = ['technical', 'design', 'research', 'operations', 'community']
 
 const ROLE_LABELS: Record<string, string> = {
   admin:     'Admin',
@@ -37,7 +47,14 @@ function PersonCardItem({ person }: { person: PersonCard }) {
           <span className="person-card-role">{ROLE_LABELS[person.role] ?? person.role}</span>
           {person.trackName && <span className="person-card-track">{person.trackName}</span>}
           {person.isTeamMember && person.role !== 'member' && <span className="person-card-track">Also team member</span>}
+          {person.contribution?.status === 'invited' && <span className="person-card-track">Invited</span>}
         </div>
+        {person.contribution && (
+          <div className="person-card-email">
+            {person.contribution.points} pts · {person.contribution.verified} verified · {person.contribution.openTasks} open
+            {person.contribution.categories.length > 0 ? ` · ${person.contribution.categories.join(', ')}` : ''}
+          </div>
+        )}
       </div>
       <div className="person-card-badges">
         {person.discordLinked && <span className="person-card-badge" title={`Discord: ${person.discordUsername}`}>🎮</span>}
@@ -50,7 +67,13 @@ function PersonCardItem({ person }: { person: PersonCard }) {
 export default function PeopleClient({ staff, members, canSeeStaff }: { staff: PersonCard[]; members: PersonCard[]; canSeeStaff: boolean }) {
   const searchParams = useSearchParams()
   const view = canSeeStaff ? (searchParams.get('view') ?? 'staff') : 'members'
-  const list = view === 'members' ? members : staff
+  const category = searchParams.get('category') ?? ''
+  const status = searchParams.get('status') ?? ''
+  const list = view === 'members'
+    ? members.filter((m) =>
+        (!category || m.contribution?.categories.includes(category)) &&
+        (!status || m.contribution?.status === status))
+    : staff
 
   return (
     <>
@@ -76,6 +99,19 @@ export default function PeopleClient({ staff, members, canSeeStaff }: { staff: P
         {canSeeStaff && <Link href="/dashboard/people" className={`person-tab ${view !== 'members' ? 'active' : ''}`}>Staff ({staff.length})</Link>}
         <Link href="/dashboard/people?view=members" className={`person-tab ${view === 'members' ? 'active' : ''}`}>General Team Members ({members.length})</Link>
       </div>
+
+      {view === 'members' && (
+        <div className="person-tabs" style={{ marginTop: -8 }}>
+          {[['', 'All'], ...CONTRIB_CATEGORIES.map((c) => [c, c])].map(([value, label]) => (
+            <Link key={`c-${value}`} className={`person-tab ${category === value ? 'active' : ''}`}
+              href={`/dashboard/people?view=members${value ? `&category=${value}` : ''}${status ? `&status=${status}` : ''}`}>{label}</Link>
+          ))}
+          {[['', 'Any status'], ['active', 'Active'], ['invited', 'Invited']].map(([value, label]) => (
+            <Link key={`s-${value}`} className={`person-tab ${status === value ? 'active' : ''}`}
+              href={`/dashboard/people?view=members${category ? `&category=${category}` : ''}${value ? `&status=${value}` : ''}`}>{label}</Link>
+          ))}
+        </div>
+      )}
 
       {list.length === 0 ? (
         <div className="person-empty">No {view === 'members' ? 'team members' : 'staff'} yet.</div>

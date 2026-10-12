@@ -49,6 +49,20 @@ const ACTION_LABELS: Record<string, string> = {
   team_member_removed: 'Removed team member (public page)',
   contact_status_updated: 'Updated contact status',
   email_sent: 'Sent email',
+  task_created: 'Created task',
+  task_updated: 'Updated task',
+  task_cancelled: 'Cancelled task',
+  task_assigned: 'Assigned task',
+  task_unassigned: 'Unassigned task',
+  task_extension_granted: 'Granted task extension',
+  task_extension_denied: 'Denied task extension',
+  task_extension_requested: 'Requested task extension',
+  contribution_submitted: 'Submitted contribution',
+  contribution_resubmitted: 'Resubmitted contribution',
+  contribution_verified: 'Verified contribution',
+  contribution_changes_requested: 'Requested changes',
+  contribution_rejected: 'Rejected contribution',
+  contribution_review_retried: 'Retried automated review',
 }
 
 const ACTION_COLORS: Record<string, string> = {
@@ -89,6 +103,20 @@ const ACTION_COLORS: Record<string, string> = {
   team_member_removed: 'var(--error)',
   contact_status_updated: 'var(--slate)',
   email_sent: 'var(--orange)',
+  task_created: 'var(--slate)',
+  task_updated: 'var(--slate)',
+  task_cancelled: 'var(--error)',
+  task_assigned: 'var(--success)',
+  task_unassigned: 'var(--slate)',
+  task_extension_granted: 'var(--success)',
+  task_extension_denied: 'var(--error)',
+  task_extension_requested: 'var(--orange)',
+  contribution_submitted: 'var(--success)',
+  contribution_resubmitted: 'var(--success)',
+  contribution_verified: 'var(--success)',
+  contribution_changes_requested: 'var(--orange)',
+  contribution_rejected: 'var(--error)',
+  contribution_review_retried: 'var(--slate)',
 }
 
 const LEVEL_COLORS: Record<string, string> = {
@@ -163,6 +191,21 @@ function summarizeDetails(log: TeamActivityLog): string {
       return (d.name as string) || '—'
     case 'contact_status_updated':
       return `→ ${d.newStatus ?? '—'}`
+    case 'task_created':
+    case 'task_updated':
+    case 'task_cancelled':
+    case 'task_assigned':
+    case 'task_unassigned':
+    case 'task_extension_granted':
+    case 'task_extension_denied':
+    case 'task_extension_requested':
+    case 'contribution_submitted':
+    case 'contribution_resubmitted':
+    case 'contribution_verified':
+    case 'contribution_changes_requested':
+    case 'contribution_rejected':
+    case 'contribution_review_retried':
+      return (d.title as string) || '—'
     case 'email_sent':
       return [d.subject, d.recipientCount !== undefined ? `${d.recipientCount} recipient(s)` : null].filter(Boolean).join(' · ') || '—'
     default:

@@ -376,7 +376,8 @@ export default function ApplicationsClient({
     setSelected((prev) => (prev ? patchApp(prev) : prev))
   }
 
-  async function pollBulkScreenJob(jobId: string) {
+  async function pollBulkScreenLoop(jobId: string): Promise<string[]> {
+    let targetIds: string[] = []
     const mergedApplicationIds = new Set<string>()
     // A transient gateway blip on a single 3s status check (e.g. a stray 504)
     // used to be treated as fatal, permanently abandoning a job that Render
@@ -404,6 +405,7 @@ export default function ApplicationsClient({
       setBatchProgress({ current: job.succeeded + job.failed, total: job.total })
       if (Array.isArray(job.application_ids) && job.application_ids.length > 0) {
         setBatchTargetIds(job.application_ids)
+        targetIds = job.application_ids
       }
 
       const newlySucceeded = job.results.filter(
@@ -429,18 +431,53 @@ export default function ApplicationsClient({
         break
       }
 
+      // Every candidate has an outcome but the job row still says "running":
+      // the work is done, so stop waiting for a status flip that may not come.
+      if (job.total > 0 && job.succeeded + job.failed >= job.total) break
+
+      // A running job updates its heartbeat after every candidate. Ten silent
+      // minutes means the engine stopped (e.g. a restart), so stop waiting.
+      const heartbeat = job.heartbeat_at ? Date.parse(job.heartbeat_at) : NaN
+      if (!Number.isNaN(heartbeat) && Date.now() - heartbeat > 10 * 60 * 1000) {
+        setBatchError('Screening stopped responding. Any finished results are shown; run the rest again.')
+        break
+      }
+
       await new Promise((resolve) => setTimeout(resolve, 3000))
     }
 
+    return targetIds
+  }
+
+  // Always clears the "Screening..." state, even if a status check or result
+  // load throws, and re-reads the finished results from the database so the
+  // card and the detail panel never wait on a manual refresh.
+  async function pollBulkScreenJob(jobId: string) {
+    let targetIds: string[] = []
     try {
-      localStorage.removeItem(BULK_SCREEN_JOB_STORAGE_KEY)
-    } catch {
-      // localStorage unavailable — nothing to clean up
+      targetIds = await pollBulkScreenLoop(jobId)
+    } catch (err) {
+      setBatchError(err instanceof Error ? err.message : 'Lost track of the screening job.')
+    } finally {
+      try {
+        localStorage.removeItem(BULK_SCREEN_JOB_STORAGE_KEY)
+      } catch {
+        // localStorage unavailable — nothing to clean up
+      }
+      setBatchScreening(false)
+      setBatchProgress(null)
+      setBatchJobId(null)
+      setBatchTargetIds([])
     }
-    setBatchScreening(false)
-    setBatchProgress(null)
-    setBatchJobId(null)
-    setBatchTargetIds([])
+
+    if (targetIds.length > 0) {
+      try {
+        const fresh = await getScreeningResultsForApplications(targetIds)
+        if (Object.keys(fresh).length > 0) setScreeningResults((prev) => ({ ...prev, ...fresh }))
+      } catch {
+        // the results are already saved; a refresh will show them
+      }
+    }
   }
 
   async function runBulkScreenJob(applicationIds: string[], trackOverrides?: Record<string, string>) {
