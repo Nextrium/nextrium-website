@@ -40,7 +40,7 @@ export default async function ReviewQueuePage({ searchParams }: Props) {
     ? await supabase.from('tasks').select('id, title, category, complexity').in('id', taskIds)
     : { data: [] }
   const taskOf = new Map((taskRows as Pick<Task, 'id' | 'title' | 'category' | 'complexity'>[] ?? []).map((t) => [t.id, t]))
-  const emailOf = new Map((await getMemberDirectory()).map((m) => [m.userId, m.email]))
+  const nameOf = new Map((await getMemberDirectory()).map((m) => [m.userId, m.name]))
   const now = new Date()
 
   return (
@@ -90,7 +90,7 @@ export default async function ReviewQueuePage({ searchParams }: Props) {
                     <tr key={c.id}>
                       <td><Link href={`/dashboard/reviews/${c.id}`}>{c.title}</Link></td>
                       <td>{t ? t.title : '—'} <span className="rq-muted">{t ? `· ${CATEGORY_LABELS[t.category]}` : ''}</span></td>
-                      <td className="rq-muted">{emailOf.get(c.contributor_id) ?? 'Unknown'}</td>
+                      <td className="rq-muted">{nameOf.get(c.contributor_id) ?? 'Unknown'}</td>
                       <td className="rq-muted">#{c.submission_count}</td>
                       <td>{c.review_score !== null ? Math.round(Number(c.review_score)) : '—'}</td>
                       <td className="rq-muted">{ago(c.submitted_at, now)}</td>

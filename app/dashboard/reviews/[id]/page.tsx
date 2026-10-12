@@ -6,6 +6,7 @@ import ReviewHistory from '@/components/contributions/ReviewHistory'
 import DecisionPanel from './DecisionPanel'
 import RetryReview from './RetryReview'
 import { requireStaff } from '@/lib/contributions/auth'
+import { OWN_SUBMISSION_MESSAGE, canDecideOnSubmission } from '@/lib/contributions/decisionRules'
 import { getMemberDirectory } from '@/lib/contributions/members'
 import { sanitizeBrief } from '@/lib/contributions/sanitize'
 import { CATEGORY_LABELS, COMPLEXITY_LABELS } from '@/lib/contributions/constants'
@@ -23,7 +24,8 @@ interface Props {
 }
 
 export default async function ReviewDetailPage({ params }: Props) {
-  if ('error' in (await requireStaff())) notFound()
+  const auth = await requireStaff()
+  if ('error' in auth) notFound()
   const { id } = await params
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound()
 
@@ -88,7 +90,7 @@ export default async function ReviewDetailPage({ params }: Props) {
           <div className="mt-side">
             <div className="mt-panel">
               <div className="mt-panel-title">Details</div>
-              <div className="mt-kv"><span>Member</span><span>{member?.email ?? 'Unknown'}</span></div>
+              <div className="mt-kv"><span>Member</span><span>{member?.name ?? 'Unknown'}</span></div>
               <div className="mt-kv"><span>Task</span><span>{CATEGORY_LABELS[task.category]} · {COMPLEXITY_LABELS[task.complexity]}</span></div>
               <div className="mt-kv"><span>Points range</span><span>{task.point_range_min}–{task.point_range_max}</span></div>
               <div className="mt-kv"><span>Deadline</span><span>{fmt(deadline?.toISOString() ?? null)}</span></div>
@@ -98,7 +100,9 @@ export default async function ReviewDetailPage({ params }: Props) {
             </div>
             {(c.status === 'review_failed' || stale) && <RetryReview contributionId={c.id} />}
             {['needs_human', 'ai_approved', 'review_failed', 'changes_requested'].includes(c.status) && (
-              <DecisionPanel contributionId={c.id} min={task.point_range_min} max={task.point_range_max} />
+              canDecideOnSubmission(auth.caller, c.contributor_id)
+                ? <DecisionPanel contributionId={c.id} min={task.point_range_min} max={task.point_range_max} />
+                : <div className="mt-panel"><span className="mt-hint">{OWN_SUBMISSION_MESSAGE}</span></div>
             )}
             {c.status === 'pending_review' && !stale && (
               <div className="mt-panel"><ReviewPoller /><span className="mt-hint">The automated review is running. Decisions open when it finishes.</span></div>

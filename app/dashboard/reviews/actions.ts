@@ -9,6 +9,14 @@ import { reviewContribution } from '@/lib/contributions/reviewService'
 import { changesRequestedEmail, rejectedEmail, verifiedEmail } from '@/lib/contributions/emails'
 import { notifyMember, notifyReviewResult, siteUrl } from '@/lib/contributions/notify'
 import { isReviewStale } from '@/lib/contributions/taskView'
+import { OWN_SUBMISSION_MESSAGE, canDecideOnSubmission } from '@/lib/contributions/decisionRules'
+
+/** Null when the caller may decide on this submission, otherwise the reason they can't. */
+async function decisionDenial(caller: { userId: string; role: string }, contributionId: string): Promise<string | null> {
+  const { data } = await db().from('contributions').select('contributor_id').eq('id', contributionId).maybeSingle()
+  if (!data) return 'That submission could not be found.'
+  return canDecideOnSubmission(caller, data.contributor_id) ? null : OWN_SUBMISSION_MESSAGE
+}
 
 /** True when the contribution is already in `status` — a repeated click, so no second log or email. */
 async function alreadyIn(contributionId: string, status: string): Promise<boolean> {
@@ -51,6 +59,8 @@ export async function verifyContribution(contributionId: string, basePoints: num
   if ('error' in auth) return { ok: false, error: auth.error }
   if (!UUID.test(contributionId)) return { ok: false, error: 'That submission could not be found.' }
   if (!Number.isInteger(basePoints) || basePoints < 0) return { ok: false, error: 'Choose the base points to award.' }
+  const denied = await decisionDenial(auth.caller, contributionId)
+  if (denied) return { ok: false, error: denied }
   if (await alreadyIn(contributionId, 'verified')) return { ok: true }
 
   const { data, error } = await db().rpc('verify_contribution', {
@@ -72,6 +82,8 @@ export async function requestChanges(contributionId: string, notes: string): Pro
   const auth = await requireStaff()
   if ('error' in auth) return { ok: false, error: auth.error }
   if (!UUID.test(contributionId)) return { ok: false, error: 'That submission could not be found.' }
+  const denied = await decisionDenial(auth.caller, contributionId)
+  if (denied) return { ok: false, error: denied }
   if (await alreadyIn(contributionId, 'changes_requested')) return { ok: true }
 
   const { data, error } = await db().rpc('request_contribution_changes', {
@@ -92,6 +104,8 @@ export async function rejectContribution(contributionId: string, notes: string):
   const auth = await requireStaff()
   if ('error' in auth) return { ok: false, error: auth.error }
   if (!UUID.test(contributionId)) return { ok: false, error: 'That submission could not be found.' }
+  const denied = await decisionDenial(auth.caller, contributionId)
+  if (denied) return { ok: false, error: denied }
   if (await alreadyIn(contributionId, 'rejected')) return { ok: true }
 
   const { data, error } = await db().rpc('reject_contribution', {

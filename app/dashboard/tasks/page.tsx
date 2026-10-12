@@ -32,7 +32,7 @@ export default async function TasksPage({ searchParams }: Props) {
   if (filters.overdue === '1') tasks = tasks.filter((t) => isOverdue(t, now))
 
   const members = await getMemberDirectory()
-  const emailOf = new Map(members.map((m) => [m.userId, m.email]))
+  const nameOf = new Map(members.map((m) => [m.userId, m.name]))
 
   return (
     <>
@@ -81,7 +81,7 @@ export default async function TasksPage({ searchParams }: Props) {
           <label>Assignee
             <select name="assignee" defaultValue={filters.assignee ?? ''}>
               <option value="">Anyone</option>
-              {members.map((m) => <option key={m.userId} value={m.userId}>{m.email}</option>)}
+              {members.map((m) => <option key={m.userId} value={m.userId}>{m.name}</option>)}
             </select>
           </label>
           <label className="check">
@@ -117,7 +117,7 @@ export default async function TasksPage({ searchParams }: Props) {
                         <span className={`tasks-badge ${t.status === 'completed' ? 'good' : t.status === 'cancelled' ? '' : 'warn'}`}>{TASK_STATUS_LABELS[t.status]}</span>
                         {t.extension_status === 'requested' && <> <span className="tasks-badge warn">Extension requested</span></>}
                       </td>
-                      <td className={t.assigned_to ? '' : 'tasks-muted'}>{t.assigned_to ? emailOf.get(t.assigned_to) ?? 'Unknown' : 'Unassigned'}</td>
+                      <td className={t.assigned_to ? '' : 'tasks-muted'}>{t.assigned_to ? nameOf.get(t.assigned_to) ?? 'Unknown' : 'Unassigned'}</td>
                       <td>{overdue ? <span className="tasks-badge bad">{deadlineLabel(t, now)}</span> : <span className="tasks-muted">{deadlineLabel(t, now)}</span>}</td>
                       <td className="tasks-muted">{t.point_range_min}–{t.point_range_max}</td>
                     </tr>

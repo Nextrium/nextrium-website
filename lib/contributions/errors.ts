@@ -17,6 +17,7 @@ const MESSAGES: Record<string, string> = {
   review_in_progress: 'The automated review is still running for this submission. Try again in a minute.',
   contribution_final: 'This submission has already been decided.',
   notes_required: 'Add a note for the member explaining the decision.',
+  own_submission: 'You cannot review your own submission. An admin will review it.',
 }
 
 export function describeDbError(error: { message?: string } | null | undefined, fallback = 'Something went wrong. Please try again.'): string {

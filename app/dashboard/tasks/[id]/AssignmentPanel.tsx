@@ -51,7 +51,7 @@ export default function AssignmentPanel({ task, members, hasSubmission }: Props)
 
       {assignee && (
         <>
-          <div className="task-kv"><span>Assignee</span><span>{assignee.email}</span></div>
+          <div className="task-kv"><span>Assignee</span><span>{assignee.name}</span></div>
           <div className="task-kv"><span>Deadline</span><span>{fmt(effectiveDeadline(task))}</span></div>
           <div className="task-kv"><span>Time left</span><span>{deadlineLabel(task)}</span></div>
         </>
@@ -80,7 +80,7 @@ export default function AssignmentPanel({ task, members, hasSubmission }: Props)
               <option value="">Choose a member…</option>
               {active.map((m) => (
                 <option key={m.userId} value={m.userId}>
-                  {m.email} · {m.openTasks} open{m.categories.includes(task.category) ? ' · ✓ ' + CATEGORY_LABELS[task.category] : ''}
+                  {m.name} · {m.openTasks} open{m.categories.includes(task.category) ? ' · ✓ ' + CATEGORY_LABELS[task.category] : ''}
                 </option>
               ))}
             </select>
