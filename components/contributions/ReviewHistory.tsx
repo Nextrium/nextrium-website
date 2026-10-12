@@ -1,4 +1,5 @@
 import type { ContributionReview } from '@/lib/types/database'
+import { SCOPE_CHECK, isScopeOnlyMismatch } from '@/lib/contributions/reviewMapping'
 
 // Review feedback comes from the review service (or staff), so every value is
 // rendered as text by React — never as HTML.
@@ -42,11 +43,17 @@ export default function ReviewHistory({ reviews, showSecurity = false }: { revie
       <div className="mt-panel-title">Review history</div>
       {reviews.map((r) => {
         const f = (r.feedback ?? {}) as Feedback
-        const checks = (r.checks ?? {}) as Record<string, boolean>
+        const allChecks = (r.checks ?? {}) as Record<string, boolean>
+        // Complexity is set by staff, so members never see the scope check or advice about it;
+        // when scope was the only problem, the advice was about complexity and is hidden too.
+        const scopeOnly = isScopeOnlyMismatch(allChecks)
+        const checks = showSecurity ? allChecks : Object.fromEntries(Object.entries(allChecks).filter(([k]) => k !== SCOPE_CHECK))
+        const issues = showSecurity ? f.issues : f.issues?.filter((i) => i.check !== SCOPE_CHECK)
+        const whatToDo = showSecurity || !scopeOnly ? f.what_to_do : undefined
         return (
           <div key={r.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div className="mt-kv">
-              <span>Submission #{r.submission_number} · {r.source === 'staff' ? 'Team' : 'Automated review'}</span>
+              <span>Attempt {r.submission_number} · {r.source === 'staff' ? 'Team' : 'Automated review'}</span>
               <span>{DECISION_LABELS[r.decision] ?? r.decision}{r.overall_score !== null ? ` · ${Math.round(Number(r.overall_score))}/100` : ''}</span>
             </div>
             {f.summary && <div className="mt-brief" style={{ fontSize: 13 }}>{f.summary}</div>}
@@ -57,12 +64,12 @@ export default function ReviewHistory({ reviews, showSecurity = false }: { revie
                 ))}
               </div>
             )}
-            {f.issues && f.issues.length > 0 && (
+            {issues && issues.length > 0 && (
               <ul style={{ margin: 0, paddingLeft: 18 }}>
-                {f.issues.map((i, n) => <li key={n} className="mt-hint" style={{ color: 'var(--off-white)' }}>{i.message}</li>)}
+                {issues.map((i, n) => <li key={n} className="mt-hint" style={{ color: 'var(--off-white)' }}>{i.message}</li>)}
               </ul>
             )}
-            {f.what_to_do && <div className="mt-hint" style={{ whiteSpace: 'pre-wrap', color: 'var(--off-white)' }}><strong>What to do: </strong>{f.what_to_do}</div>}
+            {whatToDo && <div className="mt-hint" style={{ whiteSpace: 'pre-wrap', color: 'var(--off-white)' }}><strong>What to do: </strong>{whatToDo}</div>}
             {showSecurity && Array.isArray((r.code_audit as any)?.security_issues) && (r.code_audit as any).security_issues.length > 0 && (
               <div className="mt-hint">
                 <strong style={{ color: 'var(--error)' }}>Security findings</strong>

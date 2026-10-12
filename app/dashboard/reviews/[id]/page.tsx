@@ -5,6 +5,8 @@ import Header from '@/components/dashboard/Header'
 import ReviewHistory from '@/components/contributions/ReviewHistory'
 import DecisionPanel from './DecisionPanel'
 import RetryReview from './RetryReview'
+import AdjustComplexity from './AdjustComplexity'
+import { SCOPE_CHECK } from '@/lib/contributions/reviewMapping'
 import { requireStaff } from '@/lib/contributions/auth'
 import { OWN_SUBMISSION_MESSAGE, canDecideOnSubmission } from '@/lib/contributions/decisionRules'
 import { getMemberDirectory } from '@/lib/contributions/members'
@@ -12,6 +14,7 @@ import { sanitizeBrief } from '@/lib/contributions/sanitize'
 import { CATEGORY_LABELS, COMPLEXITY_LABELS } from '@/lib/contributions/constants'
 import { QUEUE_TABS, effectiveDeadline, isReviewStale } from '@/lib/contributions/taskView'
 import ReviewPoller from '@/components/contributions/ReviewPoller'
+import { loadSubmissionNumbers } from '@/lib/contributions/submissionNumber'
 import type { Contribution, ContributionReview, Task } from '@/lib/types/database'
 
 export const dynamic = 'force-dynamic'
@@ -39,9 +42,13 @@ export default async function ReviewDetailPage({ params }: Props) {
     getMemberDirectory(),
   ])
   const reviews: ContributionReview[] = reviewRows ?? []
+  // Did the latest automated review flag the work as not matching the task's complexity?
+  const latestReview = reviews.find((r) => r.id === c.latest_review_id) ?? reviews[0]
+  const scopeFlagged = (latestReview?.checks as Record<string, unknown> | null)?.[SCOPE_CHECK] === false
   const member = members.find((m) => m.userId === c.contributor_id)
   const deadline = effectiveDeadline(task)
   const stale = isReviewStale(c)
+  const submissionNo = (await loadSubmissionNumbers(supabase)).get(c.id)
 
   const statusLabel = QUEUE_TABS.find((t) => t.key === c.status)?.label ?? c.status
   const fmt = (iso: string | null) => iso ? new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '—'
@@ -68,9 +75,11 @@ export default async function ReviewDetailPage({ params }: Props) {
         .mt-btn.danger { background: none; border-color: rgba(232,69,69,0.35); color: var(--error); }
         .mt-alert { padding: 10px 14px; font-size: 12px; border: 1px solid; }
         .mt-alert.error { background: rgba(232,69,69,0.08); border-color: rgba(232,69,69,0.3); color: var(--error); }
+        .mt-alert.warn { background: rgba(212,168,67,0.08); border-color: rgba(212,168,67,0.3); color: var(--warning); line-height: 1.5; }
+        .mt-alert.success { background: rgba(34,193,122,0.08); border-color: rgba(34,193,122,0.3); color: var(--success); }
         @media (max-width: 1100px) { .mt-layout { grid-template-columns: 1fr; } .mt-side { position: static; } }
       `}</style>
-      <Header title={c.title} description={`${statusLabel} · submission #${c.submission_count}`}
+      <Header title={c.title} description={`${statusLabel} · Submission #${submissionNo ?? '—'} · attempt ${c.submission_count}`}
         action={<Link href={`/dashboard/reviews?tab=${c.status}`} className="mt-btn ghost" style={{ textDecoration: 'none' }}>Back to queue</Link>} />
       <div className="dash-content">
         <div className="mt-layout">
@@ -101,7 +110,10 @@ export default async function ReviewDetailPage({ params }: Props) {
             {(c.status === 'review_failed' || stale) && <RetryReview contributionId={c.id} />}
             {['needs_human', 'ai_approved', 'review_failed', 'changes_requested'].includes(c.status) && (
               canDecideOnSubmission(auth.caller, c.contributor_id)
-                ? <DecisionPanel contributionId={c.id} min={task.point_range_min} max={task.point_range_max} />
+                ? <>
+                    <AdjustComplexity contributionId={c.id} category={task.category} complexity={task.complexity} scopeFlagged={scopeFlagged} />
+                    <DecisionPanel key={`${task.point_range_min}-${task.point_range_max}`} contributionId={c.id} min={task.point_range_min} max={task.point_range_max} />
+                  </>
                 : <div className="mt-panel"><span className="mt-hint">{OWN_SUBMISSION_MESSAGE}</span></div>
             )}
             {c.status === 'pending_review' && !stale && (

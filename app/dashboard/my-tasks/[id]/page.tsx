@@ -8,6 +8,7 @@ import ExtensionRequest from './ExtensionRequest'
 import SubmissionForm from './SubmissionForm'
 import ReviewHistory from '@/components/contributions/ReviewHistory'
 import ReviewPoller from '@/components/contributions/ReviewPoller'
+import { loadSubmissionNumbers } from '@/lib/contributions/submissionNumber'
 import { sanitizeBrief } from '@/lib/contributions/sanitize'
 import type { Contribution, ContributionReview, Task } from '@/lib/types/database'
 
@@ -40,6 +41,7 @@ export default async function MyTaskPage({ params }: Props) {
         .order('submission_number', { ascending: false }).order('created_at', { ascending: false })
     : { data: [] }
   const reviews: ContributionReview[] = reviewRows ?? []
+  const submissionNo = contribution ? (await loadSubmissionNumbers(supabase)).get(contribution.id) : undefined
 
   const now = new Date()
   const deadline = effectiveDeadline(task)
@@ -96,7 +98,8 @@ export default async function MyTaskPage({ params }: Props) {
               <div className="mt-panel">
                 <div className="mt-panel-title">Your submission</div>
                 <div className="mt-kv"><span>Status</span><span>{CONTRIBUTION_STATUS_MEMBER_LABELS[contribution.status]}</span></div>
-                <div className="mt-kv"><span>Submission</span><span>#{contribution.submission_count}</span></div>
+                <div className="mt-kv"><span>Submission</span><span>#{submissionNo ?? '—'}</span></div>
+                <div className="mt-kv"><span>Attempt</span><span>{contribution.submission_count}</span></div>
                 {contribution.final_points !== null && <div className="mt-kv"><span>Points awarded</span><span>{contribution.final_points}</span></div>}
                 {contribution.evidence_url && <a className="mt-hint" href={contribution.evidence_url} target="_blank" rel="noopener noreferrer">{contribution.evidence_url}</a>}
               </div>

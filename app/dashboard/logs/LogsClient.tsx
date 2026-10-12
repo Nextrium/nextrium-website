@@ -63,6 +63,7 @@ const ACTION_LABELS: Record<string, string> = {
   contribution_changes_requested: 'Requested changes',
   contribution_rejected: 'Rejected contribution',
   contribution_review_retried: 'Retried automated review',
+  task_complexity_adjusted: 'Adjusted task complexity',
 }
 
 const ACTION_COLORS: Record<string, string> = {
@@ -117,6 +118,7 @@ const ACTION_COLORS: Record<string, string> = {
   contribution_changes_requested: 'var(--orange)',
   contribution_rejected: 'var(--error)',
   contribution_review_retried: 'var(--slate)',
+  task_complexity_adjusted: 'var(--orange)',
 }
 
 const LEVEL_COLORS: Record<string, string> = {
@@ -205,6 +207,7 @@ function summarizeDetails(log: TeamActivityLog): string {
     case 'contribution_changes_requested':
     case 'contribution_rejected':
     case 'contribution_review_retried':
+    case 'task_complexity_adjusted':
       return (d.title as string) || '—'
     case 'email_sent':
       return [d.subject, d.recipientCount !== undefined ? `${d.recipientCount} recipient(s)` : null].filter(Boolean).join(' · ') || '—'

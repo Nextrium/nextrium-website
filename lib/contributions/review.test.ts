@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mapReviewResponse } from './reviewMapping'
+import { isScopeOnlyMismatch, mapReviewResponse } from './reviewMapping'
 import { signReviewBody } from './reviewSignature'
 
 const base = {
@@ -55,4 +55,25 @@ test('feedback is normalised and bad issues dropped', () => {
 test('score is clamped and non-numbers become null', () => {
   assert.equal(mapReviewResponse({ ...base, decision: 'rejected', overall_score: 140 })?.score, 100)
   assert.equal(mapReviewResponse({ ...base, decision: 'rejected', overall_score: 'high' })?.score, null)
+})
+
+test('a rejection for scope alone goes to staff, not back to the member', () => {
+  const body = { decision: 'rejected', overall_score: 70, checks: { title_descriptive: true, complexity_proportionate: false, evidence_url_present: true } }
+  assert.equal(mapReviewResponse(body)?.status, 'needs_human')
+})
+
+test('a rejection with any other failed check still goes back to the member', () => {
+  const body = { decision: 'rejected', checks: { complexity_proportionate: false, description_substance: false } }
+  assert.equal(mapReviewResponse(body)?.status, 'changes_requested')
+  assert.equal(mapReviewResponse({ decision: 'rejected', checks: { description_substance: false } })?.status, 'changes_requested')
+  assert.equal(mapReviewResponse({ decision: 'rejected' })?.status, 'changes_requested')
+})
+
+test('isScopeOnlyMismatch needs the scope check to have failed alone', () => {
+  assert.equal(isScopeOnlyMismatch({ complexity_proportionate: false }), true)
+  assert.equal(isScopeOnlyMismatch({ complexity_proportionate: false, a: true }), true)
+  assert.equal(isScopeOnlyMismatch({ complexity_proportionate: false, a: false }), false)
+  assert.equal(isScopeOnlyMismatch({ complexity_proportionate: true }), false)
+  assert.equal(isScopeOnlyMismatch(null), false)
+  assert.equal(isScopeOnlyMismatch({}), false)
 })
