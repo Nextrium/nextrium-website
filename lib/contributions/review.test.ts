@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { hasMemberFixableFailure, isStaffOnlyIssue, mapReviewResponse } from './reviewMapping'
+import { hasMemberFixableFailure, isStaffOnlyIssue, mapReviewResponse, memberResubmissionView } from './reviewMapping'
 import { signReviewBody } from './reviewSignature'
 
 const base = {
@@ -88,4 +88,27 @@ test('hasMemberFixableFailure ignores scope and security checks', () => {
 test('isStaffOnlyIssue covers scope and every security note', () => {
   for (const c of ['complexity_proportionate', 'security_high', 'security_medium', 'security']) assert.equal(isStaffOnlyIssue(c), true, c)
   for (const c of ['title_descriptive', 'description_substance', '', null, undefined]) assert.equal(isStaffOnlyIssue(c), false, String(c))
+})
+
+test('memberResubmissionView removes staff-only items and the summary written about them', () => {
+  const v = memberResubmissionView({
+    summary: 'You ignored the security and complexity feedback.',
+    previous_issues_resolved: [
+      { check: 'security_high', status: 'unresolved', explanation: 'x' },
+      { check: 'complexity_proportionate', status: 'unresolved', explanation: 'y' },
+      { check: 'title_descriptive', status: 'unresolved', explanation: 'Title unchanged' },
+    ],
+  })
+  assert.deepEqual(v, { summary: undefined, previous_issues_resolved: [{ check: 'title_descriptive', status: 'unresolved', explanation: 'Title unchanged' }] })
+})
+
+test('memberResubmissionView keeps the summary when nothing staff-only was compared', () => {
+  const a = { summary: 'Title now fixed.', previous_issues_resolved: [{ check: 'title_descriptive', status: 'resolved', explanation: 'ok' }] }
+  assert.deepEqual(memberResubmissionView(a), a)
+})
+
+test('memberResubmissionView hides the section when only staff-only items remain', () => {
+  assert.equal(memberResubmissionView({ summary: 's', previous_issues_resolved: [{ check: 'security_low', status: 'resolved', explanation: 'e' }] }), null)
+  assert.equal(memberResubmissionView(null), null)
+  assert.deepEqual(memberResubmissionView({ summary: 'only text' }), { summary: 'only text', previous_issues_resolved: [] })
 })
