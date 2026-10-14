@@ -1,0 +1,156 @@
+@import "tailwindcss";
+
+/* Colour tokens (--navy, --orange, ...) are written to :root by the root layout
+   from @nextrium/brand, so each brand supplies its own values. */
+
+/* Base styles sit in the base layer so Tailwind utilities (p-10, mx-auto, ...) win over them. */
+@layer base {
+  *, *::before, *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--navy-deep);
+    color: var(--off-white);
+    font-family: var(--font-dm), 'DM Sans', system-ui, sans-serif;
+    font-weight: 300;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--orange) 35%, transparent);
+    color: var(--off-white);
+  }
+
+  ::-webkit-scrollbar { width: 3px; }
+  ::-webkit-scrollbar-track { background: var(--navy-deep); }
+  ::-webkit-scrollbar-thumb { background: var(--slate); border-radius: 2px; }
+
+  :focus-visible {
+    outline: 2px solid var(--orange-w);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .bg-void { background-color: var(--navy-deep); }
+  .bg-page-gradient {
+    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-deep) 50%, var(--black) 100%);
+  }
+  .glass {
+    background: color-mix(in srgb, var(--navy-deep) 85%, transparent);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+  .text-gradient {
+    background: linear-gradient(135deg, var(--orange-w), var(--orange), var(--orange-f));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .section-label {
+    font-family: var(--font-dm), sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--grey-mid);
+  }
+  .field-label {
+    font-family: var(--font-dm), sans-serif;
+    font-size: 11px;
+    color: var(--grey-mid);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 6px;
+  }
+  .card-base {
+    background: var(--navy);
+    border: 1px solid var(--navy-mid);
+    border-radius: 16px;
+    transition: border-color 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
+  }
+  .card-base:hover {
+    border-color: var(--orange);
+    transform: translateY(-4px);
+    box-shadow: 0 20px 60px color-mix(in srgb, var(--orange) 12%, transparent);
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--orange-w), var(--orange), var(--orange-f));
+    color: var(--white);
+    padding: 14px 32px;
+    border: none;
+    border-radius: 9999px;
+    font-family: var(--font-dm), sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+  }
+  .btn-primary:hover:not(:disabled) {
+    box-shadow: 0 0 60px color-mix(in srgb, var(--orange) 45%, transparent);
+    transform: translateY(-1px);
+  }
+  .btn-outline {
+    background: transparent;
+    color: var(--grey-light);
+    padding: 13px 31px;
+    border-radius: 9999px;
+    border: 1px solid var(--navy-mid);
+    font-family: var(--font-dm), sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    transition: border-color 0.2s ease, color 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+  }
+  .btn-outline:hover {
+    border-color: var(--orange);
+    color: var(--orange-w);
+  }
+  .nav-link {
+    font-family: var(--font-dm), sans-serif;
+    font-size: 13px;
+    color: var(--grey-mid);
+    text-decoration: none;
+    transition: color 0.2s ease;
+  }
+  .nav-link:hover { color: var(--off-white); }
+  .link-quiet {
+    font-family: var(--font-dm), sans-serif;
+    font-size: 12px;
+    color: var(--slate-l);
+    text-decoration: none;
+    cursor: pointer;
+    transition: color 0.2s ease;
+  }
+  .link-quiet:hover { color: var(--grey-mid); }
+  .portal-input { outline: none; transition: border-color 0.2s ease; }
+  .portal-input:focus { border-color: var(--orange) !important; }
+  .portal-input::placeholder { color: var(--slate-l); opacity: 0.8; }
+  .orb {
+    position: fixed;
+    border-radius: 9999px;
+    pointer-events: none;
+  }
+  .orb-a { width: 600px; height: 600px; background: var(--orange); filter: blur(140px); opacity: 0.07; top: -200px; right: -100px; }
+  .orb-b { width: 400px; height: 400px; background: var(--slate); filter: blur(120px); opacity: 0.06; bottom: -100px; left: 5%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+}

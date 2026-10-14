@@ -6,7 +6,10 @@
     "./client": "./src/client.ts",
     "./database": "./src/database.ts",
     "./proxy": "./src/proxy.ts",
-    "./server": "./src/server.ts"
+    "./server": "./src/server.ts",
+    "./community/database": "./src/community/database.ts",
+    "./community/proxy": "./src/community/proxy.ts",
+    "./community/server": "./src/community/server.ts"
   },
   "scripts": {
     "type-check": "tsc --noEmit"
