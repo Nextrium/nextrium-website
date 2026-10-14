@@ -1,50 +1,14 @@
 {
-  "name": "nextrium-website",
-  "version": "0.1.0",
+  "name": "nextrium",
   "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "next dev --turbopack",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
-    "type-check": "tsc --noEmit",
-    "test": "tsx --test \"app/**/*.test.ts\" \"lib/**/*.test.ts\" \"components/**/*.test.ts\""
-  },
-  "dependencies": {
-    "@hookform/resolvers": "^5.4.0",
-    "@supabase/ssr": "^0.10.3",
-    "@supabase/supabase-js": "^2.107.0",
-    "@tiptap/extension-color": "^3.24.0",
-    "@tiptap/extension-highlight": "^3.24.0",
-    "@tiptap/extension-image": "^3.24.0",
-    "@tiptap/extension-link": "^3.23.4",
-    "@tiptap/extension-table": "^3.25.0",
-    "@tiptap/extension-text-align": "^3.24.0",
-    "@tiptap/extension-text-style": "^3.24.0",
-    "@tiptap/extension-underline": "^3.24.0",
-    "@tiptap/extension-youtube": "^3.24.0",
-    "@tiptap/extensions": "^3.24.0",
-    "@tiptap/pm": "^3.24.0",
-    "@tiptap/react": "^3.24.0",
-    "@tiptap/starter-kit": "^3.23.5",
-    "lucide-react": "^1.17.0",
-    "next": "16.3.5",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "react-hook-form": "^7.77.0",
-    "sanitize-html": "^2.17.7",
-    "zod": "^4.4.3"
-  },
-  "devDependencies": {
-    "@tailwindcss/postcss": "^4.3.0",
-    "@types/node": "^22.0.0",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
-    "@types/sanitize-html": "^2.16.2",
-    "eslint": "^9.0.0",
-    "eslint-config-next": "16.2.7",
-    "tailwindcss": "^4.3.0",
-    "tsx": "^4.23.15",
-    "typescript": "^5.8.3"
+    "dev:website": "npm run dev -w @nextrium/website",
+    "build:website": "npm run build -w @nextrium/website",
+    "type-check": "npm run type-check --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
   }
 }

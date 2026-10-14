@@ -1,0 +1,20 @@
+{
+  "name": "@nextrium/brand",
+  "version": "0.1.0",
+  "private": true,
+  "exports": {
+    "./NTMark": "./src/NTMark.tsx",
+    "./Wordmark": "./src/Wordmark.tsx"
+  },
+  "scripts": {
+    "type-check": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.8.3",
+    "@types/react": "^19.0.0"
+  }
+}
