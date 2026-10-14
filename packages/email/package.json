@@ -1,0 +1,21 @@
+{
+  "name": "@nextrium/email",
+  "version": "0.1.0",
+  "private": true,
+  "exports": {
+    "./compose": "./src/compose.ts",
+    "./send": "./src/send.ts"
+  },
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "test": "tsx --test \"src/**/*.test.ts\""
+  },
+  "dependencies": {
+    "@nextrium/supabase": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.8.3",
+    "tsx": "^4.23.15"
+  }
+}

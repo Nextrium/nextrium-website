@@ -1,0 +1,34 @@
+{
+  "name": "@nextrium/contributions-core",
+  "version": "0.1.0",
+  "private": true,
+  "exports": {
+    "./analytics": "./src/analytics.ts",
+    "./constants": "./src/constants.ts",
+    "./decisionRules": "./src/decisionRules.ts",
+    "./emails": "./src/emails.ts",
+    "./errors": "./src/errors.ts",
+    "./leaderboard": "./src/leaderboard.ts",
+    "./profile": "./src/profile.ts",
+    "./reviewMapping": "./src/reviewMapping.ts",
+    "./reviewSignature": "./src/reviewSignature.ts",
+    "./sanitize": "./src/sanitize.ts",
+    "./submission": "./src/submission.ts",
+    "./submissionNumber": "./src/submissionNumber.ts",
+    "./taskInput": "./src/taskInput.ts",
+    "./taskView": "./src/taskView.ts"
+  },
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "test": "tsx --test \"src/**/*.test.ts\""
+  },
+  "dependencies": {
+    "sanitize-html": "^2.17.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.8.3",
+    "tsx": "^4.23.15",
+    "@types/sanitize-html": "^2.16.2"
+  }
+}
