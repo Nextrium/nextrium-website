@@ -1,5 +1,6 @@
 // Types for the community database (the contributor portal's Supabase project).
-// Generated on 2026-10-14 from the project's REST schema; regenerate when its tables change.
+// Generated on 2026-10-14 from the project's REST schema (function return types checked
+// against their definitions); regenerate when its tables change.
 export type Json =
   | string
   | number
@@ -371,21 +372,33 @@ export type CommunityDatabase = {
     }
     Views: { [_ in never]: never }
     Functions: {
+      // claim_task / unclaim_task check the caller themselves unless called with
+      // the service key; the portal passes only a verified, active contributor.
+      // The deadline arguments are ignored: the deadline comes from the task.
       claim_task: {
         Args: { task_id: string; contributor_id: string; deadline_days_val: number; deadline_at_val: string }
-        Returns: Json
+        Returns: boolean
       }
       unclaim_task: {
         Args: { task_id: string; contributor_id: string }
-        Returns: Json
+        Returns: undefined
       }
       check_claim_cooldown: {
         Args: { task_id: string; contributor_id: string }
-        Returns: Json
+        Returns: boolean
       }
       get_public_contributors: {
         Args: Record<string, never>
-        Returns: Json
+        Returns: {
+          id: string
+          name: string
+          categories: string[]
+          location: string | null
+          contributor_type: string | null
+          team_name: string | null
+          total_points: number | null
+          verified_contributions: number | null
+        }[]
       }
     }
     Enums: { [_ in never]: never }

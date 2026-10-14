@@ -2,7 +2,7 @@ import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
   // Shared workspace packages ship TypeScript source; Next compiles them with the app.
-  transpilePackages: ['@nextrium/supabase', '@nextrium/utils', '@nextrium/brand'],
+  transpilePackages: ['@nextrium/supabase', '@nextrium/utils', '@nextrium/brand', '@nextrium/contributions-core'],
   async headers() {
     return [
       {

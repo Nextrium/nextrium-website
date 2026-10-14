@@ -39,3 +39,16 @@ export const F = {
 } as const
 
 export const GRADIENT = 'linear-gradient(135deg, var(--orange-w), var(--orange), var(--orange-f))'
+
+/** Each contribution category's colour token, used for its badges and accents. */
+export const CATEGORY_TOKEN: Record<string, string> = {
+  technical: '--slate-l',
+  design: '--orange-w',
+  community: '--teal-l',
+  research: '--gold-l',
+  operations: '--grey-light',
+}
+
+export function categoryToken(category: string | null | undefined): string {
+  return (category && CATEGORY_TOKEN[category]) || '--orange-w'
+}
