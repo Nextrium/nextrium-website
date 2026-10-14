@@ -11,7 +11,9 @@
     "type-check": "npm run type-check --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "brand:check": "tsx scripts/brand-check.ts",
-    "brand:new": "tsx scripts/brand-new.ts"
+    "brand:new": "tsx scripts/brand-new.ts",
+    "dev:dashboard": "npm run dev -w @nextrium/dashboard",
+    "build:dashboard": "npm run build -w @nextrium/dashboard"
   },
   "devDependencies": {
     "tsx": "^4.23.15",
