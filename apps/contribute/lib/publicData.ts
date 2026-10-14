@@ -64,25 +64,44 @@ export interface TaskDetail {
   unclaimed_at: string[] | null
 }
 
-/** An open task, or null when it does not exist or is no longer open. Once per request. */
-export const getOpenTask = cache(async (id: string): Promise<TaskDetail | null> => {
+/** A task with who holds it, or null. Callers decide who may see it. Once per request. */
+const getTask = cache(async (id: string): Promise<{ task: TaskDetail; status: string | null; assignedTo: string | null } | null> => {
   if (!isUuid(id)) return null
   const db = createCommunityServiceClient()
   const { data, error } = await db
     .from('tasks')
-    .select('id, title, description, category, complexity, point_range_min, point_range_max, deadline_days, primitives, links, created_at, status, unclaimed_by, unclaimed_at')
+    .select('id, title, description, category, complexity, point_range_min, point_range_max, deadline_days, primitives, links, created_at, status, assigned_to, unclaimed_by, unclaimed_at')
     .eq('id', id)
     .maybeSingle()
   if (error) throw new Error('Could not load the task')
-  if (!data || data.status !== 'open') return null
-  const { description, primitives, links, status: _status, ...rest } = data
+  if (!data) return null
+  const { description, primitives, links, status, assigned_to, ...rest } = data
   return {
-    ...rest,
-    descriptionHtml: sanitizeBrief(description ?? ''),
-    tags: (primitives ?? []).filter((p) => typeof p === 'string' && p.trim()).map((p) => p.trim().slice(0, 40)),
-    links: parseTaskLinks(links),
+    status,
+    assignedTo: assigned_to,
+    task: {
+      ...rest,
+      descriptionHtml: sanitizeBrief(description ?? ''),
+      tags: (primitives ?? []).filter((p) => typeof p === 'string' && p.trim()).map((p) => p.trim().slice(0, 40)),
+      links: parseTaskLinks(links),
+    },
   }
 })
+
+/** An open task, or null when it does not exist or is no longer open. */
+export async function getOpenTask(id: string): Promise<TaskDetail | null> {
+  const found = await getTask(id)
+  return found && found.status === 'open' ? found.task : null
+}
+
+/** An open task, or a task this contributor is working on; null otherwise. */
+export async function getTaskForContributor(id: string, contributorId: string): Promise<{ task: TaskDetail; mine: boolean } | null> {
+  const found = await getTask(id)
+  if (!found) return null
+  if (found.status === 'open') return { task: found.task, mine: false }
+  if (found.status === 'assigned' && found.assignedTo === contributorId) return { task: found.task, mine: true }
+  return null
+}
 
 export interface PublicContributor {
   id: string

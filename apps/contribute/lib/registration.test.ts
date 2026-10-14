@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { parseApplication } from './registration'
+import { parseApplication, parseProfileFields } from './registration'
 
 function form(fields: Record<string, string | string[]>) {
   const fd = new FormData()
@@ -86,4 +86,13 @@ test('email reminders are off unless ticked', () => {
   const { notification_email: _, ...rest } = valid
   const r = parseApplication(form(rest))
   assert.ok(r.ok && r.value.notification_email === false)
+})
+
+test('profile edits cover only the editable fields', () => {
+  const r = parseProfileFields(form({ ...valid, name: 'New Name', categories: ['research'], contributor_type: 'team', team_name: 'X', status: 'active' }))
+  assert.ok(r.ok)
+  if (!r.ok) return
+  for (const k of ['name', 'categories', 'contributor_type', 'team_name', 'status', 'email', 'user_id']) assert.ok(!(k in r.value), k)
+  assert.equal(r.value.location, 'Lagos, Nigeria')
+  assert.equal(parseProfileFields(form({ ...valid, bio: '' })).ok, false)
 })

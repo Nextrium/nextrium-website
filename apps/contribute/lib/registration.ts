@@ -118,19 +118,29 @@ export function parseApplication(form: FormLike): ParseResult {
     if (team_name.length > LIMITS.teamName) return { ok: false, error: `The team name can be at most ${LIMITS.teamName} characters.` }
   }
 
-  const location = text(form, 'location')
-  if (location.length < 2) return { ok: false, error: 'Enter your location.' }
-  if (location.length > LIMITS.location) return { ok: false, error: `Your location can be at most ${LIMITS.location} characters.` }
-
-  const timezone = text(form, 'timezone')
-  if (!(TIMEZONES as readonly string[]).includes(timezone)) return { ok: false, error: 'Choose a timezone from the list.' }
-
   const known = CATEGORIES.map((c) => c.id) as string[]
   const picked = [...new Set(form.getAll('categories').filter((v): v is string => typeof v === 'string'))]
   if (picked.length === 0) return { ok: false, error: 'Choose at least one category.' }
   if (picked.length > MAX_CATEGORIES) return { ok: false, error: `Choose at most ${MAX_CATEGORIES} categories.` }
   if (picked.some((c) => !known.includes(c))) return { ok: false, error: 'Choose categories from the list.' }
   const categories = picked as CategoryId[]
+
+  const profile = parseProfileFields(form)
+  if (!profile.ok) return profile
+
+  return { ok: true, value: { name, contributor_type, team_name, categories, ...profile.value } }
+}
+
+/** The fields a contributor may change later from their profile. Name, type, team and categories are fixed after approval. */
+export type ProfileFields = Omit<Application, 'name' | 'contributor_type' | 'team_name' | 'categories'>
+
+export function parseProfileFields(form: FormLike): { ok: true; value: ProfileFields } | { ok: false; error: string } {
+  const location = text(form, 'location')
+  if (location.length < 2) return { ok: false, error: 'Enter your location.' }
+  if (location.length > LIMITS.location) return { ok: false, error: `Your location can be at most ${LIMITS.location} characters.` }
+
+  const timezone = text(form, 'timezone')
+  if (!(TIMEZONES as readonly string[]).includes(timezone)) return { ok: false, error: 'Choose a timezone from the list.' }
 
   const skillList = text(form, 'skills').split(',').map((s) => s.trim()).filter(Boolean)
   if (skillList.length > LIMITS.skills) return { ok: false, error: `List at most ${LIMITS.skills} skills.` }
@@ -162,12 +172,8 @@ export function parseApplication(form: FormLike): ParseResult {
   return {
     ok: true,
     value: {
-      name,
-      contributor_type,
-      team_name,
       location,
       timezone,
-      categories,
       skills,
       availability_hours_per_week: hours,
       bio,

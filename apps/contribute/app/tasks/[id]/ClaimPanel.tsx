@@ -13,11 +13,12 @@ export type ClaimView =
   | { kind: 'limit'; maxClaims: number }
   | { kind: 'cooldown'; hours: number }
   | { kind: 'can_claim' }
+  | { kind: 'mine' }
 
 const IDLE: ClaimState = { status: 'idle' }
 const text: React.CSSProperties = { fontFamily: F.body, fontSize: 14, color: C.mute, lineHeight: 1.7 }
 
-export default function ClaimPanel({ taskId, title, deadlineDays, view }: { taskId: string; title: string; deadlineDays: number; view: ClaimView }) {
+export default function ClaimPanel({ taskId, title, deadlineDays, view, boardHref = '/tasks' }: { taskId: string; title: string; deadlineDays: number; view: ClaimView; boardHref?: string }) {
   const [state, action, claiming] = useActionState(claimTask, IDLE)
 
   if (state.status === 'claimed') {
@@ -36,7 +37,7 @@ export default function ClaimPanel({ taskId, title, deadlineDays, view }: { task
         </p>
         <div className="flex gap-3 flex-wrap justify-center">
           <Link href="/dashboard" className="btn-primary" style={{ fontSize: 13 }}>Go to dashboard</Link>
-          <Link href="/tasks" className="btn-outline" style={{ fontSize: 13 }}>Browse more tasks</Link>
+          <Link href={boardHref} className="btn-outline" style={{ fontSize: 13 }}>Browse more tasks</Link>
         </div>
       </section>
     )
@@ -85,7 +86,14 @@ export default function ClaimPanel({ taskId, title, deadlineDays, view }: { task
       {view.kind === 'cooldown' && (
         <div className="flex flex-col gap-3">
           <p style={text}>{cooldownMessage(view.hours)}</p>
-          <div><Link href="/tasks" className="btn-outline" style={{ fontSize: 13 }}>Back to tasks</Link></div>
+          <div><Link href={boardHref} className="btn-outline" style={{ fontSize: 13 }}>Back to tasks</Link></div>
+        </div>
+      )}
+
+      {view.kind === 'mine' && (
+        <div className="flex flex-col gap-3">
+          <p style={text}>You are working on this task. Track your deadline and submit your work from your dashboard.</p>
+          <div><Link href={`/dashboard?tab=tasks#task-${taskId}`} className="btn-primary" style={{ fontSize: 13 }}>Go to my tasks</Link></div>
         </div>
       )}
 
@@ -99,7 +107,7 @@ export default function ClaimPanel({ taskId, title, deadlineDays, view }: { task
             <button type="submit" disabled={claiming} className="btn-primary" style={{ fontSize: 13, opacity: claiming ? 0.7 : 1, cursor: 'pointer' }} aria-label={`Claim ${title}`}>
               {claiming ? 'Claiming...' : 'Claim this task'}
             </button>
-            <Link href="/tasks" className="btn-outline" style={{ fontSize: 13 }}>Back to tasks</Link>
+            <Link href={boardHref} className="btn-outline" style={{ fontSize: 13 }}>Back to tasks</Link>
           </div>
         </form>
       )}

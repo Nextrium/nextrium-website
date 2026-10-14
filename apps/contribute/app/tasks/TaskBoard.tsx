@@ -9,7 +9,7 @@ import { C, F, categoryToken } from '@/lib/theme'
 
 const SIZE_ORDER: Record<string, number> = { small: 1, medium: 2, large: 3 }
 
-export default function TaskBoard({ tasks }: { tasks: TaskCard[] }) {
+export default function TaskBoard({ tasks, basePath = '/tasks' }: { tasks: TaskCard[]; basePath?: string }) {
   const [category, setCategory] = useState('all')
   const [complexity, setComplexity] = useState('all')
   const [search, setSearch] = useState('')
@@ -89,7 +89,7 @@ export default function TaskBoard({ tasks }: { tasks: TaskCard[] }) {
                 </div>
 
                 <h2 style={{ fontFamily: F.display, fontWeight: 600, fontSize: 15, color: C.light, lineHeight: 1.3, flex: 1 }}>
-                  <Link href={`/tasks/${task.id}`} style={{ color: 'inherit', textDecoration: 'none' }}>{task.title}</Link>
+                  <Link href={`${basePath}/${task.id}`} style={{ color: 'inherit', textDecoration: 'none' }}>{task.title}</Link>
                 </h2>
 
                 <p style={{ fontFamily: F.body, fontWeight: 300, fontSize: 12.5, color: C.mute, lineHeight: 1.65, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
@@ -104,10 +104,10 @@ export default function TaskBoard({ tasks }: { tasks: TaskCard[] }) {
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Link href={`/tasks/${task.id}`} className="btn-outline" style={{ fontSize: 11, padding: '8px 16px', whiteSpace: 'nowrap' }} aria-label={`Read more about ${task.title}`}>
+                    <Link href={`${basePath}/${task.id}`} className="btn-outline" style={{ fontSize: 11, padding: '8px 16px', whiteSpace: 'nowrap' }} aria-label={`Read more about ${task.title}`}>
                       Read more
                     </Link>
-                    <Link href={`/tasks/${task.id}#claim`} className="btn-primary" style={{ fontSize: 11, padding: '8px 16px', whiteSpace: 'nowrap' }} aria-label={`Claim ${task.title}`}>
+                    <Link href={`${basePath}/${task.id}#claim`} className="btn-primary" style={{ fontSize: 11, padding: '8px 16px', whiteSpace: 'nowrap' }} aria-label={`Claim ${task.title}`}>
                       Claim
                     </Link>
                   </div>
