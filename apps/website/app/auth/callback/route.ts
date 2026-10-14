@@ -1,23 +1,7 @@
-import { createClient } from '@nextrium/supabase/server'
-import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { toDashboard } from '@/lib/dashboardRedirect'
 
+// Moved to the dashboard's domain; the query string (e.g. an invite token) is kept.
 export async function GET(request: NextRequest) {
-  const { searchParams, origin } = new URL(request.url)
-  const tokenHash = searchParams.get('token_hash')
-  const type      = searchParams.get('type')
-  const next       = searchParams.get('next') ?? '/dashboard'
-
-  if (tokenHash && type) {
-    const supabase = await createClient()
-    const { error } = await supabase.auth.verifyOtp({
-      token_hash: tokenHash,
-      type:       type as any,
-    })
-    if (!error) {
-      return NextResponse.redirect(`${origin}${next}`)
-    }
-  }
-
-  return NextResponse.redirect(`${origin}/login?error=invalid_invite`)
+  return toDashboard(request, '/auth/callback')
 }

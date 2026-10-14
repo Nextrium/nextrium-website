@@ -1,6 +1,6 @@
 'use server'
 
-import { fetchAgentsEngine } from '@/lib/agentsEngine'
+import { fetchAgentsEngine } from '@nextrium/agents-engine'
 
 export async function submitReportRating(
   reportId: string,

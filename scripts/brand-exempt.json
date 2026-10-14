@@ -19,6 +19,6 @@
     "apps/website/components/ui/",
     "apps/website/components/shared/",
     "packages/supabase/src/database.ts",
-    "apps/website/app/dashboard/posts/[slug]/PostEditor.tsx"
+    "apps/dashboard/app/(console)/posts/[slug]/PostEditor.tsx"
   ]
 }
