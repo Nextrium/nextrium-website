@@ -1,0 +1,19 @@
+# Dependabot only opens PRs; nothing merges them automatically (repo auto-merge is off).
+version: 2
+updates:
+  - package-ecosystem: npm
+    # The repo is an npm-workspaces monorepo: update from the root so each PR
+    # changes the workspace's package.json and the root package-lock.json together.
+    # (Pointing at /apps/website alone leaves the lockfile behind and every build fails.)
+    directory: "/"
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      # One PR for routine minor and patch updates instead of one per package.
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+    commit-message:
+      prefix: "chore(deps)"
