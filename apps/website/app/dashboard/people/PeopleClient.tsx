@@ -80,11 +80,11 @@ export default function PeopleClient({ staff, members, canSeeStaff }: { staff: P
       <style>{`
         .person-tabs { display: flex; gap: 0; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.08); width: fit-content; }
         .person-tab { padding: 9px 18px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; text-decoration: none; color: var(--grey-mid); background: none; transition: all 0.15s ease; }
-        .person-tab.active { background: rgba(219,103,39,0.1); color: var(--orange); }
+        .person-tab.active { background: color-mix(in srgb, var(--orange) 10%, transparent); color: var(--orange); }
         .person-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
         .person-card { display: flex; align-items: center; gap: 14px; padding: 16px; background: var(--navy); border: 1px solid rgba(255,255,255,0.06); text-decoration: none; transition: all 0.15s ease; }
-        .person-card:hover { border-color: rgba(219,103,39,0.3); background: rgba(219,103,39,0.03); }
-        .person-card-avatar { flex-shrink: 0; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: rgba(219,103,39,0.12); color: var(--orange); font-family: var(--font-mono); font-size: 13px; font-weight: 700; border-radius: 2px; }
+        .person-card:hover { border-color: color-mix(in srgb, var(--orange) 30%, transparent); background: color-mix(in srgb, var(--orange) 3%, transparent); }
+        .person-card-avatar { flex-shrink: 0; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: color-mix(in srgb, var(--orange) 12%, transparent); color: var(--orange); font-family: var(--font-mono); font-size: 13px; font-weight: 700; border-radius: 2px; }
         .person-card-body { flex: 1; min-width: 0; }
         .person-card-name { font-size: 14px; color: var(--white); text-transform: capitalize; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .person-card-email { font-size: 11px; color: var(--grey-mid); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }

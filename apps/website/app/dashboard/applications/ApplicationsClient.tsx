@@ -26,6 +26,7 @@ import {
   type ReviewedInfo,
   type ArchivedInfo,
 } from './actions'
+import { brand, color } from '@nextrium/brand'
 
 const BULK_SCREEN_JOB_STORAGE_KEY = 'nextrium-active-bulk-screen-job'
 
@@ -65,11 +66,11 @@ const EVALUATION_TRACK_OPTIONS = [
 ]
 
 const STATUS_STYLES: Record<Application['status'], { bg: string; color: string }> = {
-  pending:     { bg: 'rgba(219,103,39,0.1)',  color: 'var(--orange)'  },
-  reviewed:    { bg: 'rgba(74,111,165,0.1)',  color: 'var(--slate)'   },
-  shortlisted: { bg: 'rgba(212,168,67,0.1)',  color: 'var(--gold)'    },
-  rejected:    { bg: 'rgba(232,69,69,0.1)',   color: 'var(--error)'   },
-  accepted:    { bg: 'rgba(34,193,122,0.1)',  color: 'var(--success)' },
+  pending:     { bg: 'color-mix(in srgb, var(--orange) 10%, transparent)',  color: 'var(--orange)'  },
+  reviewed:    { bg: 'color-mix(in srgb, var(--slate) 10%, transparent)',  color: 'var(--slate)'   },
+  shortlisted: { bg: 'color-mix(in srgb, var(--gold) 10%, transparent)',  color: 'var(--gold)'    },
+  rejected:    { bg: 'color-mix(in srgb, var(--error) 10%, transparent)',   color: 'var(--error)'   },
+  accepted:    { bg: 'color-mix(in srgb, var(--success) 10%, transparent)',  color: 'var(--success)' },
 }
 
 const SCREENING_STEPS = [
@@ -89,10 +90,10 @@ function asDisplayText(value: unknown): string {
 }
 
 function getScoreColor(score: number): { color: string; bg: string; border: string } {
-  if (score >= 85) return { color: '#22c17a', bg: 'rgba(34,193,122,0.1)', border: 'rgba(34,193,122,0.3)' }
-  if (score >= 70) return { color: '#d4a843', bg: 'rgba(212,168,67,0.1)', border: 'rgba(212,168,67,0.3)' }
-  if (score >= 50) return { color: '#4a6fa5', bg: 'rgba(74,111,165,0.1)', border: 'rgba(74,111,165,0.3)' }
-  return { color: '#e84545', bg: 'rgba(232,69,69,0.1)', border: 'rgba(232,69,69,0.3)' }
+  if (score >= 85) return { color: color('--success'), bg: 'color-mix(in srgb, var(--success) 10%, transparent)', border: 'color-mix(in srgb, var(--success) 30%, transparent)' }
+  if (score >= 70) return { color: color('--gold'), bg: 'color-mix(in srgb, var(--gold) 10%, transparent)', border: 'color-mix(in srgb, var(--gold) 30%, transparent)' }
+  if (score >= 50) return { color: color('--slate'), bg: 'color-mix(in srgb, var(--slate) 10%, transparent)', border: 'color-mix(in srgb, var(--slate) 30%, transparent)' }
+  return { color: color('--error'), bg: 'color-mix(in srgb, var(--error) 10%, transparent)', border: 'color-mix(in srgb, var(--error) 30%, transparent)' }
 }
 
 export default function ApplicationsClient({
@@ -614,7 +615,7 @@ export default function ApplicationsClient({
       return
     }
 
-    setEmailSubject(letter.subject || `Update regarding your application for ${selected.role_title || 'Role'} at Nextrium`)
+    setEmailSubject(letter.subject || `Update regarding your application for ${selected.role_title || 'Role'} at ${brand.name}`)
 
     // letter.body is the actual, complete message the AI engine builds
     // (compensation disclaimer, Discord invite, report link, etc. — see
@@ -636,7 +637,7 @@ export default function ApplicationsClient({
         ? ['', 'Areas for Development & Next Steps:', ...letter.growthOpportunitiesAndGaps.map((g) => `• ${g}`)]
         : []),
       '',
-      letter.closingNote || 'Best regards,\nNextrium Talent Team',
+      letter.closingNote || `Best regards,\n${brand.teams.talent}`,
     ].join('\n')
 
     setEmailMessage(formattedMessage)
@@ -711,7 +712,7 @@ export default function ApplicationsClient({
     || selectedConsensus?.publicFeedbackReport?.reportId
     || selectedRebuttal?.reportId
     || null
-  const selectedReportUrl = selectedReportId ? `https://www.nextrium.org/feedback/${selectedReportId}` : null
+  const selectedReportUrl = selectedReportId ? `${brand.urls.website}/feedback/${selectedReportId}` : null
 
   const batchQueueIndex = selected ? batchTargetIds.indexOf(selected.id) : -1
   const batchCompletedCount = batchProgress?.current ?? 0
@@ -895,21 +896,21 @@ export default function ApplicationsClient({
         .apps-count-num { font-family: var(--font-exo2); font-weight: 800; font-size: 20px; color: var(--white); line-height: 1; }
         .apps-count-label { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--grey-mid); margin-top: 4px; }
         
-        .ai-banner-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px; background: rgba(219,103,39,0.04); border-bottom: 1px solid rgba(255,255,255,0.06); }
+        .ai-banner-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px; background: color-mix(in srgb, var(--orange) 4%, transparent); border-bottom: 1px solid rgba(255,255,255,0.06); }
         .ai-banner-text { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--orange); display: flex; align-items: center; gap: 8px; white-space: nowrap; }
         .ai-btn-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
         .ai-btn { padding: 8px 14px; font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.12em; text-transform: uppercase; cursor: pointer; transition: all 0.15s ease; white-space: nowrap; }
         .ai-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .ai-btn-primary { border: 1px solid var(--orange); background: var(--orange); color: var(--white); }
-        .ai-btn-primary:hover:not(:disabled) { background: #C4521A; border-color: #C4521A; }
-        .ai-btn-secondary { border: 1px solid rgba(219,103,39,0.4); background: none; color: var(--orange); }
-        .ai-btn-secondary:hover:not(:disabled) { background: rgba(219,103,39,0.08); }
+        .ai-btn-primary:hover:not(:disabled) { background: var(--orange-f); border-color: var(--orange-f); }
+        .ai-btn-secondary { border: 1px solid color-mix(in srgb, var(--orange) 40%, transparent); background: none; color: var(--orange); }
+        .ai-btn-secondary:hover:not(:disabled) { background: color-mix(in srgb, var(--orange) 8%, transparent); }
         .ai-btn-toggle { border: 1px solid rgba(255,255,255,0.15); background: none; color: var(--grey-mid); }
         .ai-btn-toggle:hover:not(:disabled) { color: var(--white); border-color: rgba(255,255,255,0.3); }
         .ai-held-note { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--warning); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; padding: 0 4px; cursor: help; }
-        .ai-btn-toggle.active { border-color: var(--orange); background: rgba(219,103,39,0.12); color: var(--orange); }
+        .ai-btn-toggle.active { border-color: var(--orange); background: color-mix(in srgb, var(--orange) 12%, transparent); color: var(--orange); }
         .ai-status-ok { font-family: var(--font-mono); font-size: 8px; color: var(--success); letter-spacing: 0.1em; white-space: nowrap; }
-        .ai-progress-wrap { padding: 0 16px 12px; background: rgba(219,103,39,0.04); border-bottom: 1px solid rgba(255,255,255,0.06); }
+        .ai-progress-wrap { padding: 0 16px 12px; background: color-mix(in srgb, var(--orange) 4%, transparent); border-bottom: 1px solid rgba(255,255,255,0.06); }
         .ai-progress-track { width: 100%; height: 4px; background: rgba(255,255,255,0.08); overflow: hidden; }
         .ai-progress-fill { height: 100%; background: var(--orange); transition: width 0.4s ease; }
         .ai-progress-label { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.08em; color: var(--grey-mid); margin-top: 6px; }
@@ -917,7 +918,7 @@ export default function ApplicationsClient({
         .app-row { padding: 16px 20px; border-bottom: 1px solid rgba(255,255,255,0.04); cursor: pointer; transition: background 0.15s ease; }
         .app-row:last-child { border-bottom: none; }
         .app-row:hover { background: rgba(255,255,255,0.03); }
-        .app-row.selected { background: rgba(219,103,39,0.06); border-left: 2px solid var(--orange); }
+        .app-row.selected { background: color-mix(in srgb, var(--orange) 6%, transparent); border-left: 2px solid var(--orange); }
         .app-row-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
         .app-name { font-size: 14px; color: var(--white); font-weight: 500; }
         .app-role { font-size: 11px; color: var(--grey-mid); margin-bottom: 4px; }
@@ -929,12 +930,12 @@ export default function ApplicationsClient({
         .detail-header { padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.06); }
         .detail-name { font-family: var(--font-exo2); font-weight: 700; font-size: 18px; color: var(--white); letter-spacing: -0.3px; margin-bottom: 4px; }
         .detail-email { font-size: 13px; color: var(--orange); }
-        .reviewed-chip { display: inline-flex; align-items: center; gap: 5px; margin-top: 8px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; padding: 4px 8px; background: rgba(34,193,122,0.1); border: 1px solid rgba(34,193,122,0.3); color: var(--success); }
+        .reviewed-chip { display: inline-flex; align-items: center; gap: 5px; margin-top: 8px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; padding: 4px 8px; background: color-mix(in srgb, var(--success) 10%, transparent); border: 1px solid color-mix(in srgb, var(--success) 30%, transparent); color: var(--success); }
         .reviewed-first-note { display: block; margin-top: 4px; font-size: 10.5px; color: var(--grey-mid); }
-        .mark-reviewed-btn { margin-top: 8px; padding: 6px 12px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; border: 1px solid rgba(34,193,122,0.35); background: rgba(34,193,122,0.06); color: var(--success); transition: all 0.15s ease; }
-        .mark-reviewed-btn:hover:not(:disabled) { background: rgba(34,193,122,0.15); }
+        .mark-reviewed-btn { margin-top: 8px; padding: 6px 12px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; border: 1px solid color-mix(in srgb, var(--success) 35%, transparent); background: color-mix(in srgb, var(--success) 6%, transparent); color: var(--success); transition: all 0.15s ease; }
+        .mark-reviewed-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--success) 15%, transparent); }
         .mark-reviewed-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-        .track-review-banner { margin: 0 20px; padding: 14px 16px; background: rgba(212,168,67,0.08); border: 1px solid rgba(212,168,67,0.3); }
+        .track-review-banner { margin: 0 20px; padding: 14px 16px; background: color-mix(in srgb, var(--gold) 8%, transparent); border: 1px solid color-mix(in srgb, var(--gold) 30%, transparent); }
         .track-review-banner-title { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--warning); margin-bottom: 6px; }
         .track-review-banner-text { font-size: 12.5px; color: var(--grey-mid); line-height: 1.6; margin-bottom: 12px; }
         .track-review-banner-row { display: flex; gap: 8px; }
@@ -944,7 +945,7 @@ export default function ApplicationsClient({
         .detail-status-row { display: flex; flex-direction: column; gap: 6px; }
         .status-select-btn { padding: 9px 14px; font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.12em; text-transform: uppercase; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); background: none; color: var(--grey-mid); transition: all 0.15s ease; text-align: left; display: flex; align-items: center; justify-content: space-between; }
         .status-select-btn:hover { color: var(--white); border-color: rgba(255,255,255,0.2); }
-        .status-select-btn.active { border-color: var(--orange); color: var(--white); background: rgba(219,103,39,0.08); }
+        .status-select-btn.active { border-color: var(--orange); color: var(--white); background: color-mix(in srgb, var(--orange) 8%, transparent); }
         .status-select-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .detail-empty { padding: 48px 24px; text-align: center; font-size: 13px; color: var(--grey-mid); }
         .apps-empty-state { padding: 64px 32px; text-align: center; background: var(--navy); border: 1px solid rgba(255,255,255,0.06); }
@@ -954,10 +955,10 @@ export default function ApplicationsClient({
         /* AI Scorecard Styles */
         .ai-box { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); padding: 16px; display: flex; flex-direction: column; gap: 14px; }
         .ai-box-header { display: flex; align-items: center; justify-content: space-between; }
-        .ai-box-title { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.15em; text-transform: uppercase; color: #22c17a; display: flex; align-items: center; gap: 6px; }
+        .ai-box-title { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--success); display: flex; align-items: center; gap: 6px; }
         .ai-score-bar-bg { width: 100%; height: 6px; background: rgba(255,255,255,0.06); overflow: hidden; margin: 6px 0; }
         .ai-score-bar-fill { height: 100%; transition: width 0.4s ease; }
-        .ai-quote-box { padding: 12px 14px; background: rgba(255,255,255,0.02); border-left: 2px solid #22c17a; font-size: 12.5px; color: var(--off-white); line-height: 1.6; }
+        .ai-quote-box { padding: 12px 14px; background: rgba(255,255,255,0.02); border-left: 2px solid var(--success); font-size: 12.5px; color: var(--off-white); line-height: 1.6; }
         .rubric-row { display: flex; align-items: center; justify-content: space-between; font-size: 11.5px; margin-bottom: 4px; }
         .rubric-label { color: var(--grey-mid); }
         .rubric-val { font-family: var(--font-mono); font-size: 10.5px; color: var(--white); }
@@ -966,12 +967,12 @@ export default function ApplicationsClient({
         @keyframes screening-step-fade { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: translateY(0); } }
         .screening-step-text { animation: screening-step-fade 0.35s ease; }
 
-        .track-badge { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 9px; display: inline-block; background: rgba(74,111,165,0.1); color: var(--slate); border: 1px solid rgba(74,111,165,0.3); }
+        .track-badge { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 9px; display: inline-block; background: color-mix(in srgb, var(--slate) 10%, transparent); color: var(--slate); border: 1px solid color-mix(in srgb, var(--slate) 30%, transparent); }
         .rescan-btn { padding: 5px 10px; font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.12em; text-transform: uppercase; cursor: pointer; border: 1px solid rgba(255,255,255,0.12); background: none; color: var(--grey-mid); transition: all 0.15s ease; }
         .rescan-btn:hover:not(:disabled) { color: var(--white); border-color: rgba(255,255,255,0.25); }
         .rescan-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-        .layer2-box { display: flex; flex-direction: column; gap: 10px; padding: 12px; background: rgba(74,111,165,0.03); border: 1px solid rgba(74,111,165,0.15); }
+        .layer2-box { display: flex; flex-direction: column; gap: 10px; padding: 12px; background: color-mix(in srgb, var(--slate) 3%, transparent); border: 1px solid color-mix(in srgb, var(--slate) 15%, transparent); }
         .layer2-header { display: flex; align-items: center; justify-content: space-between; }
         .layer2-title { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--slate); }
         .layer2-status { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; }
@@ -979,23 +980,23 @@ export default function ApplicationsClient({
         .artifact-row:last-child { border-bottom: none; }
         .artifact-label { color: var(--grey-mid); flex-shrink: 0; }
         .artifact-val { color: var(--off-white); text-align: right; }
-        .artifact-val.ok { color: #22c17a; }
+        .artifact-val.ok { color: var(--success); }
         .artifact-val.bad { color: var(--error); }
 
         .report-link-box { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); }
         .report-link-url { flex: 1; font-family: var(--font-mono); font-size: 11px; color: var(--off-white); word-break: break-all; }
-        .report-copy-btn { padding: 6px 10px; font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; border: 1px solid rgba(219,103,39,0.3); background: rgba(219,103,39,0.08); color: var(--orange); flex-shrink: 0; transition: all 0.15s ease; }
+        .report-copy-btn { padding: 6px 10px; font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; border: 1px solid color-mix(in srgb, var(--orange) 30%, transparent); background: color-mix(in srgb, var(--orange) 8%, transparent); color: var(--orange); flex-shrink: 0; transition: all 0.15s ease; }
         .report-copy-btn:hover { background: var(--orange); color: var(--white); }
 
         .rebuttal-indicator { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; padding: 6px 10px; display: inline-block; }
-        .rebuttal-indicator.pending { background: rgba(219,103,39,0.12); color: var(--orange); border: 1px solid rgba(219,103,39,0.35); }
+        .rebuttal-indicator.pending { background: color-mix(in srgb, var(--orange) 12%, transparent); color: var(--orange); border: 1px solid color-mix(in srgb, var(--orange) 35%, transparent); }
         .rebuttal-indicator.locked { background: rgba(255,255,255,0.03); color: var(--grey-mid); border: 1px solid rgba(255,255,255,0.1); }
         .rebuttal-indicator.none { background: rgba(255,255,255,0.02); color: var(--grey-mid); border: 1px solid rgba(255,255,255,0.06); }
 
         .view-toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-bottom: 1px solid rgba(255,255,255,0.06); }
         .view-toggle { display: flex; gap: 0; border: 1px solid rgba(255,255,255,0.1); }
         .view-toggle-btn { padding: 6px 14px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; border: none; background: none; color: var(--grey-mid); transition: all 0.15s ease; }
-        .view-toggle-btn.active { background: rgba(219,103,39,0.12); color: var(--orange); }
+        .view-toggle-btn.active { background: color-mix(in srgb, var(--orange) 12%, transparent); color: var(--orange); }
         .view-toggle-btn + .view-toggle-btn { border-left: 1px solid rgba(255,255,255,0.1); }
 
         .table-filters { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.01); }
@@ -1003,7 +1004,7 @@ export default function ApplicationsClient({
         .table-filter-label { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--grey-mid); }
         .table-filter-input { background: var(--navy-mid); border: 1px solid rgba(255,255,255,0.08); color: var(--white); font-family: var(--font-mono); font-size: 11px; padding: 5px 8px; outline: none; width: 70px; }
         .table-filter-chip { font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.08em; text-transform: uppercase; padding: 4px 9px; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); background: none; color: var(--grey-mid); transition: all 0.15s ease; }
-        .table-filter-chip.active { border-color: var(--orange); color: var(--orange); background: rgba(219,103,39,0.08); }
+        .table-filter-chip.active { border-color: var(--orange); color: var(--orange); background: color-mix(in srgb, var(--orange) 8%, transparent); }
 
         .filter-dropdown-trigger { display: inline-flex; align-items: center; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; padding: 6px 12px; cursor: pointer; border: 1px solid rgba(255,255,255,0.12); background: var(--navy-mid); color: var(--white); transition: all 0.15s ease; }
         .filter-dropdown-trigger:hover { border-color: rgba(255,255,255,0.25); }
@@ -1021,7 +1022,7 @@ export default function ApplicationsClient({
         .apps-table td { padding: 11px 14px; font-size: 12.5px; color: var(--off-white); border-bottom: 1px solid rgba(255,255,255,0.04); white-space: nowrap; }
         .apps-table tr.table-row { cursor: pointer; transition: background 0.15s ease; }
         .apps-table tr.table-row:hover { background: rgba(255,255,255,0.03); }
-        .apps-table tr.table-row.selected { background: rgba(219,103,39,0.06); }
+        .apps-table tr.table-row.selected { background: color-mix(in srgb, var(--orange) 6%, transparent); }
         .table-empty { padding: 48px 24px; text-align: center; font-size: 13px; color: var(--grey-mid); }
 
         @media (max-width: 1200px) { .apps-layout { grid-template-columns: 1fr; } .detail-panel { position: static; max-height: none; } .apps-panel { position: static; max-height: none; } .apps-list-scroll { overflow-y: visible; } }
@@ -1130,7 +1131,7 @@ export default function ApplicationsClient({
             )}
 
             {(bulkEmailResult || bulkEmailError) && (
-              <div style={{ padding: '8px 16px', fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.05em', borderBottom: '1px solid rgba(255,255,255,0.06)', color: bulkEmailError ? 'var(--error)' : '#22c17a' }}>
+              <div style={{ padding: '8px 16px', fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '0.05em', borderBottom: '1px solid rgba(255,255,255,0.06)', color: bulkEmailError ? 'var(--error)' : color('--success') }}>
                 {bulkEmailError
                   ? `Email dispatch failed: ${bulkEmailError}`
                   : `Dispatch complete: ${bulkEmailResult!.sentCount} sent, ${bulkEmailResult!.skippedCount} skipped, ${bulkEmailResult!.failedCount} failed.`}
@@ -1279,7 +1280,7 @@ export default function ApplicationsClient({
                             checked={selectedIds.has(app.id)}
                             onChange={() => toggleSelectedId(app.id)}
                             onClick={(e) => e.stopPropagation()}
-                            style={{ accentColor: '#22c17a', cursor: 'pointer' }}
+                            style={{ accentColor: color('--success'), cursor: 'pointer' }}
                           />
                         )}
                         {app.name}
@@ -1320,7 +1321,7 @@ export default function ApplicationsClient({
 
                           if (rowCurrentlyScreening) {
                             return (
-                              <span className="ai-score-badge" style={{ background: 'rgba(219,103,39,0.1)', color: 'var(--orange)', border: '1px solid rgba(219,103,39,0.3)' }}>
+                              <span className="ai-score-badge" style={{ background: 'color-mix(in srgb, var(--orange) 10%, transparent)', color: 'var(--orange)', border: '1px solid color-mix(in srgb, var(--orange) 30%, transparent)' }}>
                                 ⚡ Screening...
                               </span>
                             )
@@ -1350,9 +1351,9 @@ export default function ApplicationsClient({
                             <span
                               className="ai-score-badge"
                               style={{
-                                background: 'rgba(74,111,165,0.1)',
+                                background: 'color-mix(in srgb, var(--slate) 10%, transparent)',
                                 color: 'var(--slate)',
-                                border: '1px solid rgba(74,111,165,0.3)',
+                                border: '1px solid color-mix(in srgb, var(--slate) 30%, transparent)',
                               }}
                             >
                               Unscreened
@@ -1405,7 +1406,7 @@ export default function ApplicationsClient({
                                   checked={selectedIds.has(app.id)}
                                   onChange={() => toggleSelectedId(app.id)}
                                   onClick={(e) => e.stopPropagation()}
-                                  style={{ accentColor: '#22c17a', cursor: 'pointer' }}
+                                  style={{ accentColor: color('--success'), cursor: 'pointer' }}
                                 />
                               </td>
                             )}
@@ -1567,7 +1568,7 @@ export default function ApplicationsClient({
                     </div>
 
                     {batchError && (
-                      <div style={{ padding: '8px 12px', background: 'rgba(232,69,69,0.1)', border: '1px solid rgba(232,69,69,0.3)', color: 'var(--error)', fontSize: '11px' }}>
+                      <div style={{ padding: '8px 12px', background: 'color-mix(in srgb, var(--error) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--error) 30%, transparent)', color: 'var(--error)', fontSize: '11px' }}>
                         {batchError}
                       </div>
                     )}
@@ -1583,7 +1584,7 @@ export default function ApplicationsClient({
                       </div>
                     ) : isCurrentlyBatchScreening ? (
                       <div style={{ padding: '24px 12px', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <div style={{ fontSize: '13px', color: '#22c17a', fontWeight: 600 }}>
+                        <div style={{ fontSize: '13px', color: color('--success'), fontWeight: 600 }}>
                           Evaluating candidate...
                         </div>
                         <div
@@ -1672,7 +1673,7 @@ export default function ApplicationsClient({
                         {/* Executive Summary */}
                         {selectedConsensus.recruiterConsensusSummary && (
                           <div className="ai-quote-box">
-                            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', textTransform: 'uppercase', color: '#22c17a', marginBottom: '4px', letterSpacing: '0.1em' }}>
+                            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', textTransform: 'uppercase', color: color('--success'), marginBottom: '4px', letterSpacing: '0.1em' }}>
                               Recruiter Briefing
                             </div>
                             {asDisplayText(selectedConsensus.recruiterConsensusSummary)}
@@ -1692,7 +1693,7 @@ export default function ApplicationsClient({
                                   <span className="rubric-val">{item.score}/{item.weight}</span>
                                 </div>
                                 <div style={{ width: '100%', height: '3px', background: 'rgba(255,255,255,0.04)', overflow: 'hidden' }}>
-                                  <div style={{ width: `${(item.score / item.weight) * 100}%`, height: '100%', background: '#22c17a' }} />
+                                  <div style={{ width: `${(item.score / item.weight) * 100}%`, height: '100%', background: color('--success') }} />
                                 </div>
                               </div>
                             ))}
@@ -1702,8 +1703,8 @@ export default function ApplicationsClient({
                         {/* Core Strengths & Red Flags */}
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '10px' }}>
                           {Array.isArray(selectedConsensus.layer1ResumeScorecard?.coreStrengths) && selectedConsensus.layer1ResumeScorecard.coreStrengths.length > 0 && (
-                            <div style={{ padding: '10px 12px', background: 'rgba(34,193,122,0.04)', border: '1px solid rgba(34,193,122,0.15)' }}>
-                              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', textTransform: 'uppercase', color: '#22c17a', marginBottom: '6px', letterSpacing: '0.1em' }}>
+                            <div style={{ padding: '10px 12px', background: 'color-mix(in srgb, var(--success) 4%, transparent)', border: '1px solid color-mix(in srgb, var(--success) 15%, transparent)' }}>
+                              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', textTransform: 'uppercase', color: color('--success'), marginBottom: '6px', letterSpacing: '0.1em' }}>
                                 ✓ Verified Strengths
                               </div>
                               <ul style={{ margin: 0, paddingLeft: '14px', fontSize: '11.5px', color: 'var(--off-white)', lineHeight: '1.6' }}>
@@ -1715,7 +1716,7 @@ export default function ApplicationsClient({
                           )}
 
                           {Array.isArray(selectedConsensus.layer1ResumeScorecard?.gapsAndRedFlags) && selectedConsensus.layer1ResumeScorecard.gapsAndRedFlags.length > 0 && (
-                            <div style={{ padding: '10px 12px', background: 'rgba(232,69,69,0.04)', border: '1px solid rgba(232,69,69,0.2)' }}>
+                            <div style={{ padding: '10px 12px', background: 'color-mix(in srgb, var(--error) 4%, transparent)', border: '1px solid color-mix(in srgb, var(--error) 20%, transparent)' }}>
                               <div style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', textTransform: 'uppercase', color: 'var(--error)', marginBottom: '6px', letterSpacing: '0.1em' }}>
                                 ⚠ Gaps / Considerations
                               </div>
@@ -1771,8 +1772,8 @@ export default function ApplicationsClient({
                             )}
 
                             {Array.isArray(selectedLayer2.verifiedStrengths) && selectedLayer2.verifiedStrengths.length > 0 && (
-                              <div style={{ padding: '10px 12px', background: 'rgba(34,193,122,0.04)', border: '1px solid rgba(34,193,122,0.15)' }}>
-                                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', textTransform: 'uppercase', color: '#22c17a', marginBottom: '6px', letterSpacing: '0.1em' }}>
+                              <div style={{ padding: '10px 12px', background: 'color-mix(in srgb, var(--success) 4%, transparent)', border: '1px solid color-mix(in srgb, var(--success) 15%, transparent)' }}>
+                                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', textTransform: 'uppercase', color: color('--success'), marginBottom: '6px', letterSpacing: '0.1em' }}>
                                   ✓ Verified Public Artifacts
                                 </div>
                                 <ul style={{ margin: 0, paddingLeft: '14px', fontSize: '11.5px', color: 'var(--off-white)', lineHeight: '1.6' }}>
@@ -1784,7 +1785,7 @@ export default function ApplicationsClient({
                             )}
 
                             {Array.isArray(selectedLayer2.artifactGapsAndRisks) && selectedLayer2.artifactGapsAndRisks.length > 0 && (
-                              <div style={{ padding: '10px 12px', background: 'rgba(232,69,69,0.04)', border: '1px solid rgba(232,69,69,0.2)' }}>
+                              <div style={{ padding: '10px 12px', background: 'color-mix(in srgb, var(--error) 4%, transparent)', border: '1px solid color-mix(in srgb, var(--error) 20%, transparent)' }}>
                                 <div style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', textTransform: 'uppercase', color: 'var(--error)', marginBottom: '6px', letterSpacing: '0.1em' }}>
                                   ⚠ Artifact Gaps / Risks
                                 </div>
@@ -1903,7 +1904,7 @@ export default function ApplicationsClient({
                                       <button
                                         type="button"
                                         onClick={() => handleCopyQuestion(q.question, qIdx)}
-                                        style={{ background: 'none', border: 'none', color: copiedQuestion === qIdx ? '#22c17a' : 'var(--grey-mid)', fontSize: '10px', cursor: 'pointer' }}
+                                        style={{ background: 'none', border: 'none', color: copiedQuestion === qIdx ? color('--success') : 'var(--grey-mid)', fontSize: '10px', cursor: 'pointer' }}
                                       >
                                         {copiedQuestion === qIdx ? '✓ Copied' : 'Copy'}
                                       </button>
@@ -2086,7 +2087,7 @@ export default function ApplicationsClient({
                       <button
                         type="button"
                         onClick={() => { setEmailOpen(true); setEmailResult(null) }}
-                        style={{ width: '100%', padding: '9px 14px', fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.12em', textTransform: 'uppercase', cursor: 'pointer', border: '1px solid rgba(219,103,39,0.3)', background: 'none', color: 'var(--orange)', transition: 'all 0.15s ease', textAlign: 'left' }}
+                        style={{ width: '100%', padding: '9px 14px', fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.12em', textTransform: 'uppercase', cursor: 'pointer', border: '1px solid color-mix(in srgb, var(--orange) 30%, transparent)', background: 'none', color: 'var(--orange)', transition: 'all 0.15s ease', textAlign: 'left' }}
                       >
                         Send email to applicant
                       </button>
@@ -2106,13 +2107,13 @@ export default function ApplicationsClient({
                         </div>
 
                         {emailResult === 'success' && (
-                          <div style={{ padding: '10px 14px', fontSize: '12px', background: 'rgba(34,193,122,0.08)', border: '1px solid rgba(34,193,122,0.2)', color: 'var(--success)' }}>
+                          <div style={{ padding: '10px 14px', fontSize: '12px', background: 'color-mix(in srgb, var(--success) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--success) 20%, transparent)', color: 'var(--success)' }}>
                             Email sent successfully to {selected.email}
                           </div>
                         )}
 
                         {emailResult === 'error' && (
-                          <div style={{ padding: '10px 14px', fontSize: '12px', background: 'rgba(232,69,69,0.08)', border: '1px solid rgba(232,69,69,0.3)', color: 'var(--error)' }}>
+                          <div style={{ padding: '10px 14px', fontSize: '12px', background: 'color-mix(in srgb, var(--error) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--error) 30%, transparent)', color: 'var(--error)' }}>
                             Failed to send. Please try again.
                           </div>
                         )}
@@ -2157,7 +2158,7 @@ export default function ApplicationsClient({
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '4px' }}>
                           <div style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--grey-mid)' }}>File uploads</div>
-                          <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', alignSelf: 'flex-start', background: 'none', border: '1px solid rgba(219,103,39,0.3)', color: 'var(--orange)', padding: '5px 10px', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                          <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', alignSelf: 'flex-start', background: 'none', border: '1px solid color-mix(in srgb, var(--orange) 30%, transparent)', color: 'var(--orange)', padding: '5px 10px', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
                             + Attach files
                             <input
                               type="file"
@@ -2202,7 +2203,7 @@ export default function ApplicationsClient({
                   </div>
 
                   {selected.status === 'accepted' && !(selected as any).archived && (
-                    <div style={{ borderTop: '1px solid rgba(219,103,39,0.15)', paddingTop: '16px' }}>
+                    <div style={{ borderTop: '1px solid color-mix(in srgb, var(--orange) 15%, transparent)', paddingTop: '16px' }}>
                       {(selected as any).invited_to_team_at || invitedIds.has(selected.id) ? (
                         <div style={{ fontSize: '12px', color: 'var(--success)', lineHeight: '1.5' }}>
                           ✓ Invited to the team{(selected as any).invited_to_team_at ? ` on ${new Date((selected as any).invited_to_team_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}.
@@ -2224,7 +2225,7 @@ export default function ApplicationsClient({
                     </div>
                   )}
 
-                  <div style={{ borderTop: '1px solid rgba(212,168,67,0.15)', paddingTop: '16px' }}>
+                  <div style={{ borderTop: '1px solid color-mix(in srgb, var(--gold) 15%, transparent)', paddingTop: '16px' }}>
                     {(selected as any).archived ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         <div style={{ fontSize: '12px', color: 'var(--warning)', lineHeight: '1.6' }}>
@@ -2240,7 +2241,7 @@ export default function ApplicationsClient({
                           type="button"
                           onClick={() => handleUnarchive(selected.id)}
                           disabled={archiving}
-                          style={{ padding: '9px 14px', fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.12em', textTransform: 'uppercase', cursor: 'pointer', border: '1px solid rgba(212,168,67,0.35)', background: 'rgba(212,168,67,0.06)', color: 'var(--warning)', transition: 'all 0.15s ease', opacity: archiving ? 0.6 : 1 }}
+                          style={{ padding: '9px 14px', fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.12em', textTransform: 'uppercase', cursor: 'pointer', border: '1px solid color-mix(in srgb, var(--gold) 35%, transparent)', background: 'color-mix(in srgb, var(--gold) 6%, transparent)', color: 'var(--warning)', transition: 'all 0.15s ease', opacity: archiving ? 0.6 : 1 }}
                         >
                           {archiving ? 'Unarchiving…' : 'Unarchive'}
                         </button>
@@ -2249,7 +2250,7 @@ export default function ApplicationsClient({
                       <button
                         type="button"
                         onClick={() => setArchiveReasonBox(true)}
-                        style={{ width: '100%', padding: '9px 14px', fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.12em', textTransform: 'uppercase', cursor: 'pointer', border: '1px solid rgba(212,168,67,0.3)', background: 'none', color: 'var(--warning)', transition: 'all 0.15s ease', textAlign: 'left' }}
+                        style={{ width: '100%', padding: '9px 14px', fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.12em', textTransform: 'uppercase', cursor: 'pointer', border: '1px solid color-mix(in srgb, var(--gold) 30%, transparent)', background: 'none', color: 'var(--warning)', transition: 'all 0.15s ease', textAlign: 'left' }}
                       >
                         Archive & stop contacting
                       </button>
@@ -2287,12 +2288,12 @@ export default function ApplicationsClient({
                     )}
                   </div>
 
-                  <div style={{ borderTop: '1px solid rgba(232,69,69,0.15)', paddingTop: '16px' }}>
+                  <div style={{ borderTop: '1px solid color-mix(in srgb, var(--error) 15%, transparent)', paddingTop: '16px' }}>
                     {!confirmDelete ? (
                       <button
                         type="button"
                         onClick={() => setConfirmDelete(true)}
-                        style={{ width: '100%', padding: '9px 14px', fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.12em', textTransform: 'uppercase', cursor: 'pointer', border: '1px solid rgba(232,69,69,0.3)', background: 'none', color: 'var(--error)', transition: 'all 0.15s ease', textAlign: 'left' }}
+                        style={{ width: '100%', padding: '9px 14px', fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.12em', textTransform: 'uppercase', cursor: 'pointer', border: '1px solid color-mix(in srgb, var(--error) 30%, transparent)', background: 'none', color: 'var(--error)', transition: 'all 0.15s ease', textAlign: 'left' }}
                       >
                         Delete application
                       </button>
@@ -2314,7 +2315,7 @@ export default function ApplicationsClient({
                             type="button"
                             onClick={() => handleDelete(selected.id)}
                             disabled={deleting}
-                            style={{ flex: 1, padding: '9px 14px', fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.12em', textTransform: 'uppercase', cursor: 'pointer', border: '1px solid var(--error)', background: 'rgba(232,69,69,0.1)', color: 'var(--error)', transition: 'all 0.15s ease' }}
+                            style={{ flex: 1, padding: '9px 14px', fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.12em', textTransform: 'uppercase', cursor: 'pointer', border: '1px solid var(--error)', background: 'color-mix(in srgb, var(--error) 10%, transparent)', color: 'var(--error)', transition: 'all 0.15s ease' }}
                           >
                             {deleting ? 'Deleting...' : 'Confirm delete'}
                           </button>

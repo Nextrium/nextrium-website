@@ -8,6 +8,7 @@ import Header from '@/components/dashboard/Header'
 import CoverImageUpload from '@/components/dashboard/CoverImageUpload'
 import type { NTEvent } from '@nextrium/supabase/database'
 import { logActivityAction } from '@/app/actions/activityLog'
+import { color } from '@nextrium/brand'
 
 interface EventEditorProps {
   event: NTEvent | null
@@ -46,7 +47,7 @@ export default function EventEditor({ event }: EventEditorProps) {
   const [endDate,     setEndDate]     = useState(event?.end_date?.slice(0, 10)   ?? '')
   const [location,    setLocation]    = useState(event?.location           ?? '')
   const [isHubEvent,  setIsHubEvent]  = useState(event?.is_hub_event       ?? true)
-  const [coverColor,  setCoverColor]  = useState(event?.cover_color        ?? '#DB6727')
+  const [coverColor,  setCoverColor]  = useState(event?.cover_color        ?? color('--orange'))
   const [coverImage,  setCoverImage]  = useState(event?.cover_image_url    ?? '')
   const [gallery,     setGallery]     = useState<string[]>(event?.gallery   ?? [])
   const [youtubeUrl,       setYoutubeUrl]       = useState(event?.youtube_url        ?? '')
@@ -143,7 +144,7 @@ export default function EventEditor({ event }: EventEditorProps) {
     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
       {!isNew && (
         <button type="button" onClick={handleDelete} disabled={deleting}
-          style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.12em', textTransform: 'uppercase', padding: '8px 14px', background: 'none', border: '1px solid rgba(232,69,69,0.3)', color: 'var(--error)', cursor: 'pointer' }}>
+          style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.12em', textTransform: 'uppercase', padding: '8px 14px', background: 'none', border: '1px solid color-mix(in srgb, var(--error) 30%, transparent)', color: 'var(--error)', cursor: 'pointer' }}>
           {deleting ? 'Deleting...' : 'Delete'}
         </button>
       )}
@@ -183,8 +184,8 @@ export default function EventEditor({ event }: EventEditorProps) {
         .color-field { display: flex; align-items: center; gap: 12px; }
         .color-preview { width: 40px; height: 40px; border: 1px solid rgba(255,255,255,0.1); flex-shrink: 0; }
         .editor-alert { padding: 10px 14px; font-size: 12px; border: 1px solid; margin-bottom: 8px; }
-        .editor-alert-error { background: rgba(232,69,69,0.08); border-color: rgba(232,69,69,0.3); color: var(--error); }
-        .editor-alert-success { background: rgba(34,193,122,0.08); border-color: rgba(34,193,122,0.3); color: var(--success); }
+        .editor-alert-error { background: color-mix(in srgb, var(--error) 8%, transparent); border-color: color-mix(in srgb, var(--error) 30%, transparent); color: var(--error); }
+        .editor-alert-success { background: color-mix(in srgb, var(--success) 8%, transparent); border-color: color-mix(in srgb, var(--success) 30%, transparent); color: var(--success); }
         @media (max-width: 1100px) { .event-editor-layout { grid-template-columns: 1fr; } .event-editor-sidebar { position: static; } }
       `}</style>
 
@@ -322,7 +323,7 @@ export default function EventEditor({ event }: EventEditorProps) {
                       <button
                         type="button"
                         onClick={() => setGallery(gallery.filter((_, idx) => idx !== i))}
-                        style={{ background: 'none', border: '1px solid rgba(232,69,69,0.3)', color: 'var(--error)', cursor: 'pointer', padding: '4px 8px', fontSize: '10px', flexShrink: 0 }}
+                        style={{ background: 'none', border: '1px solid color-mix(in srgb, var(--error) 30%, transparent)', color: 'var(--error)', cursor: 'pointer', padding: '4px 8px', fontSize: '10px', flexShrink: 0 }}
                       >
                         Remove
                       </button>
@@ -360,7 +361,7 @@ export default function EventEditor({ event }: EventEditorProps) {
               <div className="editor-field">
                 <div className="color-field">
                   <div className="color-preview" style={{ background: coverColor }} />
-                  <input className="editor-input" type="text" placeholder="#DB6727"
+                  <input className="editor-input" type="text" placeholder={color('--orange')}
                     value={coverColor} onChange={(e) => setCoverColor(e.target.value)} />
                 </div>
                 <input type="color" value={coverColor} onChange={(e) => setCoverColor(e.target.value)}

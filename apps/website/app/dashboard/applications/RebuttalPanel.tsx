@@ -176,7 +176,7 @@ export default function RebuttalPanel({
   return (
     <div className="rebuttal-panel">
       <style>{`
-        .rebuttal-panel { background: rgba(219,103,39,0.04); border: 1px solid rgba(219,103,39,0.2); padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+        .rebuttal-panel { background: color-mix(in srgb, var(--orange) 4%, transparent); border: 1px solid color-mix(in srgb, var(--orange) 20%, transparent); padding: 14px; display: flex; flex-direction: column; gap: 10px; }
         .rebuttal-panel-title { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--orange); }
         .rebuttal-dim-list { display: flex; flex-wrap: wrap; gap: 6px; }
         .rebuttal-dim { font-size: 10.5px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); padding: 3px 8px; color: var(--grey-light); }
@@ -188,7 +188,7 @@ export default function RebuttalPanel({
         .rebuttal-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .rebuttal-btn.accept { background: var(--success); color: var(--black); }
         .rebuttal-btn.refine { background: var(--gold); color: var(--black); }
-        .rebuttal-btn.decline { background: transparent; color: var(--error); border: 1px solid rgba(232,69,69,0.4); }
+        .rebuttal-btn.decline { background: transparent; color: var(--error); border: 1px solid color-mix(in srgb, var(--error) 40%, transparent); }
         .rebuttal-btn.rescreen { background: var(--slate); color: var(--white); }
         .rebuttal-textarea { width: 100%; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); color: var(--white); padding: 8px 10px; font-size: 12px; min-height: 50px; }
         .rebuttal-error { color: var(--error); font-size: 11.5px; }

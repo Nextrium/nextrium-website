@@ -89,11 +89,11 @@ export default function CoverImageUpload({
           position: absolute; top: 8px; right: 8px;
           font-family: var(--font-mono); font-size: 8px;
           letter-spacing: 0.1em; text-transform: uppercase;
-          padding: 5px 10px; background: rgba(7,22,40,0.85);
-          border: 1px solid rgba(232,69,69,0.4); color: var(--error);
+          padding: 5px 10px; background: color-mix(in srgb, var(--navy-deep) 85%, transparent);
+          border: 1px solid color-mix(in srgb, var(--error) 40%, transparent); color: var(--error);
           cursor: pointer; transition: all 0.15s ease;
         }
-        .cover-preview-remove:hover { background: rgba(232,69,69,0.15); }
+        .cover-preview-remove:hover { background: color-mix(in srgb, var(--error) 15%, transparent); }
       `}</style>
 
       <div className="cover-upload-wrap">

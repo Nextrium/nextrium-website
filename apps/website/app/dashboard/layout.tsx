@@ -1,8 +1,9 @@
 import DashboardShell from '@/components/dashboard/DashboardShell'
 import { getDashboardRole } from '@/lib/dashboard/getRole'
+import { brand } from '@nextrium/brand'
 
 export const metadata = {
-  title: { default: 'Dashboard', template: '%s | NexTrium Dashboard' },
+  title: { default: 'Dashboard', template: `%s | ${brand.styledName} Dashboard` },
 }
 
 export default async function DashboardLayout({

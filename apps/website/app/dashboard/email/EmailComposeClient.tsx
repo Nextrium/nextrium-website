@@ -224,17 +224,17 @@ export default function EmailComposeClient({
         .email-filter-clear { align-self: flex-end; font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--orange); background: none; border: none; cursor: pointer; padding: 4px 8px; }
         .source-tabs { display: flex; gap: 0; margin-bottom: 16px; border: 1px solid rgba(255,255,255,0.08); }
         .source-tab { flex: 1; padding: 8px; font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase; text-align: center; cursor: pointer; background: none; border: none; color: var(--grey-mid); transition: all 0.15s ease; }
-        .source-tab.active { background: rgba(219,103,39,0.1); color: var(--orange); }
+        .source-tab.active { background: color-mix(in srgb, var(--orange) 10%, transparent); color: var(--orange); }
         .recipient-list { display: flex; flex-direction: column; gap: 0; max-height: 360px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.06); }
         .recipient-row { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-bottom: 1px solid rgba(255,255,255,0.04); cursor: pointer; }
         .recipient-row:last-child { border-bottom: none; }
         .recipient-row:hover { background: rgba(255,255,255,0.02); }
         .recipient-row input { accent-color: var(--orange); cursor: pointer; }
-        .recipient-already-sent { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.08em; text-transform: uppercase; padding: 3px 7px; background: rgba(34,193,122,0.08); border: 1px solid rgba(34,193,122,0.25); color: var(--success); white-space: nowrap; flex-shrink: 0; }
+        .recipient-already-sent { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.08em; text-transform: uppercase; padding: 3px 7px; background: color-mix(in srgb, var(--success) 8%, transparent); border: 1px solid color-mix(in srgb, var(--success) 25%, transparent); color: var(--success); white-space: nowrap; flex-shrink: 0; }
         .recipient-name { font-size: 12px; color: var(--white); }
         .recipient-email { font-size: 10px; color: var(--grey-dark); }
         .recipient-actions { display: flex; gap: 8px; margin-bottom: 10px; }
-        .recipient-action-btn { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--orange); background: none; border: 1px solid rgba(219,103,39,0.3); padding: 6px 10px; cursor: pointer; }
+        .recipient-action-btn { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--orange); background: none; border: 1px solid color-mix(in srgb, var(--orange) 30%, transparent); padding: 6px 10px; cursor: pointer; }
         .manual-textarea { background: var(--navy-mid); border: 1px solid rgba(255,255,255,0.08); color: var(--white); font-family: var(--font-dm); font-size: 13px; padding: 10px 12px; outline: none; width: 100%; min-height: 140px; resize: vertical; }
         .compose-input { background: var(--navy-mid); border: 1px solid rgba(255,255,255,0.08); color: var(--white); font-family: var(--font-dm); font-size: 14px; padding: 11px 14px; outline: none; width: 100%; margin-bottom: 16px; }
         .compose-textarea { min-height: 280px; resize: vertical; }
@@ -244,12 +244,12 @@ export default function EmailComposeClient({
         .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .results-box { margin-top: 16px; padding: 14px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); }
         .results-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; font-size: 12px; }
-        .error-box { padding: 10px 14px; font-size: 12px; background: rgba(232,69,69,0.08); border: 1px solid rgba(232,69,69,0.3); color: var(--error); margin-bottom: 16px; }
-        .send-preview-backdrop { position: fixed; inset: 0; z-index: 80; background: rgba(7,22,40,0.75); display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .error-box { padding: 10px 14px; font-size: 12px; background: color-mix(in srgb, var(--error) 8%, transparent); border: 1px solid color-mix(in srgb, var(--error) 30%, transparent); color: var(--error); margin-bottom: 16px; }
+        .send-preview-backdrop { position: fixed; inset: 0; z-index: 80; background: color-mix(in srgb, var(--navy-deep) 75%, transparent); display: flex; align-items: center; justify-content: center; padding: 20px; }
         .send-preview-panel { width: 100%; max-width: 480px; max-height: 80vh; overflow-y: auto; background: var(--navy); border: 1px solid rgba(255,255,255,0.1); padding: 24px; display: flex; flex-direction: column; gap: 14px; }
         .send-preview-title { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--white); }
         .send-preview-summary { font-size: 13px; color: var(--off-white); line-height: 1.6; }
-        .send-preview-duplicates { background: rgba(212,168,67,0.06); border: 1px solid rgba(212,168,67,0.25); padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+        .send-preview-duplicates { background: color-mix(in srgb, var(--gold) 6%, transparent); border: 1px solid color-mix(in srgb, var(--gold) 25%, transparent); padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
         .send-preview-duplicates-title { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--warning); }
         .send-preview-duplicate-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12px; color: var(--off-white); }
         .send-preview-actions { display: flex; gap: 10px; justify-content: flex-end; }
@@ -378,7 +378,7 @@ export default function EmailComposeClient({
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--grey-dark)' }}>File uploads</div>
-              <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', alignSelf: 'flex-start', background: 'none', border: '1px solid rgba(219,103,39,0.3)', color: 'var(--orange)', padding: '6px 12px', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', alignSelf: 'flex-start', background: 'none', border: '1px solid color-mix(in srgb, var(--orange) 30%, transparent)', color: 'var(--orange)', padding: '6px 12px', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
                 + Attach files
                 <input
                   type="file"

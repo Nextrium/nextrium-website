@@ -1,5 +1,6 @@
 import Header from '@/components/dashboard/Header'
 import AIEngineClient from './AIEngineClient'
+import { brand } from '@nextrium/brand'
 
 export const metadata = { title: 'AI Engine' }
 export const dynamic = 'force-dynamic'
@@ -13,7 +14,7 @@ export const dynamic = 'force-dynamic'
 export default function AIEnginePage() {
   return (
     <>
-      <Header title="AI Engine" description="Monitor and manage Nextrium's AI agents" />
+      <Header title="AI Engine" description={`Monitor and manage ${brand.name}'s AI agents`} />
       <div className="dash-content">
         <AIEngineClient initialMetrics={null} initialError={null} />
       </div>

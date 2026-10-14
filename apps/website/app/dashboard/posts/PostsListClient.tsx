@@ -15,12 +15,12 @@ const TYPE_LABELS: Record<Post['post_type'], string> = {
 }
 
 const TYPE_STYLES: Record<Post['post_type'], { bg: string; color: string }> = {
-  editorial:      { bg: 'rgba(138,155,176,0.1)', color: 'var(--grey-mid)' },
-  announcement:   { bg: 'rgba(219,103,39,0.1)',  color: 'var(--orange)'   },
-  product_update: { bg: 'rgba(10,139,139,0.1)',  color: 'var(--teal)'     },
-  event_recap:    { bg: 'rgba(212,168,67,0.1)',  color: 'var(--gold)'     },
-  research:       { bg: 'rgba(74,111,165,0.1)',  color: 'var(--slate)'    },
-  recruitment:    { bg: 'rgba(34,193,122,0.1)',  color: 'var(--success)'  },
+  editorial:      { bg: 'color-mix(in srgb, var(--grey-mid) 10%, transparent)', color: 'var(--grey-mid)' },
+  announcement:   { bg: 'color-mix(in srgb, var(--orange) 10%, transparent)',  color: 'var(--orange)'   },
+  product_update: { bg: 'color-mix(in srgb, var(--teal) 10%, transparent)',  color: 'var(--teal)'     },
+  event_recap:    { bg: 'color-mix(in srgb, var(--gold) 10%, transparent)',  color: 'var(--gold)'     },
+  research:       { bg: 'color-mix(in srgb, var(--slate) 10%, transparent)',  color: 'var(--slate)'    },
+  recruitment:    { bg: 'color-mix(in srgb, var(--success) 10%, transparent)',  color: 'var(--success)'  },
 }
 
 export default function PostsListClient({ posts }: { posts: Post[] }) {

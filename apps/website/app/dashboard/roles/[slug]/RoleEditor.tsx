@@ -124,7 +124,7 @@ export default function RoleEditor({ role }: RoleEditorProps) {
     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
       {!isNew && (
         <button type="button" onClick={handleDelete} disabled={deleting}
-          style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.12em', textTransform: 'uppercase', padding: '8px 14px', background: 'none', border: '1px solid rgba(232,69,69,0.3)', color: 'var(--error)', cursor: 'pointer' }}>
+          style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.12em', textTransform: 'uppercase', padding: '8px 14px', background: 'none', border: '1px solid color-mix(in srgb, var(--error) 30%, transparent)', color: 'var(--error)', cursor: 'pointer' }}>
           {deleting ? 'Deleting...' : 'Delete'}
         </button>
       )}
@@ -163,8 +163,8 @@ export default function RoleEditor({ role }: RoleEditorProps) {
         input:checked + .editor-toggle-track { background: var(--orange); }
         input:checked + .editor-toggle-track::before { transform: translateX(18px); background: var(--white); }
         .editor-alert { padding: 10px 14px; font-size: 12px; border: 1px solid; margin-bottom: 8px; }
-        .editor-alert-error { background: rgba(232,69,69,0.08); border-color: rgba(232,69,69,0.3); color: var(--error); }
-        .editor-alert-success { background: rgba(34,193,122,0.08); border-color: rgba(34,193,122,0.3); color: var(--success); }
+        .editor-alert-error { background: color-mix(in srgb, var(--error) 8%, transparent); border-color: color-mix(in srgb, var(--error) 30%, transparent); color: var(--error); }
+        .editor-alert-success { background: color-mix(in srgb, var(--success) 8%, transparent); border-color: color-mix(in srgb, var(--success) 30%, transparent); color: var(--success); }
         @media (max-width: 1100px) { .role-editor-layout { grid-template-columns: 1fr; } .role-editor-sidebar { position: static; } }
       `}</style>
 

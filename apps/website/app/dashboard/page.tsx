@@ -4,6 +4,7 @@ import { getDashboardRole, type DashboardRole } from '@/lib/dashboard/getRole'
 import Header from '@/components/dashboard/Header'
 import Link from 'next/link'
 import type { Post, Application } from '@nextrium/supabase/database'
+import { brand, color } from '@nextrium/brand'
 
 async function getStats(role: DashboardRole) {
   const supabase = createServiceClient()
@@ -74,11 +75,11 @@ export default async function DashboardPage() {
   const canSeeRoles        = role === 'admin' || role === 'moderator'
 
   const STAT_CARDS = [
-    canSeeProducts     && { label: 'Products',        value: stats.products,     href: '/dashboard/products',     accent: '#0A8B8B' },
-    canSeePosts        && { label: 'Published posts', value: stats.posts,        href: '/dashboard/posts',        accent: '#4A6FA5' },
-    { label: 'Events', value: stats.events, href: '/dashboard/events', accent: '#D4A843' },
-    canSeeApplications && { label: 'Pending apps',    value: stats.applications, href: '/dashboard/applications', accent: stats.applications > 0 ? '#DB6727' : '#2E3F54' },
-    canSeeContacts     && { label: 'New messages',    value: stats.contacts,     href: '/dashboard/contact',      accent: stats.contacts > 0 ? '#DB6727' : '#2E3F54' },
+    canSeeProducts     && { label: 'Products',        value: stats.products,     href: '/dashboard/products',     accent: color('--teal') },
+    canSeePosts        && { label: 'Published posts', value: stats.posts,        href: '/dashboard/posts',        accent: color('--slate') },
+    { label: 'Events', value: stats.events, href: '/dashboard/events', accent: color('--gold') },
+    canSeeApplications && { label: 'Pending apps',    value: stats.applications, href: '/dashboard/applications', accent: stats.applications > 0 ? color('--orange') : color('--grey-dark') },
+    canSeeContacts     && { label: 'New messages',    value: stats.contacts,     href: '/dashboard/contact',      accent: stats.contacts > 0 ? color('--orange') : color('--grey-dark') },
   ].filter(Boolean) as { label: string; value: number; href: string; accent: string }[]
 
   const QUICK_ACTIONS = [
@@ -150,13 +151,13 @@ export default async function DashboardPage() {
           font-family: var(--font-mono); font-size: 7.5px;
           letter-spacing: 0.12em; text-transform: uppercase; padding: 3px 7px; flex-shrink: 0;
         }
-        .badge-published   { background: rgba(34,193,122,0.1);  color: var(--success); border: 1px solid rgba(34,193,122,0.2); }
-        .badge-draft       { background: rgba(138,155,176,0.1); color: var(--grey-mid); border: 1px solid rgba(138,155,176,0.2); }
-        .badge-pending     { background: rgba(219,103,39,0.1);  color: var(--orange); border: 1px solid rgba(219,103,39,0.2); }
-        .badge-reviewed    { background: rgba(74,111,165,0.1);  color: var(--slate); border: 1px solid rgba(74,111,165,0.2); }
-        .badge-shortlisted { background: rgba(212,168,67,0.1);  color: var(--gold); border: 1px solid rgba(212,168,67,0.2); }
-        .badge-rejected    { background: rgba(232,69,69,0.1);   color: var(--error); border: 1px solid rgba(232,69,69,0.2); }
-        .badge-accepted    { background: rgba(34,193,122,0.1);  color: var(--success); border: 1px solid rgba(34,193,122,0.2); }
+        .badge-published   { background: color-mix(in srgb, var(--success) 10%, transparent);  color: var(--success); border: 1px solid color-mix(in srgb, var(--success) 20%, transparent); }
+        .badge-draft       { background: color-mix(in srgb, var(--grey-mid) 10%, transparent); color: var(--grey-mid); border: 1px solid color-mix(in srgb, var(--grey-mid) 20%, transparent); }
+        .badge-pending     { background: color-mix(in srgb, var(--orange) 10%, transparent);  color: var(--orange); border: 1px solid color-mix(in srgb, var(--orange) 20%, transparent); }
+        .badge-reviewed    { background: color-mix(in srgb, var(--slate) 10%, transparent);  color: var(--slate); border: 1px solid color-mix(in srgb, var(--slate) 20%, transparent); }
+        .badge-shortlisted { background: color-mix(in srgb, var(--gold) 10%, transparent);  color: var(--gold); border: 1px solid color-mix(in srgb, var(--gold) 20%, transparent); }
+        .badge-rejected    { background: color-mix(in srgb, var(--error) 10%, transparent);   color: var(--error); border: 1px solid color-mix(in srgb, var(--error) 20%, transparent); }
+        .badge-accepted    { background: color-mix(in srgb, var(--success) 10%, transparent);  color: var(--success); border: 1px solid color-mix(in srgb, var(--success) 20%, transparent); }
         .dash-empty { padding: 32px 24px; text-align: center; font-size: 13px; color: var(--grey-dark); }
         .dash-quick-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px; }
         .dash-quick-btn {
@@ -166,12 +167,12 @@ export default async function DashboardPage() {
           color: var(--grey-mid); text-decoration: none;
           transition: all 0.15s ease; display: flex; align-items: center; gap: 8px;
         }
-        .dash-quick-btn:hover { color: var(--white); border-color: var(--orange); background: rgba(219,103,39,0.06); }
+        .dash-quick-btn:hover { color: var(--white); border-color: var(--orange); background: color-mix(in srgb, var(--orange) 6%, transparent); }
         @media (max-width: 1200px) { .dash-stat-grid { grid-template-columns: repeat(3, 1fr); } }
         @media (max-width: 900px)  { .dash-two-col { grid-template-columns: 1fr; } }
       `}</style>
 
-      <Header title="Dashboard" description="NexTrium Global Innovations Ltd" />
+      <Header title="Dashboard" description={brand.styledLegalName} />
 
       <div className="dash-content">
         <div className="dash-quick-actions">

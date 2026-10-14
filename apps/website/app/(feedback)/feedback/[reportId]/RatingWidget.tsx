@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { submitReportRating } from './actions'
 import styles from './ReportClient.module.css'
+import { brand } from '@nextrium/brand'
 
 export default function RatingWidget({ reportId }: { reportId: string }) {
   const [alreadyRated, setAlreadyRated] = useState(false)
@@ -89,7 +90,7 @@ export default function RatingWidget({ reportId }: { reportId: string }) {
             <div className={styles.modalTitle}>Rate this evaluation report</div>
             <p className={styles.modalSubtitle}>
               How fair and accurate did you find this report? Your rationale
-              helps Nextrium improve the quality of AI-assisted feedback.
+              helps {brand.name} improve the quality of AI-assisted feedback.
             </p>
 
             <div className={styles.modalStars}>

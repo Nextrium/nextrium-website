@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import NTMark from '@nextrium/brand/NTMark'
+import NTMark from '@nextrium/brand/Mark'
 import SectionTag from '@/components/shared/SectionTag'
 import { normalizeUrl } from '@nextrium/utils/normalizeUrl'
 import type { Product } from '@nextrium/supabase/database'

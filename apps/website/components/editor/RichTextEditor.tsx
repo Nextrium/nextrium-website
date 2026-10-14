@@ -15,6 +15,7 @@ import { Placeholder } from '@tiptap/extensions'
 import { useCallback, useState } from 'react'
 import { normalizeUrl } from '@nextrium/utils/normalizeUrl'
 import ImageUpload from './ImageUpload'
+import { color } from '@nextrium/brand'
 
 interface RichTextEditorProps {
   content: string
@@ -125,8 +126,8 @@ export default function RichTextEditor({ content, onChange, placeholder = 'Start
         .tbar-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 2px; background: none; border: none; cursor: pointer; color: var(--grey-mid); font-size: 12px; font-weight: 600; transition: all 0.1s ease; flex-shrink: 0; }
         .tbar-btn:hover { background: rgba(255,255,255,0.08); color: var(--white); }
         .tbar-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-        .tbar-btn-active { background: rgba(219,103,39,0.15); color: var(--orange); }
-        .tbar-btn-active:hover { background: rgba(219,103,39,0.25); color: var(--orange); }
+        .tbar-btn-active { background: color-mix(in srgb, var(--orange) 15%, transparent); color: var(--orange); }
+        .tbar-btn-active:hover { background: color-mix(in srgb, var(--orange) 25%, transparent); color: var(--orange); }
         .tbar-divider { width: 1px; height: 20px; background: rgba(255,255,255,0.08); margin: 0 4px; }
         .tbar-select { background: var(--navy-mid); border: 1px solid rgba(255,255,255,0.08); color: var(--grey-mid); font-size: 11px; padding: 3px 6px; cursor: pointer; outline: none; height: 28px; }
         .tbar-select:focus { border-color: var(--orange); color: var(--white); }
@@ -136,7 +137,7 @@ export default function RichTextEditor({ content, onChange, placeholder = 'Start
         .tbar-popover-input { flex: 1; background: var(--navy-mid); border: 1px solid rgba(255,255,255,0.08); color: var(--white); font-size: 12px; padding: 5px 10px; outline: none; }
         .tbar-popover-input:focus { border-color: var(--orange); }
         .tbar-popover-btn { background: var(--orange); color: var(--white); border: none; font-size: 11px; padding: 5px 12px; cursor: pointer; white-space: nowrap; transition: background 0.1s ease; }
-        .tbar-popover-btn:hover { background: var(--orange-f, #C4521A); }
+        .tbar-popover-btn:hover { background: var(--orange-f); }
         .tbar-popover-cancel { background: none; color: var(--grey-mid); border: 1px solid rgba(255,255,255,0.08); font-size: 11px; padding: 5px 10px; cursor: pointer; transition: all 0.1s ease; }
         .tbar-popover-cancel:hover { color: var(--white); }
         .tiptap-editor { padding: 24px; min-height: 400px; outline: none; color: var(--off-white); font-family: var(--font-dm, 'DM Sans', sans-serif); font-size: 15px; line-height: 1.75; }
@@ -160,11 +161,11 @@ export default function RichTextEditor({ content, onChange, placeholder = 'Start
         .tiptap-editor a.editor-link { color: var(--orange); text-decoration: underline; }
         .tiptap-editor img { max-width: 100%; height: auto; display: block; margin: 16px 0; border: 1px solid rgba(255,255,255,0.06); }
         .tiptap-editor hr { border: none; border-top: 1px solid rgba(255,255,255,0.1); margin: 24px 0; }
-        .tiptap-editor mark { background: rgba(212,168,67,0.3); color: var(--white); padding: 0 2px; }
+        .tiptap-editor mark { background: color-mix(in srgb, var(--gold) 30%, transparent); color: var(--white); padding: 0 2px; }
         .tiptap-editor table { border-collapse: collapse; width: 100%; margin: 16px 0; }
         .tiptap-editor th, .tiptap-editor td { border: 1px solid rgba(255,255,255,0.1); padding: 8px 12px; font-size: 13px; text-align: left; }
         .tiptap-editor th { background: rgba(255,255,255,0.06); color: var(--white); font-family: var(--font-mono, 'Space Mono', monospace); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; }
-        .tiptap-editor .selectedCell { background: rgba(219,103,39,0.1); }
+        .tiptap-editor .selectedCell { background: color-mix(in srgb, var(--orange) 10%, transparent); }
         .tiptap-editor p.is-editor-empty:first-child::before { content: attr(data-placeholder); color: var(--grey-dark); pointer-events: none; float: left; height: 0; }
         .rte-footer { padding: 8px 16px; border-top: 1px solid rgba(255,255,255,0.06); background: var(--navy); display: flex; align-items: center; justify-content: flex-end; gap: 16px; }
         .rte-word-count { font-family: var(--font-mono, 'Space Mono', monospace); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--grey-dark); }
@@ -204,7 +205,7 @@ export default function RichTextEditor({ content, onChange, placeholder = 'Start
 
           <ToolbarDivider />
           <label className="tbar-color" title="Text color">
-            <input type="color" onInput={(e) => editor.chain().focus().setColor((e.target as HTMLInputElement).value).run()} defaultValue="#DB6727" />
+            <input type="color" onInput={(e) => editor.chain().focus().setColor((e.target as HTMLInputElement).value).run()} defaultValue={color('--orange')} />
           </label>
 
           <ToolbarDivider />

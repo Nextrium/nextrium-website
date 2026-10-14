@@ -117,7 +117,7 @@ export default function CopilotDrawer() {
     >
       <style>{`
         .copilot-msg { padding: 10px 12px; margin-bottom: 10px; font-size: 12.5px; line-height: 1.5; }
-        .copilot-msg.recruiter { background: rgba(219,103,39,0.08); border: 1px solid rgba(219,103,39,0.2); color: var(--white); }
+        .copilot-msg.recruiter { background: color-mix(in srgb, var(--orange) 8%, transparent); border: 1px solid color-mix(in srgb, var(--orange) 20%, transparent); color: var(--white); }
         .copilot-msg.copilot_agent { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); color: var(--grey-light); }
         .copilot-msg-sender { font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--grey-mid); margin-bottom: 4px; display: block; }
         .copilot-delta-pill { margin-top: 8px; }
@@ -142,7 +142,7 @@ export default function CopilotDrawer() {
         }
         .copilot-override-toggle:hover { color: var(--white); }
         .copilot-override-box {
-          border: 1px solid rgba(219,103,39,0.25); background: rgba(219,103,39,0.04);
+          border: 1px solid color-mix(in srgb, var(--orange) 25%, transparent); background: color-mix(in srgb, var(--orange) 4%, transparent);
           padding: 10px; display: flex; flex-direction: column; gap: 8px; margin-top: 4px;
         }
         .copilot-override-row { display: flex; gap: 8px; }

@@ -49,25 +49,25 @@
 .urlInput:focus { border-color: var(--orange); }
 .urlInput::placeholder { color: var(--grey-dark); }
 .urlRemove { background: none;
-  border: 1px solid rgba(232,69,69,0.3); color: var(--error);
+  border: 1px solid color-mix(in srgb, var(--error) 30%, transparent); color: var(--error);
   padding: 10px 12px; cursor: pointer; font-family: var(--font-mono);
   font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; }
 .addUrl { background: none;
-  border: 1px solid rgba(219,103,39,0.3); color: var(--orange);
+  border: 1px solid color-mix(in srgb, var(--orange) 30%, transparent); color: var(--orange);
   padding: 7px 14px; cursor: pointer; font-family: var(--font-mono);
   font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase;
   margin-top: 4px; transition: all 0.15s ease; }
-.addUrl:hover { background: rgba(219,103,39,0.06);
+.addUrl:hover { background: color-mix(in srgb, var(--orange) 6%, transparent);
   border-color: var(--orange); }
 .error { font-family: var(--font-dm); font-size: 13px;
-  color: var(--error); background: rgba(232,69,69,0.08);
-  border: 1px solid rgba(232,69,69,0.2); padding: 12px 14px;
+  color: var(--error); background: color-mix(in srgb, var(--error) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--error) 20%, transparent); padding: 12px 14px;
   margin-bottom: 20px; }
 .submit { width: 100%; padding: 13px; background: var(--orange);
   border: none; color: var(--white); font-family: var(--font-mono);
   font-size: 10px; cursor: pointer; letter-spacing: 0.15em;
   text-transform: uppercase; transition: background 0.15s ease; }
-.submit:hover:not(:disabled) { background: #C4521A; }
+.submit:hover:not(:disabled) { background: var(--orange-f); }
 .submit:disabled { opacity: 0.6; cursor: not-allowed; }
 .success { text-align: center; padding: 64px 24px; }
 .successIcon { font-size: 40px; margin-bottom: 16px; }

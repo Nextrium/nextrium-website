@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import RatingWidget from './RatingWidget'
 import styles from './ReportClient.module.css'
+import { brand } from '@nextrium/brand'
 
 interface DimensionFeedback {
   dimension: string
@@ -48,7 +49,7 @@ export default function ReportClient({ report, rebuttalStatus }: { report: Repor
 
   return (
     <div className={styles.page}>
-      <div className={styles.brand}>Nextrium Global Innovations Ltd</div>
+      <div className={styles.brand}>{brand.legalName}</div>
 
       <div className={styles.reportId}>Report ID: {report.id}</div>
       <div className={styles.title}>Your evaluation report</div>
@@ -134,7 +135,7 @@ export default function ReportClient({ report, rebuttalStatus }: { report: Repor
               ? 'Your dispute has been reviewed and accepted — this report has been updated to reflect the revised assessment.'
               : rebuttalStatus === 'dismissed'
               ? 'Your dispute has been reviewed. After careful consideration, the original assessment has been upheld.'
-              : 'Your rebuttal has been submitted and is under review by the Nextrium operations team.'}
+              : `Your rebuttal has been submitted and is under review by the ${brand.name} operations team.`}
           </div>
         ) : (
           <p className={styles.rebuttalDesc}>

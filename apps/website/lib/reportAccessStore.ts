@@ -1,5 +1,6 @@
 import { createServiceClient } from '@nextrium/supabase/server'
 import type { ApplicantLookup, CodeStore } from './reportAccessFlow'
+import { brand } from '@nextrium/brand'
 
 const TABLE = 'report_access_codes'
 
@@ -73,14 +74,14 @@ export async function lookupApplicantForReport(reportId: string): Promise<Applic
 export async function sendCodeEmail(email: string, code: string): Promise<boolean> {
   const key = process.env.AGENTS_ENGINE_API_KEY
   if (!key) return false
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://www.nextrium.org'
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? brand.urls.website
 
   try {
     const res = await fetch(`${siteUrl}/api/email`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
       body: JSON.stringify({
-        subject: 'Your Nextrium report access code',
+        subject: `Your ${brand.name} report access code`,
         message: `Hello,\n\nYour verification code is ${code}.\n\nIt expires in 10 minutes. If you did not request it, you can ignore this email.`,
         recipients: [{ name: 'Applicant', email }],
       }),

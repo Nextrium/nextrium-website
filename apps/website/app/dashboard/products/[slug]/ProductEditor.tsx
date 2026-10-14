@@ -8,6 +8,7 @@ import Header from '@/components/dashboard/Header'
 import CoverImageUpload from '@/components/dashboard/CoverImageUpload'
 import type { Product } from '@nextrium/supabase/database'
 import { logActivityAction } from '@/app/actions/activityLog'
+import { brand, color } from '@nextrium/brand'
 
 interface ProductEditorProps {
   product: Product | null
@@ -36,7 +37,7 @@ export default function ProductEditor({ product }: ProductEditorProps) {
   const [status,      setStatus]      = useState<Product['status']>(product?.status ?? 'in_development')
   const [category,    setCategory]    = useState((product?.category        ?? []).join(', '))
   const [techStack,   setTechStack]   = useState((product?.tech_stack      ?? []).join(', '))
-  const [bodyColor,   setBodyColor]   = useState(product?.body_color       ?? '#0D233D')
+  const [bodyColor,   setBodyColor]   = useState(product?.body_color       ?? color('--navy'))
   const [websiteUrl,  setWebsiteUrl]  = useState(product?.website_url      ?? '')
   const [githubUrl,   setGithubUrl]   = useState(product?.github_url       ?? '')
   const [coverImage,  setCoverImage]  = useState(product?.cover_image_url  ?? '')
@@ -130,7 +131,7 @@ export default function ProductEditor({ product }: ProductEditorProps) {
       {!isNew && (
         <button
           type="button" onClick={handleDelete} disabled={deleting}
-          style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.12em', textTransform: 'uppercase', padding: '8px 14px', background: 'none', border: '1px solid rgba(232,69,69,0.3)', color: 'var(--error)', cursor: 'pointer' }}
+          style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.12em', textTransform: 'uppercase', padding: '8px 14px', background: 'none', border: '1px solid color-mix(in srgb, var(--error) 30%, transparent)', color: 'var(--error)', cursor: 'pointer' }}
         >
           {deleting ? 'Deleting...' : 'Delete'}
         </button>
@@ -173,14 +174,14 @@ export default function ProductEditor({ product }: ProductEditorProps) {
         .color-field { display: flex; align-items: center; gap: 12px; }
         .color-preview { width: 40px; height: 40px; border: 1px solid rgba(255,255,255,0.1); flex-shrink: 0; }
         .editor-alert { padding: 10px 14px; font-size: 12px; border: 1px solid; margin-bottom: 8px; }
-        .editor-alert-error { background: rgba(232,69,69,0.08); border-color: rgba(232,69,69,0.3); color: var(--error); }
-        .editor-alert-success { background: rgba(34,193,122,0.08); border-color: rgba(34,193,122,0.3); color: var(--success); }
+        .editor-alert-error { background: color-mix(in srgb, var(--error) 8%, transparent); border-color: color-mix(in srgb, var(--error) 30%, transparent); color: var(--error); }
+        .editor-alert-success { background: color-mix(in srgb, var(--success) 8%, transparent); border-color: color-mix(in srgb, var(--success) 30%, transparent); color: var(--success); }
         @media (max-width: 1100px) { .prod-editor-layout { grid-template-columns: 1fr; } .prod-editor-sidebar { position: static; } }
       `}</style>
 
       <Header
         title={isNew ? 'New product' : 'Edit product'}
-        description={isNew ? 'Add a new NexTrium product' : product?.slug}
+        description={isNew ? `Add a new ${brand.styledName} product` : product?.slug}
         action={ActionButtons}
       />
 
@@ -318,7 +319,7 @@ export default function ProductEditor({ product }: ProductEditorProps) {
                   <div className="color-preview" style={{ background: bodyColor }} />
                   <input
                     className="editor-input" id="body_color" type="text"
-                    placeholder="#0D233D"
+                    placeholder={color('--navy')}
                     value={bodyColor} onChange={(e) => setBodyColor(e.target.value)}
                   />
                 </div>

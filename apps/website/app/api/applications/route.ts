@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@nextrium/supabase/server'
 import { normalizeUrl } from '@nextrium/utils/normalizeUrl'
+import { brand } from '@nextrium/brand'
+
+const C = brand.colors
 
 // Escape applicant-supplied text before putting it into email HTML.
 function h(value: string): string {
@@ -160,44 +163,44 @@ export async function POST(request: Request) {
           'api-key':      process.env.BREVO_API_KEY!,
         },
         body: JSON.stringify({
-          sender:  { name: 'NexTrium Website', email: process.env.BREVO_SENDER_EMAIL! },
-          to:      [{ email: 'hello@nextrium.org', name: 'NexTrium' }],
+          sender:  { name: `${brand.styledName} Website`, email: process.env.BREVO_SENDER_EMAIL! },
+          to:      [{ email: brand.emails.hello, name: brand.styledName }],
           replyTo: { email: email.trim(), name: name.trim() },
-          subject: `[NexTrium] New application from ${name.trim()}${role_title ? ` — ${role_title}` : ''}`,
+          subject: `[${brand.styledName}] New application from ${name.trim()}${role_title ? ` — ${role_title}` : ''}`,
           htmlContent: `
-            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 32px; background: #071628; color: #F5F6F8;">
-              <div style="border-bottom: 2px solid #DB6727; padding-bottom: 16px; margin-bottom: 24px;">
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 32px; background: ${C['--navy-deep']}; color: ${C['--off-white']};">
+              <div style="border-bottom: 2px solid ${C['--orange']}; padding-bottom: 16px; margin-bottom: 24px;">
                 <h2 style="margin: 0; font-size: 20px; color: #ffffff;">New job application</h2>
-                <p style="margin: 4px 0 0; font-size: 12px; color: #8A9BB0; text-transform: uppercase; letter-spacing: 0.1em;">${h(role_title || 'Open application')}</p>
+                <p style="margin: 4px 0 0; font-size: 12px; color: ${C['--grey-mid']}; text-transform: uppercase; letter-spacing: 0.1em;">${h(role_title || 'Open application')}</p>
               </div>
               <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
                 <tr>
-                  <td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.06); color: #8A9BB0; font-size: 12px; width: 120px;">Name</td>
-                  <td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.06); color: #F5F6F8; font-size: 14px;">${h(name.trim())}</td>
+                  <td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.06); color: ${C['--grey-mid']}; font-size: 12px; width: 120px;">Name</td>
+                  <td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.06); color: ${C['--off-white']}; font-size: 14px;">${h(name.trim())}</td>
                 </tr>
                 <tr>
-                  <td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.06); color: #8A9BB0; font-size: 12px;">Email</td>
-                  <td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.06); color: #DB6727; font-size: 14px;"><a href="mailto:${h(email.trim())}" style="color: #DB6727;">${h(email.trim())}</a></td>
+                  <td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.06); color: ${C['--grey-mid']}; font-size: 12px;">Email</td>
+                  <td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.06); color: ${C['--orange']}; font-size: 14px;"><a href="mailto:${h(email.trim())}" style="color: ${C['--orange']};">${h(email.trim())}</a></td>
                 </tr>
                 <tr>
-                  <td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.06); color: #8A9BB0; font-size: 12px;">Role</td>
-                  <td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.06); color: #F5F6F8; font-size: 14px;">${h(role_title || 'Open application')}</td>
+                  <td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.06); color: ${C['--grey-mid']}; font-size: 12px;">Role</td>
+                  <td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.06); color: ${C['--off-white']}; font-size: 14px;">${h(role_title || 'Open application')}</td>
                 </tr>
                 ${cv_url ? `
                 <tr>
-                  <td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.06); color: #8A9BB0; font-size: 12px;">CV</td>
-                  <td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 14px;"><a href="${h(cv_url)}" style="color: #DB6727;">Download CV →</a></td>
+                  <td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.06); color: ${C['--grey-mid']}; font-size: 12px;">CV</td>
+                  <td style="padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 14px;"><a href="${h(cv_url)}" style="color: ${C['--orange']};">Download CV →</a></td>
                 </tr>` : ''}
               </table>
               ${cover_note.trim() ? `
-              <div style="background: #0D233D; padding: 20px; border-left: 3px solid #DB6727;">
-                <p style="margin: 0 0 8px; color: #8A9BB0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em;">Cover note</p>
-                <p style="margin: 0; color: #F5F6F8; font-size: 14px; line-height: 1.7; white-space: pre-wrap;">${h(cover_note.trim())}</p>
+              <div style="background: ${C['--navy']}; padding: 20px; border-left: 3px solid ${C['--orange']};">
+                <p style="margin: 0 0 8px; color: ${C['--grey-mid']}; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em;">Cover note</p>
+                <p style="margin: 0; color: ${C['--off-white']}; font-size: 14px; line-height: 1.7; white-space: pre-wrap;">${h(cover_note.trim())}</p>
               </div>` : ''}
               <div style="margin-top: 32px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.06);">
-                <a href="mailto:${h(email.trim())}?subject=Re: Your application to NexTrium" style="display: inline-block; padding: 12px 24px; background: #DB6727; color: #ffffff; text-decoration: none; font-size: 13px;">Reply to ${h(name.trim())} →</a>
+                <a href="mailto:${h(email.trim())}?subject=Re: Your application to ${brand.styledName}" style="display: inline-block; padding: 12px 24px; background: ${C['--orange']}; color: #ffffff; text-decoration: none; font-size: 13px;">Reply to ${h(name.trim())} →</a>
               </div>
-              <p style="margin-top: 24px; font-size: 11px; color: #2E3F54;">This application was submitted via nextrium.org/careers</p>
+              <p style="margin-top: 24px; font-size: 11px; color: ${C['--grey-dark']};">This application was submitted via ${brand.urls.websiteDisplay}/careers</p>
             </div>
           `,
         }),
@@ -216,28 +219,28 @@ export async function POST(request: Request) {
           'api-key':      process.env.BREVO_API_KEY!,
         },
         body: JSON.stringify({
-          sender:  { name: 'NexTrium', email: process.env.BREVO_SENDER_EMAIL! },
+          sender:  { name: brand.styledName, email: process.env.BREVO_SENDER_EMAIL! },
           to:      [{ email: email.trim(), name: name.trim() }],
-          subject: `We received your application${role_title ? ` — ${role_title}` : ''} | NexTrium`,
+          subject: `We received your application${role_title ? ` — ${role_title}` : ''} | ${brand.styledName}`,
           htmlContent: `
-            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 32px; background: #071628; color: #F5F6F8;">
-              <div style="border-bottom: 2px solid #DB6727; padding-bottom: 16px; margin-bottom: 24px;">
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 32px; background: ${C['--navy-deep']}; color: ${C['--off-white']};">
+              <div style="border-bottom: 2px solid ${C['--orange']}; padding-bottom: 16px; margin-bottom: 24px;">
                 <h2 style="margin: 0; font-size: 20px; color: #ffffff;">Application received.</h2>
-                <p style="margin: 4px 0 0; font-size: 12px; color: #8A9BB0; text-transform: uppercase; letter-spacing: 0.1em;">${h(role_title || 'Open application')}</p>
+                <p style="margin: 4px 0 0; font-size: 12px; color: ${C['--grey-mid']}; text-transform: uppercase; letter-spacing: 0.1em;">${h(role_title || 'Open application')}</p>
               </div>
-              <p style="font-size: 15px; color: #F5F6F8; line-height: 1.7; margin-bottom: 16px;">Hi ${h(name.trim())},</p>
-              <p style="font-size: 15px; color: #8A9BB0; line-height: 1.7; margin-bottom: 24px;">
-                Thank you for applying${role_title ? ` for the ${h(role_title)} position` : ''} at NexTrium. We have received your application and will review it carefully.
+              <p style="font-size: 15px; color: ${C['--off-white']}; line-height: 1.7; margin-bottom: 16px;">Hi ${h(name.trim())},</p>
+              <p style="font-size: 15px; color: ${C['--grey-mid']}; line-height: 1.7; margin-bottom: 24px;">
+                Thank you for applying${role_title ? ` for the ${h(role_title)} position` : ''} at ${brand.styledName}. We have received your application and will review it carefully.
               </p>
-              <p style="font-size: 15px; color: #8A9BB0; line-height: 1.7; margin-bottom: 32px;">
+              <p style="font-size: 15px; color: ${C['--grey-mid']}; line-height: 1.7; margin-bottom: 32px;">
                 We read every application and respond to everyone within two weeks. If your background is a strong fit, we will be in touch to discuss next steps.
               </p>
-              <div style="background: #0D233D; padding: 20px; border-left: 3px solid #DB6727; margin-bottom: 32px;">
-                <p style="margin: 0; font-size: 13px; color: #8A9BB0; line-height: 1.7;">
-                  In the meantime, explore what we are building at <a href="https://nextrium.org" style="color: #DB6727;">nextrium.org</a>
+              <div style="background: ${C['--navy']}; padding: 20px; border-left: 3px solid ${C['--orange']}; margin-bottom: 32px;">
+                <p style="margin: 0; font-size: 13px; color: ${C['--grey-mid']}; line-height: 1.7;">
+                  In the meantime, explore what we are building at <a href="${brand.urls.website}" style="color: ${C['--orange']};">${brand.urls.websiteDisplay}</a>
                 </p>
               </div>
-              <p style="font-size: 13px; color: #2E3F54;">NexTrium Global Innovations Ltd · Lagos, Nigeria</p>
+              <p style="font-size: 13px; color: ${C['--grey-dark']};">${brand.styledLegalName} · ${brand.address.short}</p>
             </div>
           `,
         }),

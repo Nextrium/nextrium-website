@@ -10,6 +10,7 @@ import {
   validateEmailInput,
   wrapBrandedHtml,
 } from './compose'
+import { brand } from '@nextrium/brand'
 
 test('validateEmailInput returns the route’s messages in order', () => {
   const recipients = [{ email: 'a@example.com' }]
@@ -82,6 +83,6 @@ test('defaultSender uses the configured address', () => {
 
 test('defaultSender signs as the team, never a named person', () => {
   const s = defaultSender('hello@example.com')
-  assert.equal(s.signatureName, 'The Nextrium Team')
-  assert.equal(s.signatureTitle, 'Nextrium Global Innovations Ltd')
+  assert.equal(s.signatureName, brand.email.defaultSignatureName)
+  assert.equal(s.signatureTitle, brand.email.defaultSignatureTitle)
 })

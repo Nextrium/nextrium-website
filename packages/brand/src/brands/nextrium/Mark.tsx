@@ -1,16 +1,13 @@
-interface NTMarkProps {
-  size?: number
-  bodyColor?: string
-  accentColor?: string
-  className?: string
-}
+import type { MarkProps } from '../../types'
 
-export default function NTMark({
+// Nextrium's logo mark. Defaults are this brand's own colours.
+
+export default function NextriumMark({
   size = 48,
   bodyColor = '#F5F6F8',
   accentColor = '#DB6727',
   className,
-}: NTMarkProps) {
+}: MarkProps) {
   return (
     <svg
       width={size}

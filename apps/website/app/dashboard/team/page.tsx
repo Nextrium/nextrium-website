@@ -24,7 +24,7 @@ export default async function TeamPage() {
         .dash-list-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
         .dash-list-count { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: #B0BEC5; }
         .dash-new-btn { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase; padding: 10px 20px; background: var(--orange); color: var(--white); border: none; text-decoration: none; cursor: pointer; transition: background 0.15s ease; display: inline-flex; align-items: center; gap: 8px; }
-        .dash-new-btn:hover { background: var(--orange-f, #C4521A); }
+        .dash-new-btn:hover { background: var(--orange-f); }
         .dash-table { width: 100%; border-collapse: collapse; }
         .dash-table th { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: #B0BEC5; padding: 10px 16px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.06); background: var(--navy); white-space: nowrap; }
         .dash-table td { padding: 14px 16px; font-size: 14px; color: #E8EDF2; border-bottom: 1px solid rgba(255,255,255,0.04); vertical-align: middle; }
@@ -88,8 +88,8 @@ export default async function TeamPage() {
                       <td style={{ fontSize: '12px', color: 'var(--grey-mid)' }}>{member.role}</td>
                       <td>
                         <span className="dash-badge" style={member.is_active
-                          ? { background: 'rgba(34,193,122,0.1)', color: 'var(--success)', border: '1px solid rgba(34,193,122,0.2)' }
-                          : { background: 'rgba(138,155,176,0.1)', color: 'var(--grey-mid)', border: '1px solid rgba(138,155,176,0.2)' }
+                          ? { background: 'color-mix(in srgb, var(--success) 10%, transparent)', color: 'var(--success)', border: '1px solid color-mix(in srgb, var(--success) 20%, transparent)' }
+                          : { background: 'color-mix(in srgb, var(--grey-mid) 10%, transparent)', color: 'var(--grey-mid)', border: '1px solid color-mix(in srgb, var(--grey-mid) 20%, transparent)' }
                         }>
                           {member.is_active ? 'Active' : 'Inactive'}
                         </span>

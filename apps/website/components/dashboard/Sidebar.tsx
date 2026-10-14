@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import NTMark from '@nextrium/brand/NTMark'
+import NTMark from '@nextrium/brand/Mark'
 import { useDashboard } from './DashboardContext'
 import type { DashboardRole } from '@/lib/dashboard/getRole'
 import { roleBadgeLabel } from '@/lib/dashboard/roleBadge'
@@ -127,13 +127,13 @@ export default function Sidebar({ role }: { role: DashboardRole }) {
   return (
     <>
       <style>{`
-        .sidebar-overlay { display: none; position: fixed; inset: 0; z-index: 39; background: rgba(7,22,40,0.7); backdrop-filter: blur(2px); }
+        .sidebar-overlay { display: none; position: fixed; inset: 0; z-index: 39; background: color-mix(in srgb, var(--navy-deep) 70%, transparent); backdrop-filter: blur(2px); }
         .sidebar-overlay.open { display: block; }
         .sidebar { width: 240px; flex-shrink: 0; background: var(--navy); border-right: 1px solid rgba(255,255,255,0.06); display: flex; flex-direction: column; height: 100vh; position: sticky; top: 0; z-index: 40; transition: transform 0.25s ease; }
         .sidebar-logo { flex-shrink: 0; padding: 24px 20px; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; gap: 10px; text-decoration: none; }
         .sidebar-wordmark { font-family: var(--font-exo2, 'Exo 2', sans-serif); font-weight: 900; font-size: 18px; letter-spacing: -0.3px; color: var(--off-white); }
         .sidebar-wordmark span { color: var(--orange); }
-        .sidebar-badge { font-family: var(--font-mono, 'Space Mono', monospace); font-size: 7px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--orange); background: rgba(219,103,39,0.1); border: 1px solid rgba(219,103,39,0.2); padding: 2px 6px; margin-left: auto; }
+        .sidebar-badge { font-family: var(--font-mono, 'Space Mono', monospace); font-size: 7px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--orange); background: color-mix(in srgb, var(--orange) 10%, transparent); border: 1px solid color-mix(in srgb, var(--orange) 20%, transparent); padding: 2px 6px; margin-left: auto; }
         /* Nav scrolls on its own; logo and footer stay pinned in place
            regardless of how long the nav (with sub-navs open) gets. */
         .sidebar-nav { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 0; }
@@ -146,7 +146,7 @@ export default function Sidebar({ role }: { role: DashboardRole }) {
         }
         .sidebar-item-row.toggle { width: 100%; background: none; border: none; border-left: 2px solid transparent; cursor: pointer; font: inherit; text-align: left; }
         .sidebar-item-row:hover { background: rgba(255,255,255,0.04); }
-        .sidebar-item-row.active { background: rgba(219,103,39,0.08); border-left-color: var(--orange); }
+        .sidebar-item-row.active { background: color-mix(in srgb, var(--orange) 8%, transparent); border-left-color: var(--orange); }
         .sidebar-item { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 9px 20px; text-decoration: none; font-size: 13px; color: var(--grey-mid); transition: color 0.15s ease; }
         .sidebar-item-row:hover .sidebar-item, .sidebar-item-row.active .sidebar-item { color: var(--white); }
         .sidebar-icon { font-size: 10px; color: inherit; opacity: 0.6; flex-shrink: 0; }
@@ -164,7 +164,7 @@ export default function Sidebar({ role }: { role: DashboardRole }) {
           color: var(--grey-mid); transition: all 0.15s ease; border-left: 2px solid transparent;
         }
         .sidebar-subitem:hover { color: var(--white); background: rgba(255,255,255,0.03); }
-        .sidebar-subitem.active { color: var(--orange); border-left-color: var(--orange); background: rgba(219,103,39,0.06); }
+        .sidebar-subitem.active { color: var(--orange); border-left-color: var(--orange); background: color-mix(in srgb, var(--orange) 6%, transparent); }
         .sidebar-footer { flex-shrink: 0; padding: 16px 20px; border-top: 1px solid rgba(255,255,255,0.06); }
         .sidebar-footer-link { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--grey-mid); text-decoration: none; padding: 8px 0; transition: color 0.15s ease; }
         .sidebar-footer-link:hover { color: var(--white); }

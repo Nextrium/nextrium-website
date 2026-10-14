@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import { createClient } from '@nextrium/supabase/client'
 import { logActivityAction } from '@/app/actions/activityLog'
-import NTMark from '@nextrium/brand/NTMark'
+import NTMark from '@nextrium/brand/Mark'
+import { brand } from '@nextrium/brand'
 
 export default function LoginClient({ message, error: initialError }: { message?: string; error?: string }) {
   const [email, setEmail]       = useState('')
@@ -82,7 +83,7 @@ export default function LoginClient({ message, error: initialError }: { message?
         .login-input::placeholder { color: var(--grey-dark); }
         .login-error {
           font-size: 12px; color: var(--error);
-          background: rgba(232,69,69,0.08); border: 1px solid rgba(232,69,69,0.2);
+          background: color-mix(in srgb, var(--error) 8%, transparent); border: 1px solid color-mix(in srgb, var(--error) 20%, transparent);
           padding: 10px 14px;
         }
         .login-submit {
@@ -92,7 +93,7 @@ export default function LoginClient({ message, error: initialError }: { message?
           display: flex; align-items: center; justify-content: space-between;
           transition: background 0.15s ease;
         }
-        .login-submit:hover:not(:disabled) { background: var(--orange-f, #C4521A); }
+        .login-submit:hover:not(:disabled) { background: var(--orange-f); }
         .login-submit:disabled { opacity: 0.6; cursor: not-allowed; }
       `}</style>
 
@@ -104,13 +105,13 @@ export default function LoginClient({ message, error: initialError }: { message?
             <NTMark size={36} />
             <div>
               <div className="login-title">Dashboard</div>
-              <div className="login-subtitle">NexTrium Admin</div>
+              <div className="login-subtitle">{brand.styledName} Admin</div>
             </div>
           </div>
           <div className="login-body">
             <form className="login-form" onSubmit={handleSubmit} noValidate>
               {message === 'password_set' && (
-                <div style={{ fontSize: '12px', color: 'var(--success)', background: 'rgba(34,193,122,0.08)', border: '1px solid rgba(34,193,122,0.2)', padding: '10px 14px' }}>
+                <div style={{ fontSize: '12px', color: 'var(--success)', background: 'color-mix(in srgb, var(--success) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--success) 20%, transparent)', padding: '10px 14px' }}>
                   Password set successfully. Sign in to continue.
                 </div>
               )}
