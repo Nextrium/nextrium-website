@@ -3,10 +3,10 @@
 export type BadgeVariant = 'success' | 'warning' | 'error' | 'info' | 'neutral'
 
 const VARIANT_STYLES: Record<BadgeVariant, { color: string; bg: string; border: string }> = {
-  success: { color: 'var(--success)', bg: 'rgba(34,193,122,0.12)', border: 'rgba(34,193,122,0.35)' },
-  warning: { color: 'var(--gold)',    bg: 'rgba(212,168,67,0.12)', border: 'rgba(212,168,67,0.35)' },
-  error:   { color: 'var(--error)',   bg: 'rgba(232,69,69,0.12)',  border: 'rgba(232,69,69,0.35)' },
-  info:    { color: 'var(--slate)',   bg: 'rgba(74,111,165,0.12)', border: 'rgba(74,111,165,0.35)' },
+  success: { color: 'var(--success)', bg: 'color-mix(in srgb, var(--success) 12%, transparent)', border: 'color-mix(in srgb, var(--success) 35%, transparent)' },
+  warning: { color: 'var(--gold)',    bg: 'color-mix(in srgb, var(--gold) 12%, transparent)', border: 'color-mix(in srgb, var(--gold) 35%, transparent)' },
+  error:   { color: 'var(--error)',   bg: 'color-mix(in srgb, var(--error) 12%, transparent)',  border: 'color-mix(in srgb, var(--error) 35%, transparent)' },
+  info:    { color: 'var(--slate)',   bg: 'color-mix(in srgb, var(--slate) 12%, transparent)', border: 'color-mix(in srgb, var(--slate) 35%, transparent)' },
   neutral: { color: 'var(--grey-mid)', bg: 'rgba(255,255,255,0.03)', border: 'rgba(255,255,255,0.1)' },
 }
 

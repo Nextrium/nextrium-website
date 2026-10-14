@@ -7,6 +7,7 @@ import {
   leaderboardName, leaderboardStats, pointsBarPercent, rankLeaderboard, type LeaderboardEntry,
 } from '@nextrium/contributions-core/leaderboard'
 import { CATEGORIES, CATEGORY_LABELS, COMPLEXITY_LABELS, isCategory, type Category, type Complexity } from '@nextrium/contributions-core/constants'
+import { color } from '@nextrium/brand'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Leaderboard' }
@@ -18,7 +19,7 @@ const AREA_TINT: Record<string, string> = {
   research: '#F0CB6E',
   operations: '#8ED9B8',
   community: '#F2A27A',
-  default: '#DB6727',
+  default: color('--orange'),
 }
 
 interface Props {
@@ -130,23 +131,23 @@ export default async function LeaderboardPage({ searchParams }: Props) {
         .lb-tabs { display: inline-flex; padding: 3px; gap: 3px; background: var(--navy); border: 1px solid rgba(255,255,255,0.07); border-radius: 999px; }
         .lb-tab { padding: 7px 16px; border-radius: 999px; font-size: 12px; font-weight: 500; text-decoration: none; color: var(--grey-mid); transition: background .15s ease, color .15s ease; }
         .lb-tab:hover { color: var(--off-white); }
-        .lb-tab.active { background: rgba(219,103,39,0.16); color: var(--orange); }
+        .lb-tab.active { background: color-mix(in srgb, var(--orange) 16%, transparent); color: var(--orange); }
 
         .lb-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 26px; }
-        .lb-stat { background: linear-gradient(160deg, var(--navy), rgba(219,103,39,0.04)); border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; padding: 22px 24px; display: flex; flex-direction: column; gap: 8px; }
+        .lb-stat { background: linear-gradient(160deg, var(--navy), color-mix(in srgb, var(--orange) 4%, transparent)); border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; padding: 22px 24px; display: flex; flex-direction: column; gap: 8px; }
         .lb-stat-value { font-family: var(--font-exo2); font-weight: 800; font-size: 30px; line-height: 1; color: var(--orange); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
         .lb-stat-label { font-size: 13px; color: var(--grey-mid); }
 
         .lb-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
         .lb-chip { padding: 7px 16px; border-radius: 999px; font-size: 13px; text-decoration: none; color: var(--grey-mid); border: 1px solid rgba(255,255,255,0.1); transition: border-color .15s ease, color .15s ease; }
         .lb-chip:hover { color: var(--off-white); border-color: rgba(255,255,255,0.22); }
-        .lb-chip.active { color: var(--orange); border-color: rgba(219,103,39,0.6); background: rgba(219,103,39,0.1); }
+        .lb-chip.active { color: var(--orange); border-color: color-mix(in srgb, var(--orange) 60%, transparent); background: color-mix(in srgb, var(--orange) 10%, transparent); }
 
         .lb-list { display: flex; flex-direction: column; gap: 12px; }
         .lb-card { position: relative; background: var(--navy); border: 1px solid rgba(255,255,255,0.07); border-radius: 18px; overflow: hidden; }
-        .lb-card.top { background: linear-gradient(135deg, var(--navy) 55%, rgba(219,103,39,0.07)); border-color: rgba(219,103,39,0.22); }
-        .lb-card.me { box-shadow: inset 0 0 0 1px rgba(219,103,39,0.55); }
-        .lb-bar { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, rgba(219,103,39,0.08), transparent); pointer-events: none; }
+        .lb-card.top { background: linear-gradient(135deg, var(--navy) 55%, color-mix(in srgb, var(--orange) 7%, transparent)); border-color: color-mix(in srgb, var(--orange) 22%, transparent); }
+        .lb-card.me { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--orange) 55%, transparent); }
+        .lb-bar { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, color-mix(in srgb, var(--orange) 8%, transparent), transparent); pointer-events: none; }
 
         .lb-card > summary { list-style: none; cursor: pointer; }
         .lb-card > summary::-webkit-details-marker { display: none; }
@@ -155,7 +156,7 @@ export default async function LeaderboardPage({ searchParams }: Props) {
 
         .lb-rank { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: var(--font-exo2); font-weight: 800; font-size: 14px; color: var(--grey-mid); font-variant-numeric: tabular-nums; }
         .lb-rank.medal { color: var(--navy-deep); box-shadow: 0 0 0 3px rgba(255,255,255,0.06); }
-        .lb-rank.r1 { background: radial-gradient(circle at 35% 30%, #FFD9A8, #DB6727 70%); }
+        .lb-rank.r1 { background: radial-gradient(circle at 35% 30%, #FFD9A8, var(--orange) 70%); }
         .lb-rank.r2 { background: radial-gradient(circle at 35% 30%, #F2F4F7, #9AA6B5 70%); }
         .lb-rank.r3 { background: radial-gradient(circle at 35% 30%, #F1C9A3, #A86A3D 70%); }
 
@@ -172,7 +173,7 @@ export default async function LeaderboardPage({ searchParams }: Props) {
         .lb-points { display: block; font-family: var(--font-exo2); font-size: 24px; font-weight: 800; color: var(--orange); line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
         .lb-points-label { font-size: 11px; color: var(--grey-mid); }
         .lb-chevron { width: 32px; height: 32px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; color: var(--grey-mid); transition: transform .2s ease, border-color .15s ease, color .15s ease; }
-        .lb-card > summary:hover .lb-chevron { border-color: rgba(219,103,39,0.5); color: var(--orange); }
+        .lb-card > summary:hover .lb-chevron { border-color: color-mix(in srgb, var(--orange) 50%, transparent); color: var(--orange); }
         .lb-card[open] .lb-chevron { transform: rotate(180deg); }
         .lb-chevron.empty { visibility: hidden; }
 

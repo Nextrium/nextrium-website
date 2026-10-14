@@ -52,13 +52,13 @@ export default async function MyTasksPage() {
         .mytask-section { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--grey-mid); margin: 24px 0 10px; }
         .mytask-list { display: flex; flex-direction: column; gap: 8px; }
         .mytask-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; background: var(--navy); border: 1px solid rgba(255,255,255,0.06); padding: 16px 20px; text-decoration: none; }
-        .mytask-row:hover { border-color: rgba(219,103,39,0.35); }
+        .mytask-row:hover { border-color: color-mix(in srgb, var(--orange) 35%, transparent); }
         .mytask-title { color: var(--white); font-weight: 600; font-size: 14px; }
         .mytask-meta { color: var(--grey-mid); font-size: 12px; margin-top: 4px; }
         .mytask-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
         .mytask-badge { font-family: var(--font-mono); font-size: 7.5px; letter-spacing: 0.12em; text-transform: uppercase; padding: 3px 8px; border: 1px solid rgba(255,255,255,0.12); color: var(--grey-mid); }
-        .mytask-badge.warn { color: var(--orange); border-color: rgba(219,103,39,0.35); }
-        .mytask-badge.good { color: var(--success); border-color: rgba(34,193,122,0.3); }
+        .mytask-badge.warn { color: var(--orange); border-color: color-mix(in srgb, var(--orange) 35%, transparent); }
+        .mytask-badge.good { color: var(--success); border-color: color-mix(in srgb, var(--success) 30%, transparent); }
         .mytask-due { font-size: 12px; color: var(--off-white); }
         .mytask-due.bad { color: var(--error); }
         .mytask-empty { padding: 32px; background: var(--navy); border: 1px solid rgba(255,255,255,0.06); color: var(--grey-mid); font-size: 13px; }

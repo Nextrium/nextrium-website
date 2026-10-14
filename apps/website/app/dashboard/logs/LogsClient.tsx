@@ -322,12 +322,12 @@ export default function LogsClient({
         .logs-load-more { display: block; width: 100%; padding: 12px; text-align: center; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; border: none; border-top: 1px solid rgba(255,255,255,0.06); background: none; color: var(--grey-mid); transition: all 0.15s ease; }
         .logs-load-more:hover:not(:disabled) { color: var(--orange); }
         .logs-load-more:disabled { opacity: 0.5; cursor: not-allowed; }
-        .logs-error { padding: 14px 16px; font-size: 12.5px; color: var(--error); background: rgba(232,69,69,0.08); border-bottom: 1px solid rgba(232,69,69,0.2); }
+        .logs-error { padding: 14px 16px; font-size: 12.5px; color: var(--error); background: color-mix(in srgb, var(--error) 8%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--error) 20%, transparent); }
 
         .run-status-badge { font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.08em; text-transform: uppercase; padding: 2px 8px; }
-        .run-status-ok { background: rgba(34,193,122,0.1); color: var(--success); border: 1px solid rgba(34,193,122,0.2); }
-        .run-status-warn { background: rgba(212,168,67,0.1); color: var(--gold); border: 1px solid rgba(212,168,67,0.2); }
-        .run-status-error { background: rgba(232,69,69,0.1); color: var(--error); border: 1px solid rgba(232,69,69,0.2); }
+        .run-status-ok { background: color-mix(in srgb, var(--success) 10%, transparent); color: var(--success); border: 1px solid color-mix(in srgb, var(--success) 20%, transparent); }
+        .run-status-warn { background: color-mix(in srgb, var(--gold) 10%, transparent); color: var(--gold); border: 1px solid color-mix(in srgb, var(--gold) 20%, transparent); }
+        .run-status-error { background: color-mix(in srgb, var(--error) 10%, transparent); color: var(--error); border: 1px solid color-mix(in srgb, var(--error) 20%, transparent); }
 
         .run-trace { border-top: 1px solid rgba(255,255,255,0.08); background: #050d18; }
         .run-trace-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--orange); border-bottom: 1px solid rgba(255,255,255,0.06); }

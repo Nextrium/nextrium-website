@@ -51,9 +51,9 @@ export default async function TasksPage({ searchParams }: Props) {
         .tasks-table a.title { color: var(--white); text-decoration: none; font-weight: 600; }
         .tasks-table a.title:hover { color: var(--orange); }
         .tasks-badge { font-family: var(--font-mono); font-size: 7.5px; letter-spacing: 0.12em; text-transform: uppercase; padding: 3px 8px; display: inline-block; white-space: nowrap; border: 1px solid rgba(255,255,255,0.12); color: var(--grey-mid); }
-        .tasks-badge.warn { color: var(--orange); border-color: rgba(219,103,39,0.35); }
-        .tasks-badge.bad { color: var(--error); border-color: rgba(232,69,69,0.35); }
-        .tasks-badge.good { color: var(--success); border-color: rgba(34,193,122,0.3); }
+        .tasks-badge.warn { color: var(--orange); border-color: color-mix(in srgb, var(--orange) 35%, transparent); }
+        .tasks-badge.bad { color: var(--error); border-color: color-mix(in srgb, var(--error) 35%, transparent); }
+        .tasks-badge.good { color: var(--success); border-color: color-mix(in srgb, var(--success) 30%, transparent); }
         .tasks-muted { color: var(--grey-mid); font-size: 12px; }
         .tasks-empty { padding: 56px 32px; text-align: center; background: var(--navy); border: 1px solid rgba(255,255,255,0.06); color: var(--grey-mid); }
       `}</style>

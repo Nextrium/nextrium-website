@@ -1,3 +1,6 @@
+import { brand } from '@nextrium/brand'
+
+const C = brand.colors
 // Pure pieces of sending an email: validation, archived-recipient
 // suppression, placeholder filling and the branded wrapper. No I/O here, so
 // they can be unit-tested; lib/email/send.ts does the lookups and the send.
@@ -30,11 +33,11 @@ export const ARCHIVED_RECIPIENT_ERROR = 'Recipient is archived — this address 
 
 export function defaultSender(senderEmail: string): SenderIdentity {
   return {
-    name: 'Nextrium Global Innovations Ltd',
+    name: brand.legalName,
     email: senderEmail,
     // Used only when no sender row is found; a brand address signs as the team, not a person.
-    signatureName: 'The Nextrium Team',
-    signatureTitle: 'Nextrium Global Innovations Ltd',
+    signatureName: brand.email.defaultSignatureName,
+    signatureTitle: brand.email.defaultSignatureTitle,
   }
 }
 
@@ -108,9 +111,9 @@ export function personalise(message: string, recipient: EmailRecipient): string 
 export function wrapBrandedHtml(innerHtml: string, sender: SenderIdentity): string {
   return `
   <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff;">
-    <div style="background: #071628; padding: 24px 32px; border-bottom: 3px solid #DB6727;">
-      <h2 style="margin: 0; font-size: 20px; color: #ffffff; font-family: sans-serif; letter-spacing: -0.3px;">NexTrium</h2>
-      <p style="margin: 4px 0 0; font-size: 11px; color: #8A9BB0; text-transform: uppercase; letter-spacing: 0.12em;">Global Innovations Ltd</p>
+    <div style="background: ${C['--navy-deep']}; padding: 24px 32px; border-bottom: 3px solid ${C['--orange']};">
+      <h2 style="margin: 0; font-size: 20px; color: #ffffff; font-family: sans-serif; letter-spacing: -0.3px;">${brand.styledName}</h2>
+      <p style="margin: 4px 0 0; font-size: 11px; color: ${C['--grey-mid']}; text-transform: uppercase; letter-spacing: 0.12em;">Global Innovations Ltd</p>
     </div>
     <div style="padding: 32px; background: #ffffff;">
       <div style="font-size: 15px; color: #1a1a2e; line-height: 1.8; white-space: pre-wrap; margin-bottom: 32px;">${innerHtml}</div>
@@ -118,14 +121,14 @@ export function wrapBrandedHtml(innerHtml: string, sender: SenderIdentity): stri
         <p style="margin: 0 0 4px; font-size: 13px; color: #1a1a2e; font-weight: 600;">${sender.signatureName}</p>
         <p style="margin: 0 0 4px; font-size: 12px; color: #4a5568;">${sender.signatureTitle}</p>
         <p style="margin: 0; font-size: 12px;">
-          <a href="mailto:${sender.email}" style="color: #DB6727; text-decoration: none;">${sender.email}</a>
+          <a href="mailto:${sender.email}" style="color: ${C['--orange']}; text-decoration: none;">${sender.email}</a>
           &nbsp;·&nbsp;
-          <a href="https://nextrium.org" style="color: #DB6727; text-decoration: none;">nextrium.org</a>
+          <a href="${brand.urls.website}" style="color: ${C['--orange']}; text-decoration: none;">${brand.urls.websiteDisplay}</a>
         </p>
       </div>
     </div>
-    <div style="background: #071628; padding: 16px 32px;">
-      <p style="margin: 0; font-size: 11px; color: #8A9BB0;">NexTrium Global Innovations Ltd · 69 Abeokuta Street, Ilaje Bariga, Lagos 100223, Nigeria</p>
+    <div style="background: ${C['--navy-deep']}; padding: 16px 32px;">
+      <p style="margin: 0; font-size: 11px; color: ${C['--grey-mid']};">${brand.styledLegalName} · ${brand.address.full}</p>
     </div>
   </div>
 `

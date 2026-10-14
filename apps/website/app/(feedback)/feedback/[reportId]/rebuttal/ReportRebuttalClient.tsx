@@ -4,6 +4,7 @@ import { useState }      from 'react'
 import { useRouter }     from 'next/navigation'
 import { submitRebuttal } from './actions'
 import styles from './ReportRebuttalClient.module.css'
+import { brand } from '@nextrium/brand'
 
 export default function ReportRebuttalClient({
   reportId,
@@ -61,7 +62,7 @@ export default function ReportRebuttalClient({
 
   return (
     <div className={styles.page}>
-      <div className={styles.brand}>Nextrium Global Innovations Ltd</div>
+      <div className={styles.brand}>{brand.legalName}</div>
       <a href={`/feedback/${reportId}`} className={styles.back}>
         Back to report
       </a>
@@ -72,7 +73,7 @@ export default function ReportRebuttalClient({
           <div className={styles.successTitle}>Rebuttal submitted</div>
           <p className={styles.successDesc}>
             Your rebuttal has been received and will be reviewed by the
-            Nextrium operations team. Returning you to your report.
+            {' '}{brand.name} operations team. Returning you to your report.
           </p>
         </div>
       ) : (
@@ -89,7 +90,7 @@ export default function ReportRebuttalClient({
             Only evidence that was part of your original application can be
             referenced. Work completed after your application date will not
             be considered. Submitting a rebuttal does not guarantee a change
-            in outcome. All rebuttals are reviewed by the Nextrium
+            in outcome. All rebuttals are reviewed by the {brand.name}{' '}
             operations team.
           </div>
 

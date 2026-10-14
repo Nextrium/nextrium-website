@@ -1,5 +1,6 @@
 import type { ActionHandler } from './engine'
 import type { DiscordAssignOptions } from './discordAssignRole'
+import { brand } from '@nextrium/brand'
 
 const API = 'https://discord.com/api/v10'
 const TIMEOUT_MS = 10_000
@@ -13,7 +14,7 @@ const SNOWFLAKE = /^\d{15,25}$/
 export function createDiscordRemoveRoles(options: Pick<DiscordAssignOptions, 'fetchFn' | 'botToken' | 'guildId'>): ActionHandler {
   const headers = {
     Authorization: `Bot ${options.botToken}`,
-    'X-Audit-Log-Reason': encodeURIComponent('Nextrium access removed'),
+    'X-Audit-Log-Reason': encodeURIComponent(`${brand.name} access removed`),
   }
 
   return async (ctx, config) => {

@@ -1,0 +1,24 @@
+{
+  "_why": "Paths brand:check skips. Marketing pages are brand-authored content (each brand writes its own website copy); the rest hold data values or internal identifiers, not user-facing identity.",
+  "paths": [
+    "packages/brand/src/brands/",
+    "packages/brand/src/index.ts",
+    "apps/website/app/page.tsx",
+    "apps/website/app/about/",
+    "apps/website/app/blog/",
+    "apps/website/app/careers/",
+    "apps/website/app/contact/",
+    "apps/website/app/events/",
+    "apps/website/app/hub/",
+    "apps/website/app/products/",
+    "apps/website/app/research/",
+    "apps/website/app/services/",
+    "apps/website/app/team/",
+    "apps/website/app/maintenance/",
+    "apps/website/components/public/",
+    "apps/website/components/ui/",
+    "apps/website/components/shared/",
+    "packages/supabase/src/database.ts",
+    "apps/website/app/dashboard/posts/[slug]/PostEditor.tsx"
+  ]
+}

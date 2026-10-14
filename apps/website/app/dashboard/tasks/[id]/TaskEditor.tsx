@@ -147,11 +147,11 @@ export default function TaskEditor({ task, members, hasSubmission }: Props) {
         .task-btn { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.12em; text-transform: uppercase; padding: 8px 18px; background: var(--orange); border: 1px solid var(--orange); color: var(--white); cursor: pointer; }
         .task-btn:disabled { opacity: 0.6; cursor: default; }
         .task-btn.ghost { background: none; border-color: rgba(255,255,255,0.12); color: var(--grey-mid); }
-        .task-btn.danger { background: none; border-color: rgba(232,69,69,0.35); color: var(--error); }
+        .task-btn.danger { background: none; border-color: color-mix(in srgb, var(--error) 35%, transparent); color: var(--error); }
         .task-link-row { display: grid; grid-template-columns: 1fr 2fr auto; gap: 8px; }
         .task-alert { padding: 10px 14px; font-size: 12px; border: 1px solid; margin-bottom: 8px; }
-        .task-alert.error { background: rgba(232,69,69,0.08); border-color: rgba(232,69,69,0.3); color: var(--error); }
-        .task-alert.success { background: rgba(34,193,122,0.08); border-color: rgba(34,193,122,0.3); color: var(--success); }
+        .task-alert.error { background: color-mix(in srgb, var(--error) 8%, transparent); border-color: color-mix(in srgb, var(--error) 30%, transparent); color: var(--error); }
+        .task-alert.success { background: color-mix(in srgb, var(--success) 8%, transparent); border-color: color-mix(in srgb, var(--success) 30%, transparent); color: var(--success); }
         @media (max-width: 1100px) { .task-layout { grid-template-columns: 1fr; } .task-side { position: static; } }
       `}</style>
 

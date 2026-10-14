@@ -1,36 +1,8 @@
 @import "tailwindcss";
 
-/* ── Brand Tokens ───────────────────────────────────────────── */
+/* Colour tokens (--navy, --orange, ...) are written to :root by the root layout
+   from @nextrium/brand, so each brand supplies its own values. */
 :root {
-  /* Primary */
-  --navy-deep:  #071628;
-  --navy:       #0D233D;
-  --navy-mid:   #163352;
-  --orange:     #DB6727;
-  --orange-w:   #E8843A;
-  --orange-f:   #C4521A;
-
-  /* Accent */
-  --teal:       #0A8B8B;
-  --teal-l:     #12B3B3;
-  --gold:       #D4A843;
-  --gold-l:     #E8C06A;
-  --slate:      #4A6FA5;
-  --slate-l:    #6B8FC4;
-
-  /* Neutrals */
-  --black:      #060E18;
-  --grey-dark:  #2E3F54;
-  --grey-mid:   #8A9BB0;
-  --grey-light: #E2E6ED;
-  --off-white:  #F5F6F8;
-  --white:      #FFFFFF;
-
-  /* Semantic */
-  --success:    #22C17A;
-  --warning:    #D4A843;
-  --error:      #E84545;
-
   /* Typography */
   --font-exo2:  var(--font-exo2, 'Exo 2', sans-serif);
   --font-dm:    var(--font-dm, 'DM Sans', sans-serif);
@@ -207,7 +179,7 @@ ul, ol {
 /* Sidebar nav items */
 .sidebar-item {
   font-size: 14px !important;
-  color: #8A9BB0;
+  color: var(--grey-mid);
 }
 
 /* Panel titles */
@@ -224,7 +196,7 @@ ul, ol {
 /* Header description */
 .dash-header-desc {
   font-size: 13px !important;
-  color: #8A9BB0 !important;
+  color: var(--grey-mid) !important;
 }
 
 /* Badge text */
@@ -251,13 +223,13 @@ ul, ol {
 
 /* Row meta text */
 .dash-row-title { font-size: 14px !important; color: #E8EDF2 !important; }
-.dash-row-meta  { font-size: 12px !important; color: #8A9BB0 !important; }
+.dash-row-meta  { font-size: 12px !important; color: var(--grey-mid) !important; }
 
 /* App and contact rows */
 .app-name,
 .contact-name    { font-size: 14px !important; color: #E8EDF2 !important; }
 .app-role,
-.contact-subject { font-size: 12px !important; color: #8A9BB0 !important; }
+.contact-subject { font-size: 12px !important; color: var(--grey-mid) !important; }
 .app-date        { font-size: 11px !important; color: #6B7E94 !important; }
 
 /* Detail panel */
@@ -380,7 +352,7 @@ textarea::placeholder {
 
 .status-select-btn.active {
   color: #ffffff !important;
-  background: rgba(219,103,39,0.12) !important;
+  background: color-mix(in srgb, var(--orange) 12%, transparent) !important;
 }
 
 /* ── Detail panel labels ─────────────────────────────────────── */

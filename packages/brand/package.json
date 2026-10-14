@@ -3,11 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "exports": {
-    "./NTMark": "./src/NTMark.tsx",
+    ".": "./src/index.ts",
+    "./Mark": "./src/Mark.tsx",
     "./Wordmark": "./src/Wordmark.tsx"
   },
   "scripts": {
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "tsx --test \"src/**/*.test.ts\""
   },
   "peerDependencies": {
     "react": "^19.0.0"
@@ -15,6 +17,7 @@
   "devDependencies": {
     "@types/node": "^22.0.0",
     "typescript": "^5.8.3",
-    "@types/react": "^19.0.0"
+    "@types/react": "^19.0.0",
+    "tsx": "^4.23.15"
   }
 }

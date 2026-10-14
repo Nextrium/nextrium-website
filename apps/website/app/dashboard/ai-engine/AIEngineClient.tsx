@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { getAgentMetrics, type AgentMetrics } from './actions'
 import { startBulkScreenAction } from '../applications/actions'
+import { color } from '@nextrium/brand'
 
 interface AgentDefinition {
   id: string
@@ -36,18 +37,18 @@ const AGENTS: AgentDefinition[] = [
 function getTierColor(tier: string): string {
   const norm = tier.toLowerCase()
   if (norm.includes('public projects path') || norm.includes('reject') || norm.includes('not a fit')) {
-    return '#e84545'
+    return color('--error')
   }
   if (norm.includes('founding team ready') || norm.includes('strong')) {
-    return '#22c17a'
+    return color('--success')
   }
   if (norm.includes('further review required') || norm.includes('recruiter screen') || norm.includes('shortlist')) {
-    return '#d4a843'
+    return color('--gold')
   }
   if (norm.includes('ecosystem entry') || norm.includes('under consideration') || norm.includes('hold')) {
-    return '#4a6fa5'
+    return color('--slate')
   }
-  return '#8A9BB0'
+  return color('--grey-mid')
 }
 
 function formatDate(iso: string | null) {
@@ -129,12 +130,12 @@ export default function AIEngineClient({
         .engine-panel-title { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--grey-mid); padding: 16px 16px 10px; }
         .agent-row { padding: 14px 16px; border-top: 1px solid rgba(255,255,255,0.04); cursor: pointer; transition: background 0.15s ease; }
         .agent-row:hover { background: rgba(255,255,255,0.03); }
-        .agent-row.active { background: rgba(219,103,39,0.06); border-left: 2px solid var(--orange); }
+        .agent-row.active { background: color-mix(in srgb, var(--orange) 6%, transparent); border-left: 2px solid var(--orange); }
         .agent-row.coming-soon { cursor: default; opacity: 0.5; }
         .agent-name { font-size: 13.5px; color: var(--white); font-weight: 500; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
         .agent-desc { font-size: 11.5px; color: var(--grey-mid); margin-top: 4px; line-height: 1.5; }
         .agent-tag { font-family: var(--font-mono); font-size: 7px; letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 6px; flex-shrink: 0; }
-        .agent-tag.active { background: rgba(34,193,122,0.1); color: #22c17a; border: 1px solid rgba(34,193,122,0.3); }
+        .agent-tag.active { background: color-mix(in srgb, var(--success) 10%, transparent); color: var(--success); border: 1px solid color-mix(in srgb, var(--success) 30%, transparent); }
         .agent-tag.soon { background: rgba(255,255,255,0.04); color: var(--grey-mid); border: 1px solid rgba(255,255,255,0.08); }
 
         .metrics-header { display: flex; align-items: center; justify-content: space-between; padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.06); }
@@ -151,7 +152,7 @@ export default function AIEngineClient({
         .tile-label { font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--grey-mid); margin-top: 8px; }
         .tile-sub { font-size: 11px; color: var(--grey-mid); margin-top: 4px; }
 
-        .section-title { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--orange); margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid rgba(219,103,39,0.2); }
+        .section-title { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--orange); margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid color-mix(in srgb, var(--orange) 20%, transparent); }
 
         .bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 12px; }
         .bar-label { width: 200px; flex-shrink: 0; color: var(--grey-mid); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -172,16 +173,16 @@ export default function AIEngineClient({
         .failed-reason-pill {
           display: inline-flex; align-items: center; gap: 6px; margin-left: 26px; width: fit-content;
           padding: 4px 10px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.06em;
-          text-transform: uppercase; background: rgba(212,168,67,0.1); border: 1px solid rgba(212,168,67,0.3);
+          text-transform: uppercase; background: color-mix(in srgb, var(--gold) 10%, transparent); border: 1px solid color-mix(in srgb, var(--gold) 30%, transparent);
           color: var(--warning); text-decoration: none; transition: all 0.15s ease;
         }
-        .failed-reason-pill:hover { background: rgba(212,168,67,0.2); border-color: rgba(212,168,67,0.5); }
-        .retry-btn { padding: 9px 16px; font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.12em; text-transform: uppercase; cursor: pointer; border: 1px solid rgba(219,103,39,0.4); background: rgba(219,103,39,0.08); color: var(--orange); transition: all 0.15s ease; margin-top: 12px; }
+        .failed-reason-pill:hover { background: color-mix(in srgb, var(--gold) 20%, transparent); border-color: color-mix(in srgb, var(--gold) 50%, transparent); }
+        .retry-btn { padding: 9px 16px; font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.12em; text-transform: uppercase; cursor: pointer; border: 1px solid color-mix(in srgb, var(--orange) 40%, transparent); background: color-mix(in srgb, var(--orange) 8%, transparent); color: var(--orange); transition: all 0.15s ease; margin-top: 12px; }
         .retry-btn:hover:not(:disabled) { background: var(--orange); color: var(--white); }
         .retry-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .empty-note { font-size: 12.5px; color: var(--grey-mid); padding: 12px 0; }
-        .error-note { font-size: 12.5px; color: var(--error); padding: 12px 16px; background: rgba(232,69,69,0.08); border: 1px solid rgba(232,69,69,0.2); }
-        .retry-note { font-size: 12px; color: #22c17a; padding: 10px 12px; background: rgba(34,193,122,0.06); border: 1px solid rgba(34,193,122,0.2); margin-top: 10px; }
+        .error-note { font-size: 12.5px; color: var(--error); padding: 12px 16px; background: color-mix(in srgb, var(--error) 8%, transparent); border: 1px solid color-mix(in srgb, var(--error) 20%, transparent); }
+        .retry-note { font-size: 12px; color: var(--success); padding: 10px 12px; background: color-mix(in srgb, var(--success) 6%, transparent); border: 1px solid color-mix(in srgb, var(--success) 20%, transparent); margin-top: 10px; }
 
         @media (max-width: 900px) { .engine-layout { grid-template-columns: 1fr; } }
       `}</style>
@@ -239,7 +240,7 @@ export default function AIEngineClient({
             <div className="metrics-body">
               <div className="tile-grid">
                 <div className="tile">
-                  <div className="tile-value" style={{ color: '#22c17a' }}>{metrics.completedScreenings}</div>
+                  <div className="tile-value" style={{ color: color('--success') }}>{metrics.completedScreenings}</div>
                   <div className="tile-label">Completed Screenings</div>
                   <div className="tile-sub">Avg score {metrics.averageScore}%</div>
                 </div>
@@ -267,7 +268,7 @@ export default function AIEngineClient({
                 </div>
                 <div className="tile">
                   <div className="tile-value" style={{
-                    color: metrics.lastJob?.status === 'running' ? '#22c17a'
+                    color: metrics.lastJob?.status === 'running' ? color('--success')
                       : metrics.lastJob?.status === 'failed' ? 'var(--error)' : 'var(--white)',
                     fontSize: '16px',
                   }}>
@@ -302,7 +303,7 @@ export default function AIEngineClient({
                       <div className="bar-track">
                         <div className="bar-fill" style={{
                           width: `${(metrics.ratings.distribution[star] / maxRatingCount) * 100}%`,
-                          background: '#22c17a',
+                          background: color('--success'),
                         }} />
                       </div>
                       <span className="bar-count">{metrics.ratings.distribution[star] ?? 0}</span>

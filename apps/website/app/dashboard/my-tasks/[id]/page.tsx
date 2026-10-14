@@ -71,8 +71,8 @@ export default async function MyTaskPage({ params }: Props) {
         .mt-btn:disabled { opacity: 0.6; cursor: default; }
         .mt-btn.ghost { background: none; border-color: rgba(255,255,255,0.12); color: var(--grey-mid); }
         .mt-alert { padding: 10px 14px; font-size: 12px; border: 1px solid; }
-        .mt-alert.error { background: rgba(232,69,69,0.08); border-color: rgba(232,69,69,0.3); color: var(--error); }
-        .mt-alert.ok { background: rgba(34,193,122,0.08); border-color: rgba(34,193,122,0.3); color: var(--success); }
+        .mt-alert.error { background: color-mix(in srgb, var(--error) 8%, transparent); border-color: color-mix(in srgb, var(--error) 30%, transparent); color: var(--error); }
+        .mt-alert.ok { background: color-mix(in srgb, var(--success) 8%, transparent); border-color: color-mix(in srgb, var(--success) 30%, transparent); color: var(--success); }
         @media (max-width: 1100px) { .mt-layout { grid-template-columns: 1fr; } .mt-side { position: static; } }
       `}</style>
       <Header title={task.title} description={`${CATEGORY_LABELS[task.category]} · ${COMPLEXITY_LABELS[task.complexity]} · ${TASK_STATUS_LABELS[task.status]}`} />

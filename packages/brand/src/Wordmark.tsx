@@ -1,4 +1,5 @@
-import NTMark from './NTMark'
+import { brand } from './index'
+import Mark from './Mark'
 
 interface WordmarkProps {
   size?: 'sm' | 'md' | 'lg'
@@ -13,11 +14,7 @@ const SIZE_MAP = {
   lg: { mark: 52, name: 32, tagline: 9 },
 }
 
-const VARIANT_MAP = {
-  dark:  { text: '#F5F6F8', body: '#F5F6F8', tag: '#8A9BB0' },
-  light: { text: '#0D233D', body: '#0D233D', tag: '#8A9BB0' },
-}
-
+/** The selected brand's mark, name (with its accent letters) and optional tagline. */
 export default function Wordmark({
   size = 'md',
   variant = 'dark',
@@ -25,18 +22,13 @@ export default function Wordmark({
   className,
 }: WordmarkProps) {
   const s = SIZE_MAP[size]
-  const v = VARIANT_MAP[variant]
+  const c = brand.colors
+  const text = variant === 'dark' ? c['--off-white'] : c['--navy']
+  const accent = c['--orange']
 
   return (
-    <div
-      className={className}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: size === 'sm' ? '8px' : '12px',
-      }}
-    >
-      <NTMark size={s.mark} bodyColor={v.body} accentColor="#DB6727" />
+    <div className={className} style={{ display: 'flex', alignItems: 'center', gap: size === 'sm' ? '8px' : '12px' }}>
+      <Mark size={s.mark} bodyColor={text} accentColor={accent} />
       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
         <span
           style={{
@@ -45,11 +37,11 @@ export default function Wordmark({
             fontSize: `${s.name}px`,
             letterSpacing: '-0.3px',
             lineHeight: 1,
-            color: v.text,
+            color: text,
             whiteSpace: 'nowrap',
           }}
         >
-          Nex<span style={{ color: '#DB6727' }}>T</span>rium
+          {brand.wordmark.before}<span style={{ color: accent }}>{brand.wordmark.accent}</span>{brand.wordmark.after}
         </span>
         {showTagline && (
           <span
@@ -58,12 +50,12 @@ export default function Wordmark({
               fontSize: `${s.tagline}px`,
               letterSpacing: '0.16em',
               textTransform: 'uppercase' as const,
-              color: v.tag,
+              color: c['--grey-mid'],
               whiteSpace: 'nowrap',
               lineHeight: 1,
             }}
           >
-            Innovation. Incubation. Impact.
+            {brand.tagline}
           </span>
         )}
       </div>

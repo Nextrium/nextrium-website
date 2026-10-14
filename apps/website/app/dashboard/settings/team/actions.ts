@@ -7,6 +7,7 @@ import { getVerifiedIdentity } from '@/lib/dashboard/getRole'
 import { findAuthUserIdByEmail, grantDashboardAccess, isEmailAlreadyRegistered } from '@/lib/dashboard/teamAccounts'
 import { APPLICATION_TRACKS } from '@/lib/automation/rulesAdmin'
 import { ACCESS_REVOKED, ACCESS_SYNC, emitAutomationEvent, supersedeSuccesses } from '@/lib/automation/server'
+import { brand } from '@nextrium/brand'
 
 // Every action here manages who can access the dashboard, so all of them are
 // admin-only, checked inside the action with a verified identity (the page's
@@ -43,7 +44,7 @@ export async function inviteUser(
 
     const supabaseUrl    = process.env.NEXT_PUBLIC_SUPABASE_URL!
     const supabaseSecret = process.env.SUPABASE_SECRET_KEY!
-    const siteUrl        = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://www.nextrium.org'
+    const siteUrl        = process.env.NEXT_PUBLIC_SITE_URL ?? brand.urls.website
 
     const redirectTo = `${siteUrl}/auth/callback`
 
@@ -373,7 +374,7 @@ export async function sendPasswordSetupLink(userId: string): Promise<{ error?: s
     const email = authData?.user?.email
     if (authError || !email) return { error: 'Could not find that account.' }
 
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://www.nextrium.org'
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? brand.urls.website
     const secret = process.env.SUPABASE_SECRET_KEY!
     const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/recover?redirect_to=${encodeURIComponent(`${siteUrl}/auth/callback`)}`, {
       method: 'POST',

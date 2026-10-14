@@ -3,7 +3,7 @@ import Navbar from '@/components/public/Navbar'
 import Footer from '@/components/public/Footer'
 import CTABox from '@/components/ui/CTABox'
 import SectionTag from '@/components/shared/SectionTag'
-import NTMark from '@nextrium/brand/NTMark'
+import NTMark from '@nextrium/brand/Mark'
 import { createServiceClient } from '@nextrium/supabase/server'
 import type { Product, NTEvent, Post } from '@nextrium/supabase/database'
 

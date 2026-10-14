@@ -21,7 +21,7 @@ export default function Drawer({
   return (
     <>
       <style>{`
-        .drawer-overlay { display: none; position: fixed; inset: 0; z-index: 59; background: rgba(7,22,40,0.7); backdrop-filter: blur(2px); }
+        .drawer-overlay { display: none; position: fixed; inset: 0; z-index: 59; background: color-mix(in srgb, var(--navy-deep) 70%, transparent); backdrop-filter: blur(2px); }
         .drawer-overlay.open { display: block; }
         .drawer-panel {
           position: fixed; top: 0; right: 0; bottom: 0;

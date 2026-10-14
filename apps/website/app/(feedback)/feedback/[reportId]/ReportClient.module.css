@@ -29,7 +29,7 @@
 .sectionTitle { font-family: var(--font-mono); font-size: 9px;
   letter-spacing: 0.2em; text-transform: uppercase; color: var(--orange);
   margin-bottom: 14px; padding-bottom: 8px;
-  border-bottom: 1px solid rgba(219,103,39,0.2); }
+  border-bottom: 1px solid color-mix(in srgb, var(--orange) 20%, transparent); }
 .general { font-family: var(--font-dm); font-size: 13px;
   line-height: 1.75; color: var(--grey-mid); padding: 16px;
   background: rgba(255,255,255,0.02);
@@ -66,11 +66,11 @@
 .rebuttalDesc { font-family: var(--font-dm); font-size: 13px;
   line-height: 1.7; color: var(--grey-mid); margin-bottom: 16px; }
 .rebuttalBtn { display: inline-block; padding: 10px 22px;
-  background: none; border: 1px solid rgba(219,103,39,0.4);
+  background: none; border: 1px solid color-mix(in srgb, var(--orange) 40%, transparent);
   color: var(--orange); font-family: var(--font-mono); font-size: 10px;
   letter-spacing: 0.12em; text-transform: uppercase;
   text-decoration: none; transition: all 0.15s ease; }
-.rebuttalBtn:hover { background: rgba(219,103,39,0.08);
+.rebuttalBtn:hover { background: color-mix(in srgb, var(--orange) 8%, transparent);
   border-color: var(--orange); }
 .rebuttalDone { font-family: var(--font-mono); font-size: 12px;
   color: var(--success); letter-spacing: 0.08em; }
@@ -124,7 +124,7 @@
   font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase;
   cursor: pointer; border: none; background: var(--orange); color: var(--white);
   transition: background 0.15s ease; }
-.modalSubmit:hover:not(:disabled) { background: #C4521A; }
+.modalSubmit:hover:not(:disabled) { background: var(--orange-f); }
 .modalSubmit:disabled, .modalCancel:disabled { opacity: 0.5; cursor: not-allowed; }
 
 @media (max-width: 480px) {

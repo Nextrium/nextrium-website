@@ -50,7 +50,7 @@ export default async function ReviewQueuePage({ searchParams }: Props) {
       <style>{`
         .rq-tabs { display: flex; flex-wrap: wrap; gap: 0; border: 1px solid rgba(255,255,255,0.08); width: fit-content; margin-bottom: 8px; }
         .rq-tab { padding: 9px 16px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; text-decoration: none; color: var(--grey-mid); }
-        .rq-tab.active { background: rgba(219,103,39,0.1); color: var(--orange); }
+        .rq-tab.active { background: color-mix(in srgb, var(--orange) 10%, transparent); color: var(--orange); }
         .rq-hint { font-size: 12px; color: var(--grey-mid); margin-bottom: 18px; }
         .rq-wrap { background: var(--navy); border: 1px solid rgba(255,255,255,0.06); overflow-x: auto; }
         .rq-table { width: 100%; border-collapse: collapse; }

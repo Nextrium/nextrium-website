@@ -1,4 +1,5 @@
 import type { ActionHandler } from './engine'
+import { brand } from '@nextrium/brand'
 
 const API = 'https://discord.com/api/v10'
 const TIMEOUT_MS = 10_000
@@ -33,7 +34,7 @@ export function createDiscordAssignRole(options: DiscordAssignOptions): ActionHa
     const memberUrl = `${API}/guilds/${options.guildId}/members/${ctx.discordUserId}`
     const memberRes = await options.fetchFn(memberUrl, { headers, signal: AbortSignal.timeout(TIMEOUT_MS) })
     if (memberRes.status === 404) {
-      return { status: 'waiting', detail: 'Join the Nextrium Discord server first.' }
+      return { status: 'waiting', detail: `Join the ${brand.community.discordServer} first.` }
     }
     if (memberRes.status === 429) return { status: 'waiting', detail: 'Discord is busy. Try again in a minute.' }
     if (!memberRes.ok) return { status: 'failed', detail: `Could not read the server member (${memberRes.status}).` }
@@ -51,7 +52,7 @@ export function createDiscordAssignRole(options: DiscordAssignOptions): ActionHa
 
     const assignRes = await options.fetchFn(`${memberUrl}/roles/${roleId}`, {
       method: 'PUT',
-      headers: { ...headers, 'X-Audit-Log-Reason': encodeURIComponent('Nextrium track access') },
+      headers: { ...headers, 'X-Audit-Log-Reason': encodeURIComponent(`${brand.name} track access`) },
       signal: AbortSignal.timeout(TIMEOUT_MS),
     })
     if (assignRes.status === 204 || assignRes.ok) return { status: 'success', detail: 'Role assigned.' }

@@ -1,4 +1,5 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
+import { brand } from '@nextrium/brand'
 
 export const STATE_COOKIE = 'nx-discord-state'
 export const STATE_TTL_MS = 10 * 60 * 1000
@@ -21,7 +22,7 @@ export function readDiscordConfig(env: Record<string, string | undefined> = proc
   const clientId = env.DISCORD_CLIENT_ID
   const clientSecret = env.DISCORD_CLIENT_SECRET
   if (!clientId || !clientSecret) return null
-  const site = (env.NEXT_PUBLIC_SITE_URL ?? 'https://www.nextrium.org').replace(/\/+$/, '')
+  const site = (env.NEXT_PUBLIC_SITE_URL ?? brand.urls.website).replace(/\/+$/, '')
   return { clientId, clientSecret, redirectUri: env.DISCORD_REDIRECT_URI || `${site}/api/discord/callback` }
 }
 

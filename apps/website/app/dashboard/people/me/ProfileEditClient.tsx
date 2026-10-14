@@ -8,6 +8,7 @@ import { splitSkills } from '@nextrium/contributions-core/profile'
 import ContributorFields, { type ContributorFieldsValue } from './ContributorFields'
 import { profileHasChanges, type ProfileValues } from '@/lib/dashboard/profileForm'
 import { CATEGORY_LABELS, isCategory } from '@nextrium/contributions-core/constants'
+import { brand } from '@nextrium/brand'
 
 const DISCORD_NOTICES: Record<string, { text: string; ok: boolean }> = {
   linked:      { text: 'Discord connected.', ok: true },
@@ -139,11 +140,11 @@ export default function ProfileEditClient({
         .profile-form-section-title { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--white); margin: 22px 0 14px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,0.06); }
         .profile-form-submit { padding: 12px 24px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase; cursor: pointer; border: 1px solid var(--orange); background: var(--orange); color: var(--white); }
         .profile-form-submit:disabled { opacity: 0.5; cursor: not-allowed; }
-        .profile-form-error { padding: 10px 14px; font-size: 12px; background: rgba(232,69,69,0.08); border: 1px solid rgba(232,69,69,0.3); color: var(--error); margin-bottom: 16px; }
-        .profile-form-ok { padding: 10px 14px; font-size: 12px; background: rgba(34,193,122,0.08); border: 1px solid rgba(34,193,122,0.3); color: var(--success); margin-bottom: 16px; }
+        .profile-form-error { padding: 10px 14px; font-size: 12px; background: color-mix(in srgb, var(--error) 8%, transparent); border: 1px solid color-mix(in srgb, var(--error) 30%, transparent); color: var(--error); margin-bottom: 16px; }
+        .profile-form-ok { padding: 10px 14px; font-size: 12px; background: color-mix(in srgb, var(--success) 8%, transparent); border: 1px solid color-mix(in srgb, var(--success) 30%, transparent); color: var(--success); margin-bottom: 16px; }
         .profile-discord-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
         .profile-discord-name { font-size: 13px; color: var(--off-white); line-height: 1.5; max-width: 60ch; }
-        .profile-discord-btn { padding: 9px 16px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; cursor: pointer; border: 1px solid rgba(219,103,39,0.4); background: none; color: var(--orange); text-decoration: none; white-space: nowrap; }
+        .profile-discord-btn { padding: 9px 16px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; cursor: pointer; border: 1px solid color-mix(in srgb, var(--orange) 40%, transparent); background: none; color: var(--orange); text-decoration: none; white-space: nowrap; }
         .profile-discord-btn:disabled { opacity: 0.6; cursor: not-allowed; }
         .profile-form-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
         .profile-form-cancel { padding: 12px 20px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase; cursor: pointer; border: 1px solid rgba(255,255,255,0.15); background: none; color: var(--off-white); }
@@ -274,7 +275,7 @@ export default function ProfileEditClient({
           ) : (
             <div className="profile-discord-row">
               <span className="profile-discord-name">
-                Join and verify in the Nextrium Discord server first, then connect your account here so you can be added to your track's private channel.
+                Join and verify in the {brand.community.discordServer} first, then connect your account here so you can be added to your track's private channel.
               </span>
               {discordAvailable ? (
                 <a className="profile-discord-btn" href="/api/discord/link">Connect Discord</a>

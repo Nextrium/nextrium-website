@@ -1,3 +1,4 @@
+import { color } from '@nextrium/brand'
 // Contributor program email templates. Each returns a subject and the INNER
 // HTML for lib/email/send.ts, which adds the branded wrapper and signature.
 // sendEmail inserts the body as raw HTML, so every interpolated value is
@@ -26,7 +27,7 @@ function subjectText(value: string): string {
 }
 
 function button(url: string, label: string): string {
-  return `<p><a href="${escapeHtml(url)}" style="display:inline-block;padding:10px 20px;background:#DB6727;color:#ffffff;text-decoration:none;">${escapeHtml(label)}</a></p>`
+  return `<p><a href="${escapeHtml(url)}" style="display:inline-block;padding:10px 20px;background:${color('--orange')};color:#ffffff;text-decoration:none;">${escapeHtml(label)}</a></p>`
 }
 
 function formatDate(iso: string | null | undefined): string {

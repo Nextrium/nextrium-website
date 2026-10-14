@@ -2,6 +2,7 @@
 
 import { createServiceClient } from '@nextrium/supabase/server'
 import { revalidatePath }      from 'next/cache'
+import { brand } from '@nextrium/brand'
 
 export async function submitRebuttal(
   reportId:           string,
@@ -64,7 +65,7 @@ export async function submitRebuttal(
       .eq('id', reportId)
 
     // Notify operations team via existing email route
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://www.nextrium.org'
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? brand.urls.website
     const senderId = process.env.NEXTRIUM_OPERATIONS_SENDER_ID ?? ''
 
     // The email route only accepts server-to-server calls that carry the
@@ -79,8 +80,8 @@ export async function submitRebuttal(
       },
       body: JSON.stringify({
         subject:    `Rebuttal received for report ${reportId}`,
-        message:    `A rebuttal has been submitted for evaluation report ${reportId}.\n\nDisputed dimensions:\n${disputedDimensions.join('\n')}\n\nEvidence statement:\n${evidenceStatement}\n\nPlease log into the Nextrium dashboard to review the original screening dossier alongside the submitted rebuttal.`,
-        recipients: [{ name: 'Nextrium Operations', email: 'operations@nextrium.org' }],
+        message:    `A rebuttal has been submitted for evaluation report ${reportId}.\n\nDisputed dimensions:\n${disputedDimensions.join('\n')}\n\nEvidence statement:\n${evidenceStatement}\n\nPlease log into the ${brand.name} dashboard to review the original screening dossier alongside the submitted rebuttal.`,
+        recipients: [{ name: brand.teams.operations, email: brand.emails.operations }],
         sender_id:  senderId,
       }),
     }).catch(() => {})

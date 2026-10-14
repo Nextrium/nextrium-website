@@ -84,11 +84,11 @@ export default async function PersonProfilePage({ params }: { params: Promise<{ 
         .profile-wrap { max-width: 640px; }
         .profile-card { background: var(--navy); border: 1px solid rgba(255,255,255,0.06); padding: 28px; }
         .profile-top { display: flex; align-items: center; gap: 18px; margin-bottom: 20px; }
-        .profile-avatar { width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; background: rgba(219,103,39,0.12); color: var(--orange); font-family: var(--font-mono); font-size: 20px; font-weight: 700; border-radius: 2px; flex-shrink: 0; }
+        .profile-avatar { width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; background: color-mix(in srgb, var(--orange) 12%, transparent); color: var(--orange); font-family: var(--font-mono); font-size: 20px; font-weight: 700; border-radius: 2px; flex-shrink: 0; }
         .profile-name { font-family: var(--font-exo2); font-weight: 700; font-size: 20px; color: var(--white); text-transform: capitalize; }
         .profile-email { font-size: 13px; color: var(--grey-mid); margin-top: 2px; }
         .profile-meta-row { display: flex; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
-        .profile-pill { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase; padding: 4px 10px; border: 1px solid rgba(219,103,39,0.3); color: var(--orange); }
+        .profile-pill { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase; padding: 4px 10px; border: 1px solid color-mix(in srgb, var(--orange) 30%, transparent); color: var(--orange); }
         .profile-pill.track { border-color: rgba(255,255,255,0.15); color: var(--grey-mid); }
         .profile-section { margin-top: 22px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.06); }
         .profile-section-title { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--grey-mid); margin-bottom: 10px; }
@@ -98,8 +98,8 @@ export default async function PersonProfilePage({ params }: { params: Promise<{ 
         .profile-handle-label { color: var(--grey-mid); }
         .profile-handle-value { color: var(--off-white); }
         .profile-empty { font-size: 13px; color: var(--grey-dark); }
-        .profile-edit-link { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--orange); text-decoration: none; border: 1px solid rgba(219,103,39,0.3); padding: 8px 14px; }
-        .profile-edit-link:hover { background: rgba(219,103,39,0.08); }
+        .profile-edit-link { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--orange); text-decoration: none; border: 1px solid color-mix(in srgb, var(--orange) 30%, transparent); padding: 8px 14px; }
+        .profile-edit-link:hover { background: color-mix(in srgb, var(--orange) 8%, transparent); }
       `}</style>
 
       <Header

@@ -6,11 +6,12 @@ import { createServiceClient } from '@nextrium/supabase/server'
 import { sendEmail } from '@nextrium/email/send'
 import { displayNameFromEmail } from '@nextrium/contributions-core/leaderboard'
 import { reviewResultEmail, type EmailContent } from '@nextrium/contributions-core/emails'
+import { brand } from '@nextrium/brand'
 
-const CONTRIBUTORS_SENDER_EMAIL = 'contributors@nextrium.org'
+const CONTRIBUTORS_SENDER_EMAIL = brand.emails.contributors
 
 export function siteUrl(path: string): string {
-  const base = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://nextrium.org').replace(/\/+$/, '')
+  const base = (process.env.NEXT_PUBLIC_SITE_URL ?? brand.urls.website).replace(/\/+$/, '')
   return `${base}${path}`
 }
 

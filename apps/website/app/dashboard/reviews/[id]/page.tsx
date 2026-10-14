@@ -76,11 +76,11 @@ export default async function ReviewDetailPage({ params }: Props) {
         .mt-btn { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.12em; text-transform: uppercase; padding: 9px 18px; background: var(--orange); border: 1px solid var(--orange); color: var(--white); cursor: pointer; }
         .mt-btn:disabled { opacity: 0.6; cursor: default; }
         .mt-btn.ghost { background: none; border-color: rgba(255,255,255,0.12); color: var(--grey-mid); }
-        .mt-btn.danger { background: none; border-color: rgba(232,69,69,0.35); color: var(--error); }
+        .mt-btn.danger { background: none; border-color: color-mix(in srgb, var(--error) 35%, transparent); color: var(--error); }
         .mt-alert { padding: 10px 14px; font-size: 12px; border: 1px solid; }
-        .mt-alert.error { background: rgba(232,69,69,0.08); border-color: rgba(232,69,69,0.3); color: var(--error); }
-        .mt-alert.warn { background: rgba(212,168,67,0.08); border-color: rgba(212,168,67,0.3); color: var(--warning); line-height: 1.5; }
-        .mt-alert.success { background: rgba(34,193,122,0.08); border-color: rgba(34,193,122,0.3); color: var(--success); }
+        .mt-alert.error { background: color-mix(in srgb, var(--error) 8%, transparent); border-color: color-mix(in srgb, var(--error) 30%, transparent); color: var(--error); }
+        .mt-alert.warn { background: color-mix(in srgb, var(--gold) 8%, transparent); border-color: color-mix(in srgb, var(--gold) 30%, transparent); color: var(--warning); line-height: 1.5; }
+        .mt-alert.success { background: color-mix(in srgb, var(--success) 8%, transparent); border-color: color-mix(in srgb, var(--success) 30%, transparent); color: var(--success); }
         @media (max-width: 1100px) { .mt-layout { grid-template-columns: 1fr; } .mt-side { position: static; } }
       `}</style>
       <Header title={c.title} description={`${statusLabel} · Submission #${submissionNo ?? '—'} · attempt ${c.submission_count}`}

@@ -6,6 +6,7 @@ import { createClient } from '@nextrium/supabase/client'
 import { normalizeUrl } from '@nextrium/utils/normalizeUrl'
 import Header from '@/components/dashboard/Header'
 import { logActivityAction } from '@/app/actions/activityLog'
+import { color } from '@nextrium/brand'
 
 const STATUS_OPTIONS = ['active', 'prototype', 'completed', 'abandoned']
 
@@ -27,7 +28,7 @@ export default function CommunityProjectEditor({ project }: { project: any }) {
   const [status,      setStatus]      = useState(project?.status      ?? 'active')
   const [websiteUrl,  setWebsiteUrl]  = useState(project?.website_url ?? '')
   const [githubUrl,   setGithubUrl]   = useState(project?.github_url  ?? '')
-  const [coverColor,  setCoverColor]  = useState(project?.cover_color ?? '#0D233D')
+  const [coverColor,  setCoverColor]  = useState(project?.cover_color ?? color('--navy'))
   const [isFeatured,  setIsFeatured]  = useState(project?.is_featured ?? false)
   const [sortOrder,   setSortOrder]   = useState(project?.sort_order  ?? 0)
 
@@ -118,7 +119,7 @@ export default function CommunityProjectEditor({ project }: { project: any }) {
     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
       {!isNew && (
         <button type="button" onClick={handleDelete} disabled={deleting}
-          style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.12em', textTransform: 'uppercase', padding: '8px 14px', background: 'none', border: '1px solid rgba(232,69,69,0.3)', color: 'var(--error)', cursor: 'pointer' }}>
+          style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.12em', textTransform: 'uppercase', padding: '8px 14px', background: 'none', border: '1px solid color-mix(in srgb, var(--error) 30%, transparent)', color: 'var(--error)', cursor: 'pointer' }}>
           {deleting ? 'Deleting...' : 'Delete'}
         </button>
       )}
@@ -157,8 +158,8 @@ export default function CommunityProjectEditor({ project }: { project: any }) {
         .color-field { display: flex; align-items: center; gap: 12px; }
         .color-preview { width: 40px; height: 40px; border: 1px solid rgba(255,255,255,0.1); flex-shrink: 0; }
         .editor-alert { padding: 10px 14px; font-size: 12px; border: 1px solid; margin-bottom: 8px; }
-        .editor-alert-error { background: rgba(232,69,69,0.08); border-color: rgba(232,69,69,0.3); color: var(--error); }
-        .editor-alert-success { background: rgba(34,193,122,0.08); border-color: rgba(34,193,122,0.3); color: var(--success); }
+        .editor-alert-error { background: color-mix(in srgb, var(--error) 8%, transparent); border-color: color-mix(in srgb, var(--error) 30%, transparent); color: var(--error); }
+        .editor-alert-success { background: color-mix(in srgb, var(--success) 8%, transparent); border-color: color-mix(in srgb, var(--success) 30%, transparent); color: var(--success); }
         @media (max-width: 1100px) { .proj-editor-layout { grid-template-columns: 1fr; } .proj-editor-sidebar { position: static; } }
       `}</style>
 
@@ -265,7 +266,7 @@ export default function CommunityProjectEditor({ project }: { project: any }) {
               <div className="editor-field">
                 <div className="color-field">
                   <div className="color-preview" style={{ background: coverColor }} />
-                  <input className="editor-input" type="text" placeholder="#0D233D"
+                  <input className="editor-input" type="text" placeholder={color('--navy')}
                     value={coverColor} onChange={(e) => setCoverColor(e.target.value)} />
                 </div>
                 <input type="color" value={coverColor} onChange={(e) => setCoverColor(e.target.value)}

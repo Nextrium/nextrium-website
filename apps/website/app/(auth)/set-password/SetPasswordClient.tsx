@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@nextrium/supabase/client'
-import NTMark from '@nextrium/brand/NTMark'
+import NTMark from '@nextrium/brand/Mark'
+import { brand } from '@nextrium/brand'
 
 export default function SetPasswordClient() {
   const router = useRouter()
@@ -81,9 +82,9 @@ export default function SetPasswordClient() {
         .setpw-input { background: var(--navy-mid); border: 1px solid rgba(255,255,255,0.08); color: var(--white); font-family: var(--font-dm); font-size: 14px; padding: 12px 16px; outline: none; width: 100%; transition: border-color 0.15s ease; }
         .setpw-input:focus { border-color: var(--orange); }
         .setpw-input::placeholder { color: var(--grey-dark); }
-        .setpw-error { font-size: 12px; color: var(--error); background: rgba(232,69,69,0.08); border: 1px solid rgba(232,69,69,0.2); padding: 10px 14px; }
+        .setpw-error { font-size: 12px; color: var(--error); background: color-mix(in srgb, var(--error) 8%, transparent); border: 1px solid color-mix(in srgb, var(--error) 20%, transparent); padding: 10px 14px; }
         .setpw-submit { background: var(--orange); color: var(--white); border: 1px solid var(--orange); padding: 14px 24px; font-family: var(--font-dm); font-size: 14px; cursor: pointer; width: 100%; display: flex; align-items: center; justify-content: space-between; transition: background 0.15s ease; }
-        .setpw-submit:hover:not(:disabled) { background: var(--orange-f, #C4521A); }
+        .setpw-submit:hover:not(:disabled) { background: var(--orange-f); }
         .setpw-submit:disabled { opacity: 0.6; cursor: not-allowed; }
         .setpw-note { font-size: 12px; color: var(--grey-dark); line-height: 1.6; }
       `}</style>
@@ -96,7 +97,7 @@ export default function SetPasswordClient() {
             <NTMark size={36} />
             <div>
               <div className="setpw-title">Set your password</div>
-              <div className="setpw-subtitle">Nextrium Dashboard</div>
+              <div className="setpw-subtitle">{brand.name} Dashboard</div>
             </div>
           </div>
           <div className="setpw-body">

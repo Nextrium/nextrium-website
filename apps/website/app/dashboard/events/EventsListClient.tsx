@@ -14,10 +14,10 @@ const TYPE_LABELS: Record<NTEvent['event_type'], string> = {
 }
 
 const STATUS_STYLES: Record<NTEvent['status'], { bg: string; color: string }> = {
-  upcoming:  { bg: 'rgba(74,111,165,0.1)',  color: 'var(--slate)'   },
-  ongoing:   { bg: 'rgba(212,168,67,0.1)',  color: 'var(--gold)'    },
-  completed: { bg: 'rgba(34,193,122,0.1)',  color: 'var(--success)' },
-  cancelled: { bg: 'rgba(232,69,69,0.1)',   color: 'var(--error)'   },
+  upcoming:  { bg: 'color-mix(in srgb, var(--slate) 10%, transparent)',  color: 'var(--slate)'   },
+  ongoing:   { bg: 'color-mix(in srgb, var(--gold) 10%, transparent)',  color: 'var(--gold)'    },
+  completed: { bg: 'color-mix(in srgb, var(--success) 10%, transparent)',  color: 'var(--success)' },
+  cancelled: { bg: 'color-mix(in srgb, var(--error) 10%, transparent)',   color: 'var(--error)'   },
 }
 
 export default function EventsListClient({ events }: { events: NTEvent[] }) {

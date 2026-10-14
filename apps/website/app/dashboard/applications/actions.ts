@@ -8,6 +8,7 @@ import { getVerifiedDashboardRole } from '@/lib/dashboard/getRole'
 import { roleDenial, STAFF_ROLES } from '@/lib/dashboard/requireRole'
 import { findAuthUserIdByEmail, grantDashboardAccess, isEmailAlreadyRegistered } from '@/lib/dashboard/teamAccounts'
 import type { AgentScreeningResult } from '@nextrium/supabase/database'
+import { brand } from '@nextrium/brand'
 
 export interface ReviewedInfo {
   firstReviewedByEmail: string | null
@@ -602,7 +603,7 @@ export async function inviteApplicantToTeam(
 
     const supabaseUrl    = process.env.NEXT_PUBLIC_SUPABASE_URL!
     const supabaseSecret = process.env.SUPABASE_SECRET_KEY!
-    const siteUrl        = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://www.nextrium.org'
+    const siteUrl        = process.env.NEXT_PUBLIC_SITE_URL ?? brand.urls.website
     const redirectTo     = `${siteUrl}/auth/callback`
 
     const res = await fetch(`${supabaseUrl}/auth/v1/invite?redirect_to=${encodeURIComponent(redirectTo)}`, {

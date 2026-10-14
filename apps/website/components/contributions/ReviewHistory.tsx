@@ -1,5 +1,6 @@
 import type { ContributionReview } from '@nextrium/supabase/database'
 import { hasMemberFixableFailure, isStaffOnlyIssue, memberResubmissionView } from '@nextrium/contributions-core/reviewMapping'
+import { brand } from '@nextrium/brand'
 
 // Review feedback comes from the review service (or staff), so every value is
 // rendered as text by React — never as HTML.
@@ -9,7 +10,7 @@ const CHECK_LABELS: Record<string, string> = {
   evidence_url_reachable: 'Evidence link opens',
   title_descriptive: 'Title is specific',
   description_substance: 'Description explains the work',
-  description_protocol_connection: 'Connects to Nextrium',
+  description_protocol_connection: `Connects to ${brand.name}`,
   complexity_proportionate: 'Scope matches complexity',
   category_match: 'Work matches the category',
   category_specific_requirements: 'Meets category requirements',

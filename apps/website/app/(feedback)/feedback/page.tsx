@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { brand } from '@nextrium/brand'
 
 export default function FeedbackLandingPage() {
   const router            = useRouter()
@@ -56,7 +57,7 @@ export default function FeedbackLandingPage() {
           font-family: var(--font-mono); font-size: 10px; cursor: pointer;
           letter-spacing: 0.15em; text-transform: uppercase;
           transition: background 0.15s ease; }
-        .fb-btn:hover { background: #C4521A; }
+        .fb-btn:hover { background: var(--orange-f); }
         .fb-note { font-family: var(--font-dm); font-size: 11px;
           color: var(--grey-mid); margin-top: 20px; line-height: 1.6;
           text-align: center; }
@@ -66,7 +67,7 @@ export default function FeedbackLandingPage() {
         <div className="fb-card">
           <div className="fb-corner-tl" />
           <div className="fb-corner-br" />
-          <div className="fb-brand">Nextrium Global Innovations Ltd</div>
+          <div className="fb-brand">{brand.legalName}</div>
           <div className="fb-title">View your evaluation report</div>
           <p className="fb-subtitle">
             Enter the report ID from your application status email to view
@@ -87,7 +88,7 @@ export default function FeedbackLandingPage() {
           </form>
           <p className="fb-note">
             Your report ID was included in the email you received from
-            careers@nextrium.org after your application was reviewed.
+            {' '}{brand.emails.careers} after your application was reviewed.
           </p>
         </div>
       </div>

@@ -8,6 +8,7 @@ import Header from '@/components/dashboard/Header'
 import CoverImageUpload from '@/components/dashboard/CoverImageUpload'
 import type { TeamMember } from '@nextrium/supabase/database'
 import { logActivityAction } from '@/app/actions/activityLog'
+import { brand } from '@nextrium/brand'
 
 function slugify(str: string): string {
   return str.toLowerCase().trim()
@@ -116,7 +117,7 @@ export default function TeamMemberEditor({ member }: { member: TeamMember | null
     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
       {!isNew && (
         <button type="button" onClick={handleDelete} disabled={deleting}
-          style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.12em', textTransform: 'uppercase', padding: '8px 14px', background: 'none', border: '1px solid rgba(232,69,69,0.3)', color: 'var(--error)', cursor: 'pointer' }}>
+          style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '0.12em', textTransform: 'uppercase', padding: '8px 14px', background: 'none', border: '1px solid color-mix(in srgb, var(--error) 30%, transparent)', color: 'var(--error)', cursor: 'pointer' }}>
           {deleting ? 'Removing...' : 'Remove'}
         </button>
       )}
@@ -152,8 +153,8 @@ export default function TeamMemberEditor({ member }: { member: TeamMember | null
         input:checked + .editor-toggle-track { background: var(--orange); }
         input:checked + .editor-toggle-track::before { transform: translateX(18px); background: var(--white); }
         .editor-alert { padding: 10px 14px; font-size: 12px; border: 1px solid; margin-bottom: 8px; }
-        .editor-alert-error { background: rgba(232,69,69,0.08); border-color: rgba(232,69,69,0.3); color: var(--error); }
-        .editor-alert-success { background: rgba(34,193,122,0.08); border-color: rgba(34,193,122,0.3); color: var(--success); }
+        .editor-alert-error { background: color-mix(in srgb, var(--error) 8%, transparent); border-color: color-mix(in srgb, var(--error) 30%, transparent); color: var(--error); }
+        .editor-alert-success { background: color-mix(in srgb, var(--success) 8%, transparent); border-color: color-mix(in srgb, var(--success) 30%, transparent); color: var(--success); }
         @media (max-width: 1100px) { .team-editor-layout { grid-template-columns: 1fr; } .team-editor-sidebar { position: static; } }
       `}</style>
 
@@ -205,7 +206,7 @@ export default function TeamMemberEditor({ member }: { member: TeamMember | null
 
             <div className="editor-field">
               <label className="editor-label">Email</label>
-              <input className="editor-input" type="email" placeholder="name@nextrium.org"
+              <input className="editor-input" type="email" placeholder={`name@${brand.emailDomain}`}
                 value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
 

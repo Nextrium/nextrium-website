@@ -152,3 +152,10 @@ vite.config.ts.timestamp-*
 
 # Local PR review notes
 PR_REVIEW_FEEDBACK.md
+
+# Brand assets copied into each app at dev/build time (source: packages/brand/src/brands/<brand>/public)
+apps/*/public/favicon-16x16.png
+apps/*/public/favicon-32x32.png
+apps/*/public/apple-touch-icon.png
+apps/*/public/android-chrome-192x192.png
+apps/*/public/android-chrome-512x512.png

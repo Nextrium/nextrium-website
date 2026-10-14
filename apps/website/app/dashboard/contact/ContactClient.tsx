@@ -7,6 +7,7 @@ import { useDashboardSearch } from '@/lib/dashboard/useDashboardSearch'
 import DashboardSearchBox from '@/components/dashboard/DashboardSearchBox'
 import { logActivityAction } from '@/app/actions/activityLog'
 import { useServerData } from '@/components/dashboard/useServerData'
+import { brand } from '@nextrium/brand'
 
 interface ContactClientProps {
   submissions: ContactSubmission[]
@@ -15,10 +16,10 @@ interface ContactClientProps {
 const STATUS_OPTIONS: ContactSubmission['status'][] = ['new', 'read', 'replied', 'archived']
 
 const STATUS_STYLES: Record<ContactSubmission['status'], { bg: string; color: string }> = {
-  new:      { bg: 'rgba(219,103,39,0.1)', color: 'var(--orange)'  },
-  read:     { bg: 'rgba(74,111,165,0.1)', color: 'var(--slate)'   },
-  replied:  { bg: 'rgba(34,193,122,0.1)', color: 'var(--success)' },
-  archived: { bg: 'rgba(46,63,84,0.4)',   color: 'var(--grey-mid)'},
+  new:      { bg: 'color-mix(in srgb, var(--orange) 10%, transparent)', color: 'var(--orange)'  },
+  read:     { bg: 'color-mix(in srgb, var(--slate) 10%, transparent)', color: 'var(--slate)'   },
+  replied:  { bg: 'color-mix(in srgb, var(--success) 10%, transparent)', color: 'var(--success)' },
+  archived: { bg: 'color-mix(in srgb, var(--grey-dark) 40%, transparent)',   color: 'var(--grey-mid)'},
 }
 
 const SUBJECT_LABELS: Record<ContactSubmission['subject_type'], string> = {
@@ -77,11 +78,11 @@ export default function ContactClient({ submissions: initial }: ContactClientPro
         .contact-panel { background: var(--navy); border: 1px solid rgba(255,255,255,0.06); }
         .contact-panel-header { padding: 14px 20px; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: space-between; }
         .contact-panel-title { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--grey-mid); }
-        .contact-new-count { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--orange); background: rgba(219,103,39,0.1); border: 1px solid rgba(219,103,39,0.2); padding: 3px 8px; }
+        .contact-new-count { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--orange); background: color-mix(in srgb, var(--orange) 10%, transparent); border: 1px solid color-mix(in srgb, var(--orange) 20%, transparent); padding: 3px 8px; }
         .contact-row { padding: 16px 20px; border-bottom: 1px solid rgba(255,255,255,0.04); cursor: pointer; transition: background 0.15s ease; }
         .contact-row:last-child { border-bottom: none; }
         .contact-row:hover { background: rgba(255,255,255,0.03); }
-        .contact-row.selected { background: rgba(219,103,39,0.06); border-left: 2px solid var(--orange); }
+        .contact-row.selected { background: color-mix(in srgb, var(--orange) 6%, transparent); border-left: 2px solid var(--orange); }
         .contact-row.status-new { border-left: 2px solid var(--orange); }
         .contact-row-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
         .contact-name { font-size: 14px; color: var(--white); font-weight: 500; }
@@ -99,10 +100,10 @@ export default function ContactClient({ submissions: initial }: ContactClientPro
         .detail-status-row { display: flex; gap: 6px; flex-wrap: wrap; }
         .status-pill { padding: 6px 12px; font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.12em; text-transform: uppercase; cursor: pointer; border: 1px solid rgba(255,255,255,0.1); background: none; color: var(--grey-mid); transition: all 0.15s ease; }
         .status-pill:hover { color: var(--white); border-color: rgba(255,255,255,0.2); }
-        .status-pill.active { border-color: var(--orange); color: var(--white); background: rgba(219,103,39,0.08); }
+        .status-pill.active { border-color: var(--orange); color: var(--white); background: color-mix(in srgb, var(--orange) 8%, transparent); }
         .status-pill:disabled { opacity: 0.5; cursor: not-allowed; }
         .reply-btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; background: var(--orange); color: var(--white); border: none; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase; cursor: pointer; text-decoration: none; transition: background 0.15s ease; }
-        .reply-btn:hover { background: var(--orange-f, #C4521A); }
+        .reply-btn:hover { background: var(--orange-f); }
         .detail-empty { padding: 48px 24px; text-align: center; font-size: 13px; color: var(--grey-mid); }
         .contact-empty-state { padding: 64px 32px; text-align: center; background: var(--navy); border: 1px solid rgba(255,255,255,0.06); }
         .contact-empty-title { font-family: var(--font-exo2); font-weight: 700; font-size: 20px; color: var(--white); margin-bottom: 8px; }
@@ -178,7 +179,7 @@ export default function ContactClient({ submissions: initial }: ContactClientPro
                     <div className="detail-text">{selected.message}</div>
                   </div>
                   <div>
-                    <a href={`mailto:${selected.email}?subject=Re: Your message to NexTrium`} className="reply-btn">
+                    <a href={`mailto:${selected.email}?subject=Re: Your message to ${brand.styledName}`} className="reply-btn">
                       Reply via email ↗
                     </a>
                   </div>
