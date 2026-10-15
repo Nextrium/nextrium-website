@@ -1,6 +1,7 @@
 'use client'
 
-import { useActionState, useState } from 'react'
+import { useActionState, useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { requestExtension, retryReview, unclaimTask, type WorkState } from '@/app/actions/work'
 import { CLAIM_COOLDOWN_HOURS } from '@/lib/claims'
 import { C, F, tint } from '@/lib/theme'
@@ -22,6 +23,8 @@ function Feedback({ state }: { state: WorkState }) {
 export function UnclaimButton({ taskId, taskTitle }: { taskId: string; taskTitle: string }) {
   const [open, setOpen] = useState(false)
   const [state, action, pending] = useActionState(unclaimTask, IDLE)
+  const router = useRouter()
+  const close = () => { setOpen(false); if (state.status === 'done') router.refresh() }
 
   return (
     <>
@@ -29,7 +32,7 @@ export function UnclaimButton({ taskId, taskTitle }: { taskId: string; taskTitle
         Unclaim
       </button>
       {open && (
-        <Dialog title="Unclaim this task?" subtitle={taskTitle} onClose={() => { if (!pending) setOpen(false) }}>
+        <Dialog title="Unclaim this task?" subtitle={taskTitle} onClose={() => { if (!pending) close() }}>
           <form action={action} className="p-6 flex flex-col gap-5">
             <input type="hidden" name="taskId" value={taskId} />
             <div className="p-4 rounded-xl" style={{ background: tint('--error', 6), border: `1px solid ${tint('--error', 22)}` }}>
@@ -44,7 +47,7 @@ export function UnclaimButton({ taskId, taskTitle }: { taskId: string; taskTitle
                   {pending ? 'Unclaiming…' : 'Yes, unclaim'}
                 </button>
               )}
-              <button type="button" onClick={() => setOpen(false)} className="btn-outline" style={{ fontSize: 13, cursor: 'pointer' }}>
+              <button type="button" onClick={close} className="btn-outline" style={{ fontSize: 13, cursor: 'pointer' }}>
                 {state.status === 'done' ? 'Close' : 'Keep task'}
               </button>
             </div>
@@ -57,6 +60,8 @@ export function UnclaimButton({ taskId, taskTitle }: { taskId: string; taskTitle
 
 export function ExtensionButton({ taskId, days }: { taskId: string; days: number }) {
   const [state, action, pending] = useActionState(requestExtension, IDLE)
+  const router = useRouter()
+  useEffect(() => { if (state.status === 'done') router.refresh() }, [state, router])
   if (state.status === 'done') return <span style={{ fontFamily: F.body, fontSize: 11, color: C.mute, padding: '7px 0' }}>Extension requested</span>
   return (
     <form action={action} className="flex items-center gap-2 flex-wrap">
@@ -71,6 +76,13 @@ export function ExtensionButton({ taskId, days }: { taskId: string; days: number
 
 export function RetryReviewButton({ contributionId }: { contributionId: string }) {
   const [state, action, pending] = useActionState(retryReview, IDLE)
+  const router = useRouter()
+  // Refresh shortly after, so the new status replaces this button once the message has been seen.
+  useEffect(() => {
+    if (state.status !== 'done') return
+    const t = setTimeout(() => router.refresh(), 2500)
+    return () => clearTimeout(t)
+  }, [state, router])
   return (
     <form action={action} className="flex flex-col items-end gap-1">
       <input type="hidden" name="contributionId" value={contributionId} />

@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { SUBMISSION_DESCRIPTION_MAX, SUBMISSION_MIN_WORDS, SUBMISSION_TITLE_MAX, wordCount } from '@nextrium/contributions-core/submission'
 import { submitWork, type WorkState } from '@/app/actions/work'
 import { C, F, tint } from '@/lib/theme'
@@ -29,6 +30,9 @@ const OUTCOME_TITLE = { ai_approved: 'Passed automated review', rejected: 'Chang
 /** Submit or resubmit work for one of the contributor's tasks. The review runs on the server and can take up to a minute. */
 export default function SubmitWorkDialog({ targets, initial, runningCount = 0, onClose }: { targets: SubmitTarget[]; initial: SubmitTarget | null; runningCount?: number; onClose: () => void }) {
   const [state, action, pending] = useActionState(submitWork, IDLE)
+  const router = useRouter()
+  // After a submission, refresh the page behind the dialog when it closes.
+  const close = () => { if (state.status === 'done') router.refresh(); onClose() }
   const first = initial ?? targets[0] ?? null
   const [taskId, setTaskId] = useState(first?.taskId ?? '')
   const current = targets.find((t) => t.taskId === taskId) ?? initial
@@ -40,15 +44,15 @@ export default function SubmitWorkDialog({ targets, initial, runningCount = 0, o
   if (state.status === 'done' && state.outcome) {
     const token = OUTCOME_TOKEN[state.outcome]
     return (
-      <Dialog title={OUTCOME_TITLE[state.outcome]} subtitle={current?.taskTitle} onClose={onClose}>
+      <Dialog title={OUTCOME_TITLE[state.outcome]} subtitle={current?.taskTitle} onClose={close}>
         <div className="p-6 flex flex-col gap-5">
           <div className="flex items-start gap-3 p-4 rounded-xl" style={{ background: tint(token, 8), border: `1px solid ${tint(token, 25)}` }}>
             <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', background: `var(${token})`, marginTop: 6, flexShrink: 0 }} />
             <p role="status" style={{ fontFamily: F.body, fontSize: 13, color: C.mist, lineHeight: 1.65 }}>{state.message}</p>
           </div>
           <div className="flex gap-3 flex-wrap">
-            <Link href="/dashboard?tab=submissions" onClick={onClose} className="btn-primary" style={{ fontSize: 13 }}>View submissions</Link>
-            <button type="button" onClick={onClose} className="btn-outline" style={{ fontSize: 13, cursor: 'pointer' }}>Done</button>
+            <Link href="/dashboard?tab=submissions" onClick={close} className="btn-primary" style={{ fontSize: 13 }}>View submissions</Link>
+            <button type="button" onClick={close} className="btn-outline" style={{ fontSize: 13, cursor: 'pointer' }}>Done</button>
           </div>
         </div>
       </Dialog>

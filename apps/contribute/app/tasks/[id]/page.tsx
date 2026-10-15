@@ -3,23 +3,31 @@ import { notFound } from 'next/navigation'
 import PublicShell from '@/components/PublicShell'
 import TaskDetailView, { claimView } from '@/components/TaskDetailView'
 import { getPortalIdentity } from '@/lib/portal'
-import { getOpenTask } from '@/lib/publicData'
+import { getOpenTask, getTaskForContributor } from '@/lib/publicData'
 
 export const dynamic = 'force-dynamic'
 
 type Props = { params: Promise<{ id: string }> }
 
+/** The open task, or one the signed-in contributor holds (so it stays viewable right after claiming). */
+async function visibleTask(id: string) {
+  const me = await getPortalIdentity()
+  const active = me?.contributor?.status === 'active' ? me.contributor : null
+  const found = active ? await getTaskForContributor(id, active.id) : null
+  return { me, task: found?.task ?? (await getOpenTask(id)), mine: found?.mine ?? false }
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const task = await getOpenTask((await params).id)
+  const { task } = await visibleTask((await params).id)
   return { title: task ? task.title : 'Task not available' }
 }
 
 export default async function TaskDetailPage({ params }: Props) {
   const { id } = await params
-  const task = await getOpenTask(id)
+  const { me, task, mine } = await visibleTask(id)
   if (!task) notFound()
 
-  const view = await claimView(task, await getPortalIdentity())
+  const view = await claimView(task, me, mine)
 
   return (
     <PublicShell signedIn={view.kind !== 'signed_out'}>

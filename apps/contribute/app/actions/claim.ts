@@ -1,6 +1,5 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
 import { createCommunityServiceClient } from '@nextrium/supabase/community/server'
 import { getActiveContributor } from '@/lib/portal'
 import { isUuid } from '@/lib/publicData'
@@ -43,8 +42,6 @@ export async function claimTask(_prev: ClaimState, formData: FormData): Promise<
   }
 
   const { data: task } = await db.from('tasks').select('title, status, assigned_to, unclaimed_by, unclaimed_at').eq('id', taskId).maybeSingle()
-  revalidatePath('/tasks')
-  revalidatePath(`/tasks/${taskId}`)
 
   if (claimed === true && task?.assigned_to === me.id) return { status: 'claimed', title: task.title }
   if (!task) return { status: 'error', message: 'This task could not be found.' }

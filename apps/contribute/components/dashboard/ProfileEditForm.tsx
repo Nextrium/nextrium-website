@@ -1,6 +1,7 @@
 'use client'
 
 import { useActionState, useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { brand } from '@nextrium/brand'
 import { updateProfile, type WorkState } from '@/app/actions/work'
 import { AVAILABILITY, LIMITS, TIMEZONES } from '@/lib/registration'
@@ -19,7 +20,12 @@ export default function ProfileEditForm({ me }: { me: MyProfile }) {
   const [state, action, saving] = useActionState(updateProfile, IDLE)
   const [notify, setNotify] = useState(me.notification_email)
 
-  useEffect(() => { if (state.status === 'done') setEditing(false) }, [state])
+  const router = useRouter()
+  useEffect(() => {
+    if (state.status !== 'done') return
+    setEditing(false)
+    router.refresh()
+  }, [state, router])
 
   const tz = me.timezone && (TIMEZONES as readonly string[]).includes(me.timezone) ? me.timezone : TIMEZONES[0]
   const hours = AVAILABILITY.some((a) => a.value === me.availability_hours_per_week) ? me.availability_hours_per_week! : 5

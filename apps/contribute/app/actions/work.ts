@@ -1,6 +1,5 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
 import { brand } from '@nextrium/brand'
 import { parseSubmission } from '@nextrium/contributions-core/submission'
 import { createCommunityServiceClient } from '@nextrium/supabase/community/server'
@@ -15,6 +14,10 @@ import { canRequestExtension, effectiveDeadline } from '@/lib/deadline'
 // Everything a contributor does from their dashboard. Each action looks up
 // the approved contributor from the session and only ever touches that
 // contributor's own tasks and submissions.
+//
+// Actions do not revalidate: that would re-render the page under the open
+// dialog (a finished task's card disappears) and lose the result. The pages
+// are always rendered live, and the components refresh after showing it.
 
 export type WorkState =
   | { status: 'idle' }
@@ -23,11 +26,6 @@ export type WorkState =
 
 const NOT_ALLOWED: WorkState = { status: 'error', message: 'Only approved contributors can do this. Reload the page and sign in again.' }
 const GENERIC: WorkState = { status: 'error', message: `Something went wrong. Try again, or contact ${brand.emails.contributors} if it persists.` }
-
-function refresh() {
-  revalidatePath('/dashboard', 'layout')
-  revalidatePath('/tasks', 'layout')
-}
 
 const REVIEW_MESSAGES = {
   ai_approved: 'Your work passed the automated review. The core team will do a final check before awarding points.',
@@ -120,7 +118,6 @@ export async function submitWork(_prev: WorkState, formData: FormData): Promise<
   }
 
   const outcome = await reviewSubmission(contributionId)
-  refresh()
   const key = outcome.kind === 'reviewed' ? outcome.status : 'pending'
   return { status: 'done', outcome: key, message: REVIEW_MESSAGES[key] }
 }
@@ -160,7 +157,6 @@ export async function retryReview(_prev: WorkState, formData: FormData): Promise
   if (outcome.kind === 'failed') {
     await db.from('contributions').update({ status: 'submitted' }).eq('id', c.id).eq('status', 'under_review').is('review_decision', null)
   }
-  refresh()
   const key = outcome.kind === 'reviewed' ? outcome.status : 'pending'
   return { status: 'done', outcome: key, message: REVIEW_MESSAGES[key] }
 }
@@ -190,7 +186,6 @@ export async function unclaimTask(_prev: WorkState, formData: FormData): Promise
     console.error('[contribute] unclaim failed:', error.code)
     return GENERIC
   }
-  refresh()
   return { status: 'done', message: 'Task unclaimed. It is back on the open board.' }
 }
 
@@ -220,7 +215,6 @@ export async function requestExtension(_prev: WorkState, formData: FormData): Pr
     .select('id')
   if (error) return GENERIC
   if (!updated || updated.length === 0) return { status: 'error', message: 'An extension has already been requested for this task.' }
-  refresh()
   return { status: 'done', message: 'Extension requested. The core team will review it.' }
 }
 
@@ -237,7 +231,5 @@ export async function updateProfile(_prev: WorkState, formData: FormData): Promi
     console.error('[contribute] profile update failed:', error.code)
     return GENERIC
   }
-  refresh()
-  revalidatePath(`/contributors/${me.id}`)
   return { status: 'done', message: 'Profile updated.' }
 }
