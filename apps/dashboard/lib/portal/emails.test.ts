@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { applicationApprovedEmail, applicationRejectedEmail, portalRejectedEmail, portalVerifiedEmail, portalExtensionDecidedEmail, portalTaskAssignedEmail, portalTaskUnassignedEmail, portalUrl, revisionRequestedEmail } from './emails'
+import { applicationApprovedEmail, applicationRejectedEmail, portalDeadlineReminderEmail, portalRejectedEmail, portalVerifiedEmail, portalExtensionDecidedEmail, portalTaskAssignedEmail, portalTaskUnassignedEmail, portalUrl, revisionRequestedEmail } from './emails'
 
 test('links point at the contributor portal', () => {
   assert.match(portalUrl('/tasks'), /^https?:\/\/[^/]+\/tasks$/)
@@ -44,4 +44,13 @@ test('decision emails carry points and the escaped note', () => {
   const r = portalRejectedEmail({ title: 'Docs', note: 'Copied work.', contributionId: 'c1' })
   assert.match(r.subject, /^Submission not accepted/)
   assert.ok(r.html.includes('Copied work.'))
+})
+
+test('reminder emails: overdue and upcoming read differently', () => {
+  const up = portalDeadlineReminderEmail({ taskTitle: 'T', lead: 'less than a day', overdue: false, deadlineAt: '2026-10-20T12:00:00Z', taskId: 'x' })
+  const od = portalDeadlineReminderEmail({ taskTitle: 'T', lead: '', overdue: true, deadlineAt: '2026-10-20T12:00:00Z', taskId: 'x' })
+  assert.match(up.subject, /^Deadline reminder/)
+  assert.ok(up.html.includes('less than a day'))
+  assert.match(od.subject, /^Overdue/)
+  assert.ok(od.html.includes('unclaim'))
 })

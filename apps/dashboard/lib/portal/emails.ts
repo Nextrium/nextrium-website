@@ -130,3 +130,16 @@ export function portalRejectedEmail(p: { title: string; note: string; contributi
       button(portalUrl(`/dashboard/submissions/${p.contributionId}`), 'See your submission'),
   }
 }
+
+export function portalDeadlineReminderEmail(p: { taskTitle: string; lead: string; overdue: boolean; deadlineAt: string; taskId: string }): EmailContent {
+  return {
+    subject: subject(p.overdue ? `Overdue: ${p.taskTitle}` : `Deadline reminder: ${p.taskTitle}`),
+    html:
+      '<p>Hi {{name}},</p>' +
+      (p.overdue
+        ? `<p>The deadline for <strong>${escapeHtml(p.taskTitle)}</strong> passed on ${escapeHtml(when(p.deadlineAt))}. Submit your work as soon as you can, or unclaim the task so someone else can take it.</p>`
+        : `<p>You have ${escapeHtml(p.lead)} left to submit your work for <strong>${escapeHtml(p.taskTitle)}</strong>. Deadline: ${escapeHtml(when(p.deadlineAt))}.</p>`) +
+      button(portalUrl('/dashboard?tab=tasks'), 'Go to my tasks') +
+      '<p>You are receiving this because you claimed this task. You can turn reminders off in your portal profile.</p>',
+  }
+}
