@@ -240,7 +240,9 @@ function MyTasks({ me, tasks, plans }: { me: MyProfile; tasks: MyTask[]; plans: 
                       <CategoryBadge category={task.category} />
                       <ComplexityBadge complexity={task.complexity} />
                       {task.extension_granted && <StatusBadge tone="pending">Extended</StatusBadge>}
-                      {task.extension_requested_at && !task.extension_granted && <StatusBadge tone="progress">Extension requested</StatusBadge>}
+                      {task.extension_requested_at && !task.extension_granted && (task.extended_deadline_at
+                        ? <StatusBadge tone="bad">Extension declined</StatusBadge>
+                        : <StatusBadge tone="progress">Extension requested</StatusBadge>)}
                     </div>
                     <Link href={`/dashboard/tasks/${task.id}`} style={{ fontFamily: F.display, fontWeight: 600, fontSize: 15, color: C.light, lineHeight: 1.3, textDecoration: 'none', overflowWrap: 'anywhere' }}>
                       {task.title}

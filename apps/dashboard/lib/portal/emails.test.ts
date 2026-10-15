@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { applicationApprovedEmail, applicationRejectedEmail, portalUrl, revisionRequestedEmail } from './emails'
+import { applicationApprovedEmail, applicationRejectedEmail, portalExtensionDecidedEmail, portalTaskAssignedEmail, portalTaskUnassignedEmail, portalUrl, revisionRequestedEmail } from './emails'
 
 test('links point at the contributor portal', () => {
   assert.match(portalUrl('/tasks'), /^https?:\/\/[^/]+\/tasks$/)
@@ -25,4 +25,14 @@ test('subjects are single-line and placeholder-free', () => {
     assert.ok(!/[\r\n{}]/.test(e.subject), e.subject)
     assert.ok(e.html.startsWith('<p>Hi {{name}},</p>'))
   }
+})
+
+test('task emails link to the portal dashboard and escape titles', () => {
+  const a = portalTaskAssignedEmail({ taskTitle: 'Fix <b>it</b>', points: '10–30', deadlineAt: '2026-10-18T12:00:00Z', taskId: 'abc' })
+  assert.ok(a.html.includes(portalUrl('/dashboard/tasks/abc')))
+  assert.ok(!a.html.includes('<b>it</b>'))
+  assert.ok(a.html.includes('18 Oct 2026'))
+  assert.match(portalExtensionDecidedEmail({ taskTitle: 'T', granted: true, deadlineAt: null, taskId: 'x' }).subject, /^Extension granted/)
+  assert.match(portalExtensionDecidedEmail({ taskTitle: 'T', granted: false, deadlineAt: null, taskId: 'x' }).html, /declined/)
+  assert.ok(!portalTaskUnassignedEmail({ taskTitle: 'T', reason: null }).html.includes('<p></p>'))
 })

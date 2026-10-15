@@ -24,7 +24,8 @@ export default async function PortalOverviewPage() {
     count('contributors', (q) => q.eq('status', 'active')),
     count('tasks', (q) => q.eq('status', 'open')),
     count('tasks', (q) => q.eq('status', 'assigned')),
-    count('tasks', (q) => q.eq('status', 'assigned').not('extension_requested_at', 'is', null).eq('extension_granted', false)),
+    // Pending = requested and not yet decided (a decline records the unchanged deadline).
+    count('tasks', (q) => q.eq('status', 'assigned').not('extension_requested_at', 'is', null).eq('extension_granted', false).is('extended_deadline_at', null)),
     count('contributions', (q) => q.in('status', ['under_review', 'ai_approved'])),
     count('contributions', (q) => q.eq('status', 'submitted')),
   ])
@@ -35,9 +36,9 @@ export default async function PortalOverviewPage() {
     { label: 'Approved contributors', value: active, href: '/portal/applicants?status=active' },
     { label: 'Submissions waiting for the team', value: awaitingTeam, alert: awaitingTeam > 0 },
     { label: 'Awaiting automated review', value: awaitingReview },
-    { label: 'Open tasks', value: openTasks },
-    { label: 'Tasks in progress', value: runningTasks },
-    { label: 'Extension requests', value: extensions, alert: extensions > 0 },
+    { label: 'Open tasks', value: openTasks, href: '/portal/tasks?status=open' },
+    { label: 'Tasks in progress', value: runningTasks, href: '/portal/tasks?status=assigned' },
+    { label: 'Extension requests', value: extensions, href: '/portal/tasks?status=extensions', alert: extensions > 0 },
   ]
 
   return (

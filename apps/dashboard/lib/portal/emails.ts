@@ -69,3 +69,41 @@ export function accountReactivatedEmail(): EmailContent {
       button(portalUrl('/signin?next=/dashboard'), 'Sign in to your dashboard'),
   }
 }
+
+const when = (iso: string | null) =>
+  iso ? new Date(iso).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }) + ' UTC' : 'no deadline'
+
+export function portalTaskAssignedEmail(p: { taskTitle: string; points: string; deadlineAt: string | null; taskId: string }): EmailContent {
+  return {
+    subject: subject(`New task assigned: ${p.taskTitle}`),
+    html:
+      '<p>Hi {{name}},</p>' +
+      `<p>The core team has assigned you a task: <strong>${escapeHtml(p.taskTitle)}</strong>.</p>` +
+      `<p>Points: ${escapeHtml(p.points)}<br>Deadline: ${escapeHtml(when(p.deadlineAt))}</p>` +
+      button(portalUrl(`/dashboard/tasks/${p.taskId}`), 'Open the task'),
+  }
+}
+
+export function portalExtensionDecidedEmail(p: { taskTitle: string; granted: boolean; deadlineAt: string | null; taskId: string }): EmailContent {
+  return {
+    subject: subject(`Extension ${p.granted ? 'granted' : 'declined'}: ${p.taskTitle}`),
+    html:
+      '<p>Hi {{name}},</p>' +
+      (p.granted
+        ? `<p>Your extension for <strong>${escapeHtml(p.taskTitle)}</strong> was granted. Your new deadline is ${escapeHtml(when(p.deadlineAt))}.</p>`
+        : `<p>Your extension request for <strong>${escapeHtml(p.taskTitle)}</strong> was declined. The deadline stays ${escapeHtml(when(p.deadlineAt))}.</p>`) +
+      button(portalUrl('/dashboard?tab=tasks'), 'Go to my tasks'),
+  }
+}
+
+export function portalTaskUnassignedEmail(p: { taskTitle: string; reason: string | null }): EmailContent {
+  return {
+    subject: subject(`Task returned to the board: ${p.taskTitle}`),
+    html:
+      '<p>Hi {{name}},</p>' +
+      `<p>The core team has taken <strong>${escapeHtml(p.taskTitle)}</strong> off your running tasks and returned it to the open board.</p>` +
+      (p.reason ? paragraph(p.reason) : '') +
+      '<p>This does not count against you; you can claim other tasks straight away.</p>' +
+      button(portalUrl('/dashboard/tasks'), 'Browse open tasks'),
+  }
+}
