@@ -62,6 +62,15 @@ const ALL_NAV_GROUPS = [
     ],
   },
   {
+    // The public contributor portal (its own database): staff run applicants, tasks and reviews here.
+    label: 'Contributor portal',
+    roles: ['admin', 'moderator'] as DashboardRole[],
+    items: [
+      { label: 'Portal overview', href: '/portal', icon: '◈', roles: ['admin', 'moderator'] as DashboardRole[] },
+      { label: 'Applicants', href: '/portal/applicants', icon: '◐', roles: ['admin', 'moderator'] as DashboardRole[] },
+    ],
+  },
+  {
     // Contributor program: anyone with dashboard access can be assigned tasks.
     label: 'Contributing',
     roles: ['admin', 'moderator', 'content', 'community', 'member'] as DashboardRole[],
@@ -190,8 +199,11 @@ export default function Sidebar({ role }: { role: DashboardRole }) {
             <div key={group.label} className="sidebar-group">
               <div className="sidebar-group-label">{group.label}</div>
               {group.items.map((item: any) => {
-                const isActive = item.href === '/'
-                  ? pathname === '/'
+                // An item whose path is the parent of another item in the group
+                // (e.g. /portal and /portal/applicants) only lights up on its own page.
+                const isParent = group.items.some((other: any) => other.href !== item.href && other.href.startsWith(item.href + '/'))
+                const isActive = item.href === '/' || isParent
+                  ? pathname === item.href
                   : pathname === item.href || pathname.startsWith(item.href + '/')
                 const hasSubItems = !!item.subItems?.length
                 const isOpen = openSubNavHref === item.href

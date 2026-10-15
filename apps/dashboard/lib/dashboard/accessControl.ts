@@ -18,6 +18,8 @@ export const BLOCKED_PATHS: Record<string, string[]> = {
     '/ai-engine',
     '/tasks',
     '/reviews',
+    // Contributor portal admin (applicants, tasks, reviews): admin and moderator only.
+    '/portal',
   ],
   community: [
     '/applications',
@@ -32,6 +34,8 @@ export const BLOCKED_PATHS: Record<string, string[]> = {
     '/ai-engine',
     '/tasks',
     '/reviews',
+    // Contributor portal admin (applicants, tasks, reviews): admin and moderator only.
+    '/portal',
   ],
   // Full access except the two pages that would let a moderator change
   // their own (or anyone's) access level, or see internal processing logs.
