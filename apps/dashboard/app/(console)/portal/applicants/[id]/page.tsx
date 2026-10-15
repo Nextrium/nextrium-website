@@ -5,6 +5,7 @@ import { PORTAL_CSS } from '@/components/portal/portalStyles'
 import { APPLICANT_STATUS_BADGE, APPLICANT_STATUS_LABELS, actionsFor, canDecideOnApplicant, type ApplicantStatus } from '@/lib/portal/applicantRules'
 import { UUID, community, contributorName, requirePortalStaff } from '@/lib/portal/server'
 import ApplicantDecision from './ApplicantDecision'
+import LimitControl from '../../contributors/LimitControl'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Portal applicant' }
@@ -116,6 +117,7 @@ export default async function ApplicantPage({ params }: { params: Promise<{ id: 
                 <div className="pt-hint">{(c.total_points ?? 0).toLocaleString('en-GB')} points · {c.verified_contributions ?? 0} verified · up to {c.max_claims ?? 2} running tasks</div>
               )}
             </div>
+            {status === 'active' && auth.caller.role === 'admin' && <LimitControl contributorId={c.id} current={c.max_claims ?? 2} />}
             {canDecide ? (
               <ApplicantDecision contributorId={c.id} actions={actionsFor(status)} />
             ) : (

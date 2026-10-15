@@ -70,6 +70,9 @@ const ALL_NAV_GROUPS = [
       { label: 'Applicants', href: '/portal/applicants', icon: '◐', roles: ['admin', 'moderator'] as DashboardRole[] },
       { label: 'Portal tasks', href: '/portal/tasks', icon: '◇', roles: ['admin', 'moderator'] as DashboardRole[] },
       { label: 'Portal reviews', href: '/portal/reviews', icon: '◆', roles: ['admin', 'moderator'] as DashboardRole[] },
+      { label: 'Contributors', href: '/portal/contributors', icon: '▲', roles: ['admin', 'moderator'] as DashboardRole[] },
+      { label: 'Core team', href: '/portal/team', icon: '◎', roles: ['admin', 'moderator'] as DashboardRole[] },
+      { label: 'Portal audit log', href: '/portal/audit', icon: '☰', roles: ['admin'] as DashboardRole[] },
     ],
   },
   {

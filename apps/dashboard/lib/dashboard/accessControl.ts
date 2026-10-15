@@ -43,6 +43,8 @@ export const BLOCKED_PATHS: Record<string, string[]> = {
     '/settings/team',
     '/settings/automations',
     '/logs',
+    // Admin-only, like /logs.
+    '/portal/audit',
   ],
   // Pseudo-role for a staff member whose dashboard_users row has been
   // archived (see Sprint 4 of the archive feature) — blocks the entire

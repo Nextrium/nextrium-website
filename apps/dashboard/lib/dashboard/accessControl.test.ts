@@ -72,6 +72,10 @@ test('contributor portal admin is for admin and moderator only', () => {
       assert.equal(isRestricted(path, role), true, `${role} ${path}`)
     }
   }
+  // The portal audit log is admin-only, like /logs.
+  assert.equal(isRestricted('/portal/audit', 'admin'), false)
+  assert.equal(isRestricted('/portal/audit', 'moderator'), true)
+  assert.equal(isRestricted('/portal/team', 'moderator'), false)
   // The prefix must not catch the existing community projects page.
   assert.equal(isRestricted('/community-projects', 'community'), false)
 })
