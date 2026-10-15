@@ -1,0 +1,247 @@
+@import "tailwindcss";
+
+/* Colour tokens (--navy, --orange, ...) are written to :root by the root layout
+   from @nextrium/brand, so each brand supplies its own values. */
+
+/* Base styles sit in the base layer so Tailwind utilities (p-10, mx-auto, ...) win over them. */
+@layer base {
+  *, *::before, *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--navy-deep);
+    color: var(--off-white);
+    font-family: var(--font-dm), 'DM Sans', system-ui, sans-serif;
+    font-weight: 300;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--orange) 35%, transparent);
+    color: var(--off-white);
+  }
+
+  ::-webkit-scrollbar { width: 3px; }
+  ::-webkit-scrollbar-track { background: var(--navy-deep); }
+  ::-webkit-scrollbar-thumb { background: var(--slate); border-radius: 2px; }
+
+  :focus-visible {
+    outline: 2px solid var(--orange-w);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .bg-void { background-color: var(--navy-deep); }
+  .bg-page-gradient {
+    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-deep) 50%, var(--black) 100%);
+  }
+  .glass {
+    background: color-mix(in srgb, var(--navy-deep) 85%, transparent);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+  .text-gradient {
+    background: linear-gradient(135deg, var(--orange-w), var(--orange), var(--orange-f));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .section-label {
+    font-family: var(--font-dm), sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--grey-mid);
+  }
+  .field-label {
+    font-family: var(--font-dm), sans-serif;
+    font-size: 11px;
+    color: var(--grey-mid);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 6px;
+  }
+  .card-base {
+    background: var(--navy);
+    border: 1px solid var(--navy-mid);
+    border-radius: 16px;
+    transition: border-color 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
+  }
+  .card-base:hover {
+    border-color: var(--orange);
+    transform: translateY(-4px);
+    box-shadow: 0 20px 60px color-mix(in srgb, var(--orange) 12%, transparent);
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--orange-w), var(--orange), var(--orange-f));
+    color: var(--white);
+    padding: 14px 32px;
+    border: none;
+    border-radius: 9999px;
+    font-family: var(--font-dm), sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+  }
+  .btn-primary:hover:not(:disabled) {
+    box-shadow: 0 0 60px color-mix(in srgb, var(--orange) 45%, transparent);
+    transform: translateY(-1px);
+  }
+  .btn-outline {
+    background: transparent;
+    color: var(--grey-light);
+    padding: 13px 31px;
+    border-radius: 9999px;
+    border: 1px solid var(--navy-mid);
+    font-family: var(--font-dm), sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    transition: border-color 0.2s ease, color 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+  }
+  .btn-outline:hover {
+    border-color: var(--orange);
+    color: var(--orange-w);
+  }
+  .nav-link {
+    font-family: var(--font-dm), sans-serif;
+    font-size: 13px;
+    color: var(--grey-mid);
+    text-decoration: none;
+    transition: color 0.2s ease;
+  }
+  .nav-link:hover { color: var(--off-white); }
+  .link-quiet {
+    font-family: var(--font-dm), sans-serif;
+    font-size: 12px;
+    color: var(--slate-l);
+    text-decoration: none;
+    cursor: pointer;
+    transition: color 0.2s ease;
+  }
+  .link-quiet:hover { color: var(--grey-mid); }
+  .portal-input { outline: none; transition: border-color 0.2s ease; }
+  .portal-input:focus { border-color: var(--orange) !important; }
+  .portal-input::placeholder { color: var(--slate-l); opacity: 0.8; }
+  /* A card that lifts on hover; set --accent on it to tint the hover border. */
+  .lift {
+    transition: border-color 0.3s ease, transform 0.3s ease;
+  }
+  .lift:hover {
+    border-color: color-mix(in srgb, var(--accent, var(--orange)) 50%, transparent) !important;
+    transform: translateY(-3px);
+  }
+  .chip {
+    padding: 6px 16px;
+    border-radius: 20px;
+    border: 1px solid var(--navy-mid);
+    background: transparent;
+    color: var(--grey-mid);
+    font-family: var(--font-dm), sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: capitalize;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .chip[aria-pressed="true"] {
+    border-color: var(--accent, var(--orange));
+    background: color-mix(in srgb, var(--accent, var(--orange)) 12%, transparent);
+    color: var(--accent, var(--orange-w));
+  }
+  .side-link { transition: background 0.2s ease, color 0.2s ease; }
+  .side-link:hover { background: color-mix(in srgb, var(--orange) 6%, transparent); }
+  .side-link-danger:hover { background: color-mix(in srgb, var(--error) 8%, transparent) !important; color: var(--error) !important; }
+  .btn-danger-quiet { transition: all 0.2s ease; }
+  .btn-danger-quiet:hover { color: var(--error) !important; border-color: color-mix(in srgb, var(--error) 45%, transparent) !important; background: color-mix(in srgb, var(--error) 6%, transparent) !important; }
+  .orb {
+    position: fixed;
+    border-radius: 9999px;
+    pointer-events: none;
+  }
+  .orb-a { width: 600px; height: 600px; background: var(--orange); filter: blur(140px); opacity: 0.07; top: -200px; right: -100px; }
+  .orb-b { width: 400px; height: 400px; background: var(--slate); filter: blur(120px); opacity: 0.06; bottom: -100px; left: 5%; }
+}
+
+/* A task brief (sanitised HTML from the task editor). */
+.task-description {
+  font-family: var(--font-dm), sans-serif;
+  font-size: 15px;
+  line-height: 1.8;
+  color: var(--grey-light);
+  overflow-wrap: anywhere;
+}
+.task-description > * + * { margin-top: 12px; }
+.task-description p { margin: 0 0 14px; }
+.task-description h1, .task-description h2 {
+  font-family: var(--font-exo2), sans-serif;
+  font-size: clamp(17px, 2.5vw, 22px);
+  font-weight: 600;
+  color: var(--off-white);
+  margin: 32px 0 10px;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+}
+.task-description h3, .task-description h4 {
+  font-family: var(--font-exo2), sans-serif;
+  font-size: clamp(14px, 2vw, 17px);
+  font-weight: 600;
+  color: var(--grey-light);
+  margin: 24px 0 8px;
+  line-height: 1.3;
+}
+.task-description ul { padding-left: 22px; margin: 8px 0 16px; list-style-type: disc; }
+.task-description ol { padding-left: 22px; margin: 8px 0 16px; list-style-type: decimal; }
+.task-description li { margin-bottom: 8px; line-height: 1.7; }
+.task-description li::marker { color: var(--orange-w); }
+.task-description strong, .task-description b { color: var(--off-white); font-weight: 600; }
+.task-description a { color: var(--orange-w); text-decoration: underline; text-underline-offset: 3px; }
+.task-description a:hover { color: var(--grey-light); }
+.task-description code {
+  font-family: var(--font-mono), monospace;
+  font-size: 0.88em;
+  background: var(--navy);
+  border: 1px solid var(--navy-mid);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+.task-description pre {
+  font-family: var(--font-mono), monospace;
+  font-size: 13px;
+  background: var(--navy);
+  border: 1px solid var(--navy-mid);
+  border-radius: 10px;
+  padding: 14px 16px;
+  overflow-x: auto;
+  overflow-wrap: normal;
+}
+.task-description pre code { background: none; border: none; padding: 0; }
+.task-description hr { border: none; border-top: 1px solid var(--navy-mid); margin: 24px 0; }
+.task-description blockquote { border-left: 2px solid var(--orange); padding-left: 14px; color: var(--grey-mid); }
+.task-description table { border-collapse: collapse; display: block; overflow-x: auto; }
+.task-description th, .task-description td { border: 1px solid var(--navy-mid); padding: 6px 10px; }
+.task-description img { max-width: 100%; height: auto; border-radius: 8px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+}

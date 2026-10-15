@@ -13,7 +13,9 @@
     "brand:check": "tsx scripts/brand-check.ts",
     "brand:new": "tsx scripts/brand-new.ts",
     "dev:dashboard": "npm run dev -w @nextrium/dashboard",
-    "build:dashboard": "npm run build -w @nextrium/dashboard"
+    "build:dashboard": "npm run build -w @nextrium/dashboard",
+    "dev:contribute": "npm run dev -w @nextrium/contribute",
+    "build:contribute": "npm run build -w @nextrium/contribute"
   },
   "devDependencies": {
     "tsx": "^4.23.15",
