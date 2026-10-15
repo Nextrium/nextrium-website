@@ -107,3 +107,26 @@ export function portalTaskUnassignedEmail(p: { taskTitle: string; reason: string
       button(portalUrl('/dashboard/tasks'), 'Browse open tasks'),
   }
 }
+
+export function portalVerifiedEmail(p: { title: string; points: number; note: string | null; contributionId: string }): EmailContent {
+  return {
+    subject: subject(`Verified: ${p.title}`),
+    html:
+      '<p>Hi {{name}},</p>' +
+      `<p>Your submission <strong>${escapeHtml(p.title)}</strong> has been verified. <strong>${escapeHtml(String(p.points))} points</strong> have been added to your total on the public leaderboard.</p>` +
+      (p.note ? `<p><strong>Note from the core team:</strong></p>${paragraph(p.note)}` : '') +
+      button(portalUrl(`/dashboard/submissions/${p.contributionId}`), 'See your submission'),
+  }
+}
+
+export function portalRejectedEmail(p: { title: string; note: string; contributionId: string }): EmailContent {
+  return {
+    subject: subject(`Submission not accepted: ${p.title}`),
+    html:
+      '<p>Hi {{name}},</p>' +
+      `<p>The core team has reviewed your submission <strong>${escapeHtml(p.title)}</strong> and was unable to accept it.</p>` +
+      `<p><strong>Note from the core team:</strong></p>${paragraph(p.note)}` +
+      '<p>The task has gone back to the open board. You can keep claiming other tasks.</p>' +
+      button(portalUrl(`/dashboard/submissions/${p.contributionId}`), 'See your submission'),
+  }
+}

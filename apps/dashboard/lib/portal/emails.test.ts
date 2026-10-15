@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { applicationApprovedEmail, applicationRejectedEmail, portalExtensionDecidedEmail, portalTaskAssignedEmail, portalTaskUnassignedEmail, portalUrl, revisionRequestedEmail } from './emails'
+import { applicationApprovedEmail, applicationRejectedEmail, portalRejectedEmail, portalVerifiedEmail, portalExtensionDecidedEmail, portalTaskAssignedEmail, portalTaskUnassignedEmail, portalUrl, revisionRequestedEmail } from './emails'
 
 test('links point at the contributor portal', () => {
   assert.match(portalUrl('/tasks'), /^https?:\/\/[^/]+\/tasks$/)
@@ -35,4 +35,13 @@ test('task emails link to the portal dashboard and escape titles', () => {
   assert.match(portalExtensionDecidedEmail({ taskTitle: 'T', granted: true, deadlineAt: null, taskId: 'x' }).subject, /^Extension granted/)
   assert.match(portalExtensionDecidedEmail({ taskTitle: 'T', granted: false, deadlineAt: null, taskId: 'x' }).html, /declined/)
   assert.ok(!portalTaskUnassignedEmail({ taskTitle: 'T', reason: null }).html.includes('<p></p>'))
+})
+
+test('decision emails carry points and the escaped note', () => {
+  const v = portalVerifiedEmail({ title: 'Docs', points: 25, note: 'Great <i>work</i>', contributionId: 'c1' })
+  assert.ok(v.html.includes('25 points') && v.html.includes('&lt;i&gt;') && v.html.includes(portalUrl('/dashboard/submissions/c1')))
+  assert.ok(!portalVerifiedEmail({ title: 'Docs', points: 25, note: null, contributionId: 'c1' }).html.includes('Note from'))
+  const r = portalRejectedEmail({ title: 'Docs', note: 'Copied work.', contributionId: 'c1' })
+  assert.match(r.subject, /^Submission not accepted/)
+  assert.ok(r.html.includes('Copied work.'))
 })
