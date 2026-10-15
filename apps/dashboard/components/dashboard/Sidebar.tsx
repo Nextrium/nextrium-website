@@ -30,6 +30,24 @@ const PEOPLE_SUB_ITEMS = [
   { label: 'General Team Members',  value: 'members' },
 ]
 
+// Contributor portal dropdown: unlike the filter sub-items above, each entry
+// is its own page. The portal has its own database; see app/(console)/portal.
+const PORTAL_SUB_PAGES = [
+  { label: 'Overview',     href: '/portal',              roles: ['admin', 'moderator'] as DashboardRole[] },
+  { label: 'Applicants',   href: '/portal/applicants',   roles: ['admin', 'moderator'] as DashboardRole[] },
+  { label: 'Tasks',        href: '/portal/tasks',        roles: ['admin', 'moderator'] as DashboardRole[] },
+  { label: 'Reviews',      href: '/portal/reviews',      roles: ['admin', 'moderator'] as DashboardRole[] },
+  { label: 'Contributors', href: '/portal/contributors', roles: ['admin', 'moderator'] as DashboardRole[] },
+  { label: 'Core team',    href: '/portal/team',         roles: ['admin', 'moderator'] as DashboardRole[] },
+  { label: 'Audit log',    href: '/portal/audit',        roles: ['admin'] as DashboardRole[] },
+]
+
+/** The sub-page that matches the current path: the longest matching href, so /portal only matches its own page. */
+function activeSubPage(pathname: string, pages: { href: string }[]): string | null {
+  const hits = pages.filter((p) => pathname === p.href || pathname.startsWith(p.href + '/'))
+  return hits.sort((a, b) => b.href.length - a.href.length)[0]?.href ?? null
+}
+
 const ALL_NAV_GROUPS = [
   {
     label: 'Content',
@@ -62,26 +80,14 @@ const ALL_NAV_GROUPS = [
     ],
   },
   {
-    // The public contributor portal (its own database): staff run applicants, tasks and reviews here.
-    label: 'Contributor portal',
-    roles: ['admin', 'moderator'] as DashboardRole[],
-    items: [
-      { label: 'Portal overview', href: '/portal', icon: '◈', roles: ['admin', 'moderator'] as DashboardRole[] },
-      { label: 'Applicants', href: '/portal/applicants', icon: '◐', roles: ['admin', 'moderator'] as DashboardRole[] },
-      { label: 'Portal tasks', href: '/portal/tasks', icon: '◇', roles: ['admin', 'moderator'] as DashboardRole[] },
-      { label: 'Portal reviews', href: '/portal/reviews', icon: '◆', roles: ['admin', 'moderator'] as DashboardRole[] },
-      { label: 'Contributors', href: '/portal/contributors', icon: '▲', roles: ['admin', 'moderator'] as DashboardRole[] },
-      { label: 'Core team', href: '/portal/team', icon: '◎', roles: ['admin', 'moderator'] as DashboardRole[] },
-      { label: 'Portal audit log', href: '/portal/audit', icon: '☰', roles: ['admin'] as DashboardRole[] },
-    ],
-  },
-  {
     // Contributor program: anyone with dashboard access can be assigned tasks.
     label: 'Contributing',
     roles: ['admin', 'moderator', 'content', 'community', 'member'] as DashboardRole[],
     items: [
       { label: 'My tasks', href: '/my-tasks', icon: '◇', roles: ['admin', 'moderator', 'content', 'community', 'member'] as DashboardRole[] },
       { label: 'Leaderboard', href: '/leaderboard', icon: '▲', roles: ['admin', 'moderator', 'content', 'community', 'member'] as DashboardRole[] },
+      // The public contributor portal (its own database): staff run applicants, tasks and reviews here.
+      { label: 'Contributor portal', href: '/portal', icon: '◈', roles: ['admin', 'moderator'] as DashboardRole[], subPages: PORTAL_SUB_PAGES },
     ],
   },
   {
@@ -115,7 +121,7 @@ export default function Sidebar({ role }: { role: DashboardRole }) {
   // a single Applications-only boolean so any item can carry sub-items.
   const activeSubNavHref = ALL_NAV_GROUPS
     .flatMap((g) => g.items)
-    .find((item: any) => item.subItems && (pathname === item.href || pathname.startsWith(item.href + '/')))
+    .find((item: any) => (item.subItems || item.subPages) && (pathname === item.href || pathname.startsWith(item.href + '/')))
     ?.href ?? null
   const [openSubNavHref, setOpenSubNavHref] = useState<string | null>(activeSubNavHref)
 
@@ -131,7 +137,8 @@ export default function Sidebar({ role }: { role: DashboardRole }) {
       // Moderators see only team members, so the Staff/Members split is admin-only.
       items: group.items
         .filter((item) => item.roles.includes(role))
-        .map((item: any) => (item.href === '/people' && role !== 'admin' ? { ...item, subItems: undefined } : item)),
+        .map((item: any) => (item.href === '/people' && role !== 'admin' ? { ...item, subItems: undefined } : item))
+        .map((item: any) => (item.subPages ? { ...item, subPages: item.subPages.filter((p: { roles: DashboardRole[] }) => p.roles.includes(role)) } : item)),
     }))
     .filter((group) => group.roles.includes(role) && group.items.length > 0)
 
@@ -213,6 +220,41 @@ export default function Sidebar({ role }: { role: DashboardRole }) {
                 const hasSubItems = !!item.subItems?.length
                 const isOpen = openSubNavHref === item.href
                 const activeSubValue = searchParams.get(item.subQueryKey ?? 'status') ?? item.subItems?.[0]?.value
+                if (item.subPages?.length) {
+                  // A dropdown of separate pages (Contributor portal): every entry is a plain link.
+                  const current = activeSubPage(pathname, item.subPages)
+                  return (
+                    <div key={item.href}>
+                      <button
+                        type="button"
+                        className={`sidebar-item-row toggle ${current ? 'active' : ''}`}
+                        onClick={() => setOpenSubNavHref((v) => (v === item.href ? null : item.href))}
+                        aria-label={isOpen ? `Collapse ${item.label} sub-navigation` : `Expand ${item.label} sub-navigation`}
+                        aria-expanded={isOpen}
+                      >
+                        <span className="sidebar-item">
+                          <span className="sidebar-icon">{item.icon}</span>
+                          {item.label}
+                        </span>
+                        <span className={`sidebar-subnav-toggle ${isOpen ? 'open' : ''}`}>▾</span>
+                      </button>
+                      {isOpen && (
+                        <div className="sidebar-subnav">
+                          {item.subPages.map((sub: { label: string; href: string }) => (
+                            <Link
+                              key={sub.href}
+                              href={sub.href}
+                              className={`sidebar-subitem ${current === sub.href ? 'active' : ''}`}
+                              aria-current={current === sub.href ? 'page' : undefined}
+                            >
+                              {sub.label}
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                }
                 return (
                   <div key={item.href}>
                     {hasSubItems ? (
