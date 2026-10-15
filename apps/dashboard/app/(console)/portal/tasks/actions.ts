@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { parseAssignment, parseTaskInput } from '@nextrium/contributions-core/taskInput'
 import { UUID, auditPortal, community, contributorName, notifyContributor, requirePortalStaff } from '@/lib/portal/server'
-import { assignmentDeadline, editRules, extendedDeadline, extensionState, parseTags } from '@/lib/portal/taskRules'
+import { assignmentDeadline, deleteRule, editRules, extendedDeadline, extensionState, parseTags } from '@/lib/portal/taskRules'
 import { portalExtensionDecidedEmail, portalTaskAssignedEmail, portalTaskUnassignedEmail } from '@/lib/portal/emails'
 
 type Result<T = object> = ({ ok: true; message: string } & T) | { ok: false; error: string }
@@ -182,7 +182,11 @@ export async function decidePortalExtension(taskId: string, grant: boolean): Pro
   return { ok: true, message: grant ? 'Extension granted.' : 'Extension declined.' }
 }
 
-/** Deletes a task created by mistake. Admins only, and only while it is open and has never had a submission. */
+/**
+ * Deletes a task, admins only. Its rejected submissions go with it, so it leaves
+ * no trace on the portal or here; held tasks, waiting work and verified work are
+ * kept (see deleteRule). The audit log keeps a record of the deletion.
+ */
 export async function deletePortalTask(taskId: string): Promise<Result> {
   const auth = await requirePortalStaff()
   if ('error' in auth) return { ok: false, error: auth.error }
@@ -192,14 +196,33 @@ export async function deletePortalTask(taskId: string): Promise<Result> {
   const db = community()
   const { data: task } = await db.from('tasks').select('id, title, status').eq('id', taskId).maybeSingle()
   if (!task) return { ok: false, error: 'That task could not be found.' }
-  if (task.status !== 'open') return { ok: false, error: 'Only open tasks can be deleted. Unassign it first.' }
-  const { count } = await db.from('contributions').select('id', { count: 'exact', head: true }).eq('task_id', taskId)
-  if ((count ?? 0) > 0) return { ok: false, error: 'This task has submissions, so it is kept for the record.' }
+  const { data: subs, error: subsError } = await db.from('contributions').select('id, status').eq('task_id', taskId)
+  if (subsError) return { ok: false, error: 'Could not delete the task.' }
+  const rule = deleteRule(task.status, subs ?? [])
+  if (!rule.ok) return { ok: false, error: rule.error }
+  const ids = rule.removeSubmissionIds
 
-  const { data: deleted, error } = await db.from('tasks').delete().eq('id', taskId).eq('status', 'open').select('id')
+  // Rejected submissions only, by id: anything that changed since the check is left alone.
+  const removeSubmissions = async () => {
+    if (ids.length === 0) return true
+    const { error } = await db.from('contributions').delete().in('id', ids).eq('status', 'rejected')
+    return !error
+  }
+
+  // Task first, guarded on still being open, so nobody can claim it in between.
+  let { data: deleted, error } = await db.from('tasks').delete().eq('id', taskId).eq('status', 'open').select('id')
+  if (error?.code === '23503') {
+    // The submissions still point at the task: remove them, then the task.
+    if (!(await removeSubmissions())) return { ok: false, error: 'Could not delete the task.' }
+    ;({ data: deleted, error } = await db.from('tasks').delete().eq('id', taskId).eq('status', 'open').select('id'))
+  }
   if (error) return { ok: false, error: 'Could not delete the task.' }
   if (!deleted || deleted.length === 0) return { ok: false, error: 'This task changed meanwhile. Reload and try again.' }
-  await auditPortal(auth.caller, { action: 'task.deleted', targetType: 'task', targetId: taskId, targetLabel: task.title })
+  const cleared = await removeSubmissions()
+  if (!cleared) console.error('[portal] task deleted but its rejected submissions were not removed:', taskId)
+
+  await auditPortal(auth.caller, { action: 'task.deleted', targetType: 'task', targetId: taskId, targetLabel: task.title, metadata: { submissions_removed: cleared ? ids.length : 0 } })
   refresh()
-  return { ok: true, message: 'Task deleted.' }
+  revalidatePath('/portal/reviews')
+  return { ok: true, message: ids.length > 0 ? `Task deleted with its ${ids.length} rejected submission${ids.length === 1 ? '' : 's'}.` : 'Task deleted.' }
 }

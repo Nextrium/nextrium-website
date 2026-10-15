@@ -68,3 +68,16 @@ export function editRules(status: string | null | undefined): { content: boolean
   if (status === 'assigned') return { content: true, sizing: false }
   return { content: false, sizing: false }
 }
+
+/**
+ * Whether an admin may delete a task, and which of its submissions go with it.
+ * Only an open task whose submissions were all rejected (including "changes
+ * requested") can go: those carry no points, so removing them changes no
+ * score. Held tasks, work waiting for review and verified work are kept.
+ */
+export function deleteRule(status: string | null | undefined, submissions: { id: string; status: string | null }[]): { ok: true; removeSubmissionIds: string[] } | { ok: false; error: string } {
+  if (status !== 'open') return { ok: false, error: 'Only open tasks can be deleted. Unassign it first.' }
+  if (submissions.some((s) => s.status === 'verified')) return { ok: false, error: 'This task has verified work with points awarded, so it is kept for the record.' }
+  if (submissions.some((s) => s.status !== 'rejected')) return { ok: false, error: 'This task has a submission waiting for review. Decide on it in the review queue first.' }
+  return { ok: true, removeSubmissionIds: submissions.map((s) => s.id) }
+}

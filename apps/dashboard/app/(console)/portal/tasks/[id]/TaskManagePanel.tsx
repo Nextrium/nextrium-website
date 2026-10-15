@@ -12,16 +12,20 @@ interface Props {
   extendedTo: string | null
   canUnassign: boolean
   canDelete: boolean
+  /** Rejected submissions that go with the task. */
+  deleteRemoves: number
+  /** Why an open task cannot be deleted, shown to admins. */
+  deleteBlocked: string | null
 }
 
-export default function TaskManagePanel({ taskId, status, extensionPending, extendedTo, canUnassign, canDelete }: Props) {
+export default function TaskManagePanel({ taskId, status, extensionPending, extendedTo, canUnassign, canDelete, deleteRemoves, deleteBlocked }: Props) {
   const router = useRouter()
   const [busy, setBusy] = useState<string | null>(null)
   const [confirm, setConfirm] = useState<'unassign' | 'delete' | null>(null)
   const [reason, setReason] = useState('')
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null)
 
-  if (!extensionPending && !canUnassign && !canDelete && !result) return null
+  if (!extensionPending && !canUnassign && !canDelete && !deleteBlocked && !result) return null
 
   async function run(label: string, fn: () => Promise<{ ok: true; message: string } | { ok: false; error: string }>, after?: () => void) {
     setBusy(label)
@@ -65,7 +69,11 @@ export default function TaskManagePanel({ taskId, status, extensionPending, exte
 
       {canDelete && (confirm === 'delete' ? (
         <>
-          <span className="pt-hint">Delete this task for good? It has no submissions. This cannot be undone.</span>
+          <span className="pt-hint">
+            {deleteRemoves > 0
+              ? `Delete this task for good? Its ${deleteRemoves} rejected submission${deleteRemoves === 1 ? '' : 's'} will be removed too, from the portal and from here. This cannot be undone.`
+              : 'Delete this task for good? It has no submissions. This cannot be undone.'}
+          </span>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button type="button" className="pt-btn danger" disabled={!!busy} onClick={() => run('delete', () => deletePortalTask(taskId), () => router.push('/portal/tasks'))}>{busy === 'delete' ? 'Deleting…' : 'Yes, delete'}</button>
             <button type="button" className="pt-btn ghost" disabled={!!busy} onClick={() => setConfirm(null)}>Keep</button>
@@ -74,6 +82,7 @@ export default function TaskManagePanel({ taskId, status, extensionPending, exte
       ) : (
         <button type="button" className="pt-btn danger" disabled={!!busy} onClick={() => setConfirm('delete')}>Delete task</button>
       ))}
+      {deleteBlocked && <span className="pt-hint">{deleteBlocked}</span>}
     </div>
   )
 }
