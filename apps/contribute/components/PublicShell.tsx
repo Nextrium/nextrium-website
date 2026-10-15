@@ -23,9 +23,6 @@ export default function PublicShell({ children, signedIn = false }: { children: 
         <nav className="max-w-6xl mx-auto px-6 lg:px-10 h-16 flex items-center justify-between gap-6">
           <Link href="/" aria-label={`${brand.name} Contribute home`} className="flex items-center gap-3" style={{ textDecoration: 'none' }}>
             <Wordmark size="sm" />
-            <span className="hidden sm:inline" style={{ fontFamily: F.body, fontSize: 12, color: C.mute, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
-              Contribute
-            </span>
           </Link>
           <div className="flex items-center gap-5">
             <div className="hidden md:flex items-center gap-5">
