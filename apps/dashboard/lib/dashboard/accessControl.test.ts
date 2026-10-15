@@ -63,3 +63,19 @@ test('tasks and reviews are staff-only (admin, moderator)', () => {
     assert.equal(isRestricted('/reviews', role), false, role)
   }
 })
+
+test('contributor portal admin is for admin and moderator only', () => {
+  for (const path of ['/portal', '/portal/applicants', '/portal/applicants/abc']) {
+    assert.equal(isRestricted(path, 'admin'), false, path)
+    assert.equal(isRestricted(path, 'moderator'), false, path)
+    for (const role of ['content', 'community', 'member', 'archived', 'none', 'superuser']) {
+      assert.equal(isRestricted(path, role), true, `${role} ${path}`)
+    }
+  }
+  // The portal audit log is admin-only, like /logs.
+  assert.equal(isRestricted('/portal/audit', 'admin'), false)
+  assert.equal(isRestricted('/portal/audit', 'moderator'), true)
+  assert.equal(isRestricted('/portal/team', 'moderator'), false)
+  // The prefix must not catch the existing community projects page.
+  assert.equal(isRestricted('/community-projects', 'community'), false)
+})
