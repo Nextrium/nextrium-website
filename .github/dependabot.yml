@@ -11,6 +11,15 @@ updates:
       interval: weekly
       day: monday
     open-pull-requests-limit: 5
+    ignore:
+      # Major jumps of the toolchain wait for a deliberate decision, not a weekly PR.
+      # @types/node follows the Node version we run (22), so it moves only with Node.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     groups:
       # One PR for routine minor and patch updates instead of one per package.
       minor-and-patch:
