@@ -12,8 +12,9 @@ const LINKS = [
 /**
  * Header and footer around the portal's public pages. Pass signedIn when the
  * page already knows there is a session, to offer the dashboard, not sign-in.
+ * Pass null while loading, when it is not known yet: the button is left out.
  */
-export default function PublicShell({ children, signedIn = false }: { children: React.ReactNode; signedIn?: boolean }) {
+export default function PublicShell({ children, signedIn = false }: { children: React.ReactNode; signedIn?: boolean | null }) {
   return (
     <div className="min-h-screen flex flex-col bg-void">
       <header
@@ -32,9 +33,11 @@ export default function PublicShell({ children, signedIn = false }: { children: 
                 </Link>
               ))}
             </div>
-            <Link href={signedIn ? '/dashboard' : '/signin'} className="btn-primary" style={{ padding: '9px 20px', fontSize: 13 }}>
-              {signedIn ? 'Dashboard' : 'Sign in'}
-            </Link>
+            {signedIn !== null && (
+              <Link href={signedIn ? '/dashboard' : '/signin'} className="btn-primary" style={{ padding: '9px 20px', fontSize: 13 }}>
+                {signedIn ? 'Dashboard' : 'Sign in'}
+              </Link>
+            )}
           </div>
         </nav>
       </header>

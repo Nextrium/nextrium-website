@@ -7,10 +7,10 @@ import { updateCommunitySession } from '@nextrium/supabase/community/proxy'
 const SIGNED_IN_PATHS = ['/dashboard', '/register']
 
 export async function proxy(request: NextRequest) {
-  const { response, user } = await updateCommunitySession(request)
+  const { response, signedIn } = await updateCommunitySession(request)
   const path = request.nextUrl.pathname
 
-  if (!user && SIGNED_IN_PATHS.some((p) => path === p || path.startsWith(`${p}/`))) {
+  if (!signedIn && SIGNED_IN_PATHS.some((p) => path === p || path.startsWith(`${p}/`))) {
     const to = request.nextUrl.clone()
     to.pathname = '/signin'
     to.search = ''

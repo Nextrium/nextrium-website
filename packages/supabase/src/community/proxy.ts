@@ -1,15 +1,26 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
-import type { User } from '@supabase/supabase-js'
 import { communityEnv } from './env'
 
 // Same bound as the dashboard's session check: a slow auth response must not
 // hang every request. A timeout counts as signed out (fail closed).
 const AUTH_QUERY_TIMEOUT_MS = 4000
 
-/** Refreshes the community session cookies and reports who is signed in. */
-export async function updateCommunitySession(request: NextRequest): Promise<{ response: NextResponse; user: User | null }> {
+/** True when the request carries a Supabase session cookie (possibly split into chunks). */
+function hasSessionCookie(request: NextRequest): boolean {
+  return request.cookies.getAll().some((c) => c.name.startsWith('sb-') && c.name.includes('-auth-token'))
+}
+
+/**
+ * Refreshes the community session cookies and reports whether someone is signed in.
+ * The session is checked against the project's published signing key, so most
+ * requests need no call to the auth server; it is only contacted to refresh an
+ * expired session. Pages and actions still confirm the account themselves.
+ */
+export async function updateCommunitySession(request: NextRequest): Promise<{ response: NextResponse; signedIn: boolean }> {
   let response = NextResponse.next({ request })
+  // No session cookie: nobody is signed in and there is nothing to refresh.
+  if (!hasSessionCookie(request)) return { response, signedIn: false }
 
   const supabase = createServerClient(
     communityEnv('COMMUNITY_SUPABASE_URL'),
@@ -33,14 +44,14 @@ export async function updateCommunitySession(request: NextRequest): Promise<{ re
   )
 
   let timer: ReturnType<typeof setTimeout> | undefined
-  const timeout = new Promise<null>((resolve) => {
-    timer = setTimeout(() => resolve(null), AUTH_QUERY_TIMEOUT_MS)
+  const timeout = new Promise<false>((resolve) => {
+    timer = setTimeout(() => resolve(false), AUTH_QUERY_TIMEOUT_MS)
   })
-  const user = await Promise.race([
-    supabase.auth.getUser().then(({ data }) => data.user).catch(() => null),
+  const signedIn = await Promise.race([
+    supabase.auth.getClaims().then(({ data }) => typeof data?.claims?.sub === 'string').catch(() => false),
     timeout,
   ])
   clearTimeout(timer)
 
-  return { response, user }
+  return { response, signedIn }
 }
