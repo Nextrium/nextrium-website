@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { assignmentDeadline, editRules, extendedDeadline, extensionState, parseTags } from './taskRules'
+import { assignmentDeadline, deleteRule, editRules, extendedDeadline, extensionState, parseTags } from './taskRules'
 
 test('tags: trimmed, lowercased, de-duplicated, limited', () => {
   assert.deepEqual(parseTags(' Trust, identity ,trust '), { tags: ['trust', 'identity'] })
@@ -34,4 +34,15 @@ test('sizing locks once a task is held; completed tasks are read-only', () => {
   assert.deepEqual(editRules('assigned'), { content: true, sizing: false })
   assert.deepEqual(editRules('completed'), { content: false, sizing: false })
   assert.deepEqual(editRules(null), { content: false, sizing: false })
+})
+
+test('delete: open tasks only; rejected submissions go with the task; anything else keeps it', () => {
+  const s = (id: string, status: string | null) => ({ id, status })
+  assert.deepEqual(deleteRule('open', []), { ok: true, removeSubmissionIds: [] })
+  assert.deepEqual(deleteRule('open', [s('a', 'rejected'), s('b', 'rejected')]), { ok: true, removeSubmissionIds: ['a', 'b'] })
+  for (const held of ['assigned', 'completed', null, undefined]) assert.equal(deleteRule(held, []).ok, false)
+  assert.match((deleteRule('open', [s('a', 'rejected'), s('b', 'verified')]) as { error: string }).error, /verified/)
+  for (const waiting of ['submitted', 'under_review', 'ai_approved', 'pending', null, 'something_new']) {
+    assert.equal(deleteRule('open', [s('a', 'rejected'), s('b', waiting)]).ok, false, String(waiting))
+  }
 })
