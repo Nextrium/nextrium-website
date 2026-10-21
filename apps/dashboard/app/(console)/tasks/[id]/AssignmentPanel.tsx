@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { assignTask, decideExtension, unassignTask } from '../actions'
+import { assignDraftToGroup, assignTask, decideExtension, unassignTask } from '../actions'
+import GroupPicker from './GroupPicker'
 import { CATEGORY_LABELS, EXTENSION_DAYS } from '@nextrium/contributions-core/constants'
 import { deadlineLabel, effectiveDeadline } from '@nextrium/contributions-core/taskView'
 import type { MemberSummary } from '@/lib/contributions/members'
@@ -12,13 +13,15 @@ interface Props {
   task: Task
   members: MemberSummary[]
   hasSubmission: boolean
+  /** People holding a copy of this task when it is shared; 0 when it is not. */
+  groupSize: number
 }
 
 function fmt(date: Date | null): string {
   return date ? date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '—'
 }
 
-export default function AssignmentPanel({ task, members, hasSubmission }: Props) {
+export default function AssignmentPanel({ task, members, hasSubmission, groupSize }: Props) {
   const router = useRouter()
   const active = useMemo(
     () => members.filter((m) => m.active)
@@ -32,15 +35,31 @@ export default function AssignmentPanel({ task, members, hasSubmission }: Props)
   const [deadline, setDeadline] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  // A draft that isn't shared yet can go to several people instead.
+  const [mode, setMode] = useState<'one' | 'group'>('one')
+  const [groupIds, setGroupIds] = useState<string[]>([])
+  const [confirmGroup, setConfirmGroup] = useState(false)
+  const canShare = !hasSubmission && task.status === 'draft' && !task.group_id
 
   const canAssign = !hasSubmission && (task.status === 'draft' || task.status === 'assigned')
   const picked = active.find((m) => m.userId === pick) ?? null
 
   async function run(label: string, fn: () => Promise<{ ok: boolean; error?: string }>) {
-    setError(null); setBusy(label)
+    setError(null); setNotice(null); setBusy(label)
     const res = await fn()
     setBusy(null)
     if (!res.ok) { setError(res.error ?? 'Something went wrong.'); return }
+    router.refresh()
+  }
+
+  async function share() {
+    setError(null); setNotice(null); setBusy('share')
+    const res = await assignDraftToGroup(task.id, groupIds, deadline ? new Date(deadline).toISOString() : null)
+    setBusy(null); setConfirmGroup(false)
+    if (!res.ok) { setError(res.error); router.refresh(); return }
+    setNotice(res.message)
+    setMode('one'); setGroupIds([])
     router.refresh()
   }
 
@@ -48,6 +67,8 @@ export default function AssignmentPanel({ task, members, hasSubmission }: Props)
     <div className="task-panel">
       <div className="task-panel-title">Assignment</div>
       {error && <div className="task-alert error" style={{ marginBottom: 0 }}>{error}</div>}
+      {notice && <div className="task-alert success" role="status" style={{ marginBottom: 0 }}>{notice}</div>}
+      {groupSize > 0 && <span className="group-note">One of {groupSize} copies of a shared task.</span>}
 
       {assignee && (
         <>
@@ -72,7 +93,38 @@ export default function AssignmentPanel({ task, members, hasSubmission }: Props)
       {task.extension_status === 'granted' && <span className="task-hint">Extension granted.</span>}
       {task.extension_status === 'denied' && <span className="task-hint">Extension denied.</span>}
 
-      {canAssign && (
+      {canShare && (
+        <div className="group-mode" role="group" aria-label="Who is this task for">
+          <button type="button" className={`group-chip${mode === 'one' ? ' on' : ''}`} aria-pressed={mode === 'one'} onClick={() => { setMode('one'); setConfirmGroup(false) }}>One person</button>
+          <button type="button" className={`group-chip${mode === 'group' ? ' on' : ''}`} aria-pressed={mode === 'group'} onClick={() => setMode('group')}>Several people</button>
+        </div>
+      )}
+
+      {canShare && mode === 'group' && (
+        <>
+          <GroupPicker members={active} category={task.category} selected={groupIds} onChange={(ids) => { setGroupIds(ids); setConfirmGroup(false) }} />
+          <div className="task-field">
+            <label className="task-label" htmlFor="group-deadline">Deadline for everyone (optional)</label>
+            <input id="group-deadline" type="datetime-local" className="task-input" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
+            <span className="group-note">Leave empty for {task.deadline_days} days from now. Each person gets their own copy and submits on their own.</span>
+          </div>
+          {confirmGroup ? (
+            <div className="group-confirm" role="alertdialog" aria-label="Confirm">
+              <span>Give this task to {groupIds.length} people? That makes {groupIds.length} copies and emails {groupIds.length} people.</span>
+              <span style={{ display: 'flex', gap: 8 }}>
+                <button type="button" className="task-btn" disabled={!!busy} onClick={share}>{busy === 'share' ? 'Assigning…' : 'Yes, assign'}</button>
+                <button type="button" className="task-btn ghost" disabled={!!busy} onClick={() => setConfirmGroup(false)}>Back</button>
+              </span>
+            </div>
+          ) : (
+            <button type="button" className="task-btn" style={{ width: 'fit-content' }} disabled={groupIds.length < 2 || !!busy} onClick={() => setConfirmGroup(true)}>
+              {groupIds.length < 2 ? 'Choose 2 or more people' : `Assign to ${groupIds.length} people`}
+            </button>
+          )}
+        </>
+      )}
+
+      {canAssign && !(canShare && mode === 'group') && (
         <>
           <div className="task-field">
             <label className="task-label" htmlFor="task-assignee">{assignee ? 'Reassign to' : 'Assign to'}</label>

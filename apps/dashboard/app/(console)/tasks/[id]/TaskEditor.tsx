@@ -4,9 +4,10 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Header from '@/components/dashboard/Header'
 import RichTextEditor from '@/components/editor/RichTextEditor'
-import { cancelTask, createAndAssignTask, createTask, updateTask } from '../actions'
+import { cancelTask, createAndAssignTask, createTask, createTaskForGroup, updateTask } from '../actions'
 import { taskHasChanges, type TaskFormValues } from '@nextrium/contributions-core/taskInput'
 import AssignmentPanel from './AssignmentPanel'
+import GroupPicker from './GroupPicker'
 import {
   CATEGORIES,
   CATEGORY_LABELS,
@@ -24,9 +25,13 @@ interface Props {
   task: Task | null
   members: MemberSummary[]
   hasSubmission: boolean
+  /** People holding a copy of this task when it is shared; 0 when it is not. */
+  groupSize: number
+  /** Set just after this task was created for several people. */
+  sharedWith?: number | null
 }
 
-export default function TaskEditor({ task, members, hasSubmission }: Props) {
+export default function TaskEditor({ task, members, hasSubmission, groupSize, sharedWith = null }: Props) {
   const router = useRouter()
   const isNew = !task
   const isDraft = isNew || task.status === 'draft'
@@ -42,12 +47,16 @@ export default function TaskEditor({ task, members, hasSubmission }: Props) {
   const [cancelling, setCancelling] = useState(false)
   const [confirmCancel, setConfirmCancel] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(sharedWith ? `Shared with ${sharedWith} people. Each has their own copy.` : null)
 
   // New tasks are assigned in the same pass as they are created.
   const [assignee, setAssignee] = useState('')
   const [deadline, setDeadline] = useState('')
   const [strandedDraftId, setStrandedDraftId] = useState<string | null>(null)
+  // …or to several people, each getting their own copy.
+  const [mode, setMode] = useState<'one' | 'group'>('one')
+  const [groupIds, setGroupIds] = useState<string[]>([])
+  const [confirmGroup, setConfirmGroup] = useState(false)
   const activeMembers = useMemo(
     () => members.filter((m) => m.active)
       .sort((a, b) => Number(b.categories.includes(category)) - Number(a.categories.includes(category)) || a.openTasks - b.openTasks),
@@ -88,6 +97,26 @@ export default function TaskEditor({ task, members, hasSubmission }: Props) {
     if ('draftId' in res) setStrandedDraftId(res.draftId)
   }
 
+  async function handleCreateForGroup() {
+    setError(null); setSuccess(null); setSaving(true)
+    const res = await createTaskForGroup(current, groupIds, deadline ? new Date(deadline).toISOString() : null)
+    setSaving(false); setConfirmGroup(false)
+    if (!res.ok) {
+      setError(res.error)
+      // Copies may exist as drafts now; stop a second click from making more.
+      setStrandedDraftId('list')
+      return
+    }
+    if (res.assigned < res.total) {
+      // Some copies stayed drafts: show who, and keep the form from making more.
+      setSuccess(res.message)
+      setStrandedDraftId('list')
+      return
+    }
+    router.push(`/tasks/${res.firstId}?shared=${res.total}`)
+    router.refresh()
+  }
+
   async function handleCancel() {
     if (!task) return
     setError(null); setCancelling(true)
@@ -116,9 +145,15 @@ export default function TaskEditor({ task, members, hasSubmission }: Props) {
           <button type="button" className="task-btn ghost" onClick={handleSave} disabled={!canSubmitNew}>
             {saving ? 'Saving…' : 'Save as draft'}
           </button>
-          <button type="button" className="task-btn" onClick={handleCreateAndAssign} disabled={!canSubmitNew || !assignee}>
-            {saving ? 'Creating…' : 'Create & assign'}
-          </button>
+          {mode === 'one' ? (
+            <button type="button" className="task-btn" onClick={handleCreateAndAssign} disabled={!canSubmitNew || !assignee}>
+              {saving ? 'Creating…' : 'Create & assign'}
+            </button>
+          ) : (
+            <button type="button" className="task-btn" onClick={() => setConfirmGroup(true)} disabled={!canSubmitNew || groupIds.length < 2 || confirmGroup}>
+              {groupIds.length < 2 ? 'Choose 2 or more people' : `Create for ${groupIds.length} people`}
+            </button>
+          )}
         </>
       ) : !isClosed && (
         <button type="button" className="task-btn" onClick={handleSave} disabled={saving || !dirty}>
@@ -152,6 +187,21 @@ export default function TaskEditor({ task, members, hasSubmission }: Props) {
         .task-alert { padding: 10px 14px; font-size: 12px; border: 1px solid; margin-bottom: 8px; }
         .task-alert.error { background: color-mix(in srgb, var(--error) 8%, transparent); border-color: color-mix(in srgb, var(--error) 30%, transparent); color: var(--error); }
         .task-alert.success { background: color-mix(in srgb, var(--success) 8%, transparent); border-color: color-mix(in srgb, var(--success) 30%, transparent); color: var(--success); }
+        .group-mode, .group-areas { display: flex; flex-wrap: wrap; gap: 6px; }
+        .group-chip { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.12em; text-transform: uppercase; padding: 6px 10px; background: none; border: 1px solid rgba(255,255,255,0.12); color: var(--grey-mid); cursor: pointer; }
+        .group-chip.on { border-color: var(--orange); color: var(--orange-w); }
+        .group-chip:focus-visible, .group-person:focus-within { outline: 1px solid var(--orange); outline-offset: 1px; }
+        .group-list { display: flex; flex-direction: column; max-height: 280px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.08); }
+        .group-person { display: grid; grid-template-columns: auto 1fr; column-gap: 10px; padding: 8px 12px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.04); }
+        .group-person:last-child { border-bottom: none; }
+        .group-person.on { background: color-mix(in srgb, var(--orange) 8%, transparent); }
+        .group-person input { grid-row: span 2; accent-color: var(--orange); }
+        .group-name { font-size: 13px; color: var(--off-white); }
+        .group-meta { font-size: 11px; color: var(--grey-mid); }
+        .group-note { font-size: 11px; color: var(--grey-mid); }
+        .group-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .group-confirm { display: flex; flex-direction: column; gap: 10px; padding: 12px; font-size: 12px; color: var(--off-white); border: 1px solid color-mix(in srgb, var(--orange) 40%, transparent); background: color-mix(in srgb, var(--orange) 6%, transparent); }
+        .task-alert.info { background: color-mix(in srgb, var(--orange) 6%, transparent); border-color: color-mix(in srgb, var(--orange) 30%, transparent); color: var(--off-white); }
         @media (max-width: 1100px) { .task-layout { grid-template-columns: 1fr; } .task-side { position: static; } }
       `}</style>
 
@@ -163,7 +213,13 @@ export default function TaskEditor({ task, members, hasSubmission }: Props) {
 
       <div className="dash-content">
         {error && <div className="task-alert error">{error}</div>}
-        {success && <div className="task-alert success">{success}</div>}
+        {success && <div className="task-alert success" role="status">{success}</div>}
+        {!isNew && groupSize > 0 && (
+          <div className="task-alert info">
+            Shared task: this is one of {groupSize} copies, one per person. Changes here apply to this copy only.{' '}
+            <a href={`/tasks?group=${task.group_id}`} style={{ color: 'var(--orange-w)' }}>See all copies</a>
+          </div>
+        )}
 
         <div className="task-layout">
           <div className="task-main">
@@ -223,6 +279,16 @@ export default function TaskEditor({ task, members, hasSubmission }: Props) {
             {isNew && (
               <div className="task-panel">
                 <div className="task-panel-title">Assignment</div>
+                <div className="group-mode" role="group" aria-label="Who is this task for">
+                  <button type="button" className={`group-chip${mode === 'one' ? ' on' : ''}`} aria-pressed={mode === 'one'} onClick={() => { setMode('one'); setConfirmGroup(false) }}>One person</button>
+                  <button type="button" className={`group-chip${mode === 'group' ? ' on' : ''}`} aria-pressed={mode === 'group'} onClick={() => setMode('group')}>Several people</button>
+                </div>
+                {mode === 'group' ? (
+                  <>
+                    <GroupPicker members={activeMembers} category={category} selected={groupIds} onChange={(ids) => { setGroupIds(ids); setConfirmGroup(false) }} />
+                    <span className="group-note">Each person gets their own copy and submits on their own. Everyone has the same deadline.</span>
+                  </>
+                ) : (
                 <div className="task-field">
                   <label className="task-label" htmlFor="new-task-assignee">Assign to</label>
                   <select id="new-task-assignee" className="task-select" value={assignee} onChange={(e) => setAssignee(e.target.value)}>
@@ -240,17 +306,29 @@ export default function TaskEditor({ task, members, hasSubmission }: Props) {
                     </span>
                   )}
                 </div>
+                )}
                 <div className="task-field">
                   <label className="task-label" htmlFor="new-task-deadline">Custom deadline (optional)</label>
                   <input id="new-task-deadline" type="datetime-local" className="task-input" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
                   <span className="task-hint">Leave empty for {defaults.deadlineDays} days from assignment.</span>
                 </div>
+                {mode === 'group' && confirmGroup && (
+                  <div className="group-confirm" role="alertdialog" aria-label="Confirm">
+                    <span>Create {groupIds.length} copies of this task and email {groupIds.length} people?</span>
+                    <span style={{ display: 'flex', gap: 8 }}>
+                      <button type="button" className="task-btn" onClick={handleCreateForGroup} disabled={saving}>{saving ? 'Creating…' : 'Yes, create'}</button>
+                      <button type="button" className="task-btn ghost" onClick={() => setConfirmGroup(false)} disabled={saving}>Back</button>
+                    </span>
+                  </div>
+                )}
                 {strandedDraftId && (
-                  <a className="task-btn ghost" href={`/tasks/${strandedDraftId}`} style={{ textDecoration: 'none', width: 'fit-content' }}>Open the draft to assign it</a>
+                  <a className="task-btn ghost" href={strandedDraftId === 'list' ? '/tasks?status=draft' : `/tasks/${strandedDraftId}`} style={{ textDecoration: 'none', width: 'fit-content' }}>
+                    {strandedDraftId === 'list' ? 'Open the drafts' : 'Open the draft to assign it'}
+                  </a>
                 )}
               </div>
             )}
-            {!isNew && !isClosed && <AssignmentPanel task={task} members={members} hasSubmission={hasSubmission} />}
+            {!isNew && !isClosed && <AssignmentPanel task={task} members={members} hasSubmission={hasSubmission} groupSize={groupSize} />}
             {!isNew && members.length === 0 && (
               <div className="task-panel"><span className="task-hint">No members yet. Invite people from Applications → Invite to Team.</span></div>
             )}

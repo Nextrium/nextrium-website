@@ -671,6 +671,8 @@ export type Database = {
           extended_deadline_at: string | null
           links: { label: string; url: string }[]
           created_by: string | null
+          /** Shared by the copies of a task given to several people; null for a one-person task. */
+          group_id: string | null
           created_at: string
           updated_at: string
         }
@@ -686,6 +688,7 @@ export type Database = {
           status?: 'draft' | 'assigned' | 'submitted' | 'changes_requested' | 'completed' | 'cancelled'
           links?: { label: string; url: string }[]
           created_by?: string | null
+          group_id?: string | null
           created_at?: string
           updated_at?: string
         }
