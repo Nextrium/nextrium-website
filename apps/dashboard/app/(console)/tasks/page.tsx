@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Tasks' }
 
 interface Props {
-  searchParams: Promise<{ status?: string; category?: string; assignee?: string; overdue?: string }>
+  searchParams: Promise<{ status?: string; category?: string; assignee?: string; overdue?: string; group?: string }>
 }
 
 export default async function TasksPage({ searchParams }: Props) {
@@ -26,6 +26,8 @@ export default async function TasksPage({ searchParams }: Props) {
   if (filters.status && (TASK_STATUSES as readonly string[]).includes(filters.status)) query = query.eq('status', filters.status)
   if (isCategory(filters.category)) query = query.eq('category', filters.category)
   if (filters.assignee && /^[0-9a-f-]{36}$/i.test(filters.assignee)) query = query.eq('assigned_to', filters.assignee)
+  const group = filters.group && /^[0-9a-f-]{36}$/i.test(filters.group) ? filters.group : null
+  if (group) query = query.eq('group_id', group)
   const { data } = await query
   let tasks: Task[] = data ?? []
   const now = new Date()
@@ -33,6 +35,14 @@ export default async function TasksPage({ searchParams }: Props) {
 
   const members = await getMemberDirectory()
   const nameOf = new Map(members.map((m) => [m.userId, m.name]))
+
+  // How many people share each group shown, counting every live copy, not just this page's.
+  const groupIds = [...new Set(tasks.map((t) => t.group_id).filter((g): g is string => !!g))]
+  const { data: copies } = groupIds.length
+    ? await supabase.from('tasks').select('group_id').in('group_id', groupIds).neq('status', 'cancelled')
+    : { data: [] }
+  const groupSize = new Map<string, number>()
+  for (const c of (copies ?? []) as { group_id: string }[]) groupSize.set(c.group_id, (groupSize.get(c.group_id) ?? 0) + 1)
 
   return (
     <>
@@ -87,10 +97,12 @@ export default async function TasksPage({ searchParams }: Props) {
           <label className="check">
             <input type="checkbox" name="overdue" value="1" defaultChecked={filters.overdue === '1'} /> Overdue only
           </label>
+          {group && <input type="hidden" name="group" value={group} />}
           <button type="submit" className="tasks-btn">Filter</button>
           <Link href="/tasks" className="tasks-btn ghost">Clear</Link>
         </form>
 
+        {group && <p className="tasks-muted" style={{ marginBottom: 12 }}>Showing the copies of one shared task, one per person.</p>}
         {tasks.length === 0 ? (
           <div className="tasks-empty">No tasks match. Create one with “New task”.</div>
         ) : (
@@ -111,7 +123,12 @@ export default async function TasksPage({ searchParams }: Props) {
                   const overdue = isOverdue(t, now)
                   return (
                     <tr key={t.id}>
-                      <td><Link className="title" href={`/tasks/${t.id}`}>{t.title}</Link></td>
+                      <td>
+                        <Link className="title" href={`/tasks/${t.id}`}>{t.title}</Link>
+                        {t.group_id && !group && (
+                          <> <Link className="tasks-badge" href={`/tasks?group=${t.group_id}`} style={{ textDecoration: 'none' }}>Group of {groupSize.get(t.group_id) ?? 1}</Link></>
+                        )}
+                      </td>
                       <td>{CATEGORY_LABELS[t.category]} <span className="tasks-muted">· {COMPLEXITY_LABELS[t.complexity]}</span></td>
                       <td>
                         <span className={`tasks-badge ${t.status === 'completed' ? 'good' : t.status === 'cancelled' ? '' : 'warn'}`}>{TASK_STATUS_LABELS[t.status]}</span>
