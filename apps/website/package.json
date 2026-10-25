@@ -19,7 +19,7 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.77.0",
-    "zod": "^4.4.3",
+    "zod": "^4.6.7",
     "@nextrium/supabase": "*",
     "@nextrium/email": "*",
     "@nextrium/contributions-core": "*",
