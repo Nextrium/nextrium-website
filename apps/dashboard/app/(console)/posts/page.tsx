@@ -2,6 +2,7 @@ import { createServiceClient } from '@nextrium/supabase/server'
 import Header from '@/components/dashboard/Header'
 import Link from 'next/link'
 import PostsListClient from './PostsListClient'
+import { loadPins } from '@/lib/dashboard/pins'
 import type { Post } from '@nextrium/supabase/database'
 
 export const dynamic = 'force-dynamic'
@@ -17,7 +18,7 @@ async function getPosts(): Promise<Post[]> {
 }
 
 export default async function PostsPage() {
-  const posts = await getPosts()
+  const [posts, pins] = await Promise.all([getPosts(), loadPins(createServiceClient())])
 
   return (
     <>
@@ -62,7 +63,7 @@ export default async function PostsPage() {
             <Link href="/posts/new" className="dash-new-btn">+ New post</Link>
           </div>
         ) : (
-          <PostsListClient posts={posts} />
+          <PostsListClient posts={posts} pins={pins} />
         )}
       </div>
     </>

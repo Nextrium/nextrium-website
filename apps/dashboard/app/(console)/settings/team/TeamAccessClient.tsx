@@ -17,6 +17,8 @@ interface DashboardUserRow {
   discord_linked?: boolean
   application_track?: string | null
   has_application?: boolean
+  /** Finished onboarding. Until then the link sent is a 5-day invitation. */
+  onboarded?: boolean
 }
 
 // "Member" is contribution-only access (Team page and their own profile). To
@@ -244,8 +246,9 @@ export default function TeamAccessClient({ users: initial, tracks }: { users: Da
                           style={{ borderColor: 'rgba(255,255,255,0.15)', color: 'var(--off-white)' }}
                           disabled={updatingId === user.user_id}
                           onClick={() => handlePasswordLink(user.user_id)}
+                          title={user.onboarded === false ? 'Emails a new invitation link that works for 5 days' : 'Emails a single-use link to choose a new password'}
                         >
-                          Send password link
+                          {user.onboarded === false ? 'Send invite link' : 'Send password link'}
                         </button>
                       </div>
                     )}

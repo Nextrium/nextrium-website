@@ -4,7 +4,8 @@ import { createServiceClient } from '@nextrium/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { logActivity } from '@/lib/activityLog'
 import { getVerifiedIdentity } from '@/lib/dashboard/getRole'
-import { inviteAccount } from '@/lib/dashboard/teamAccounts'
+import { inviteAccount, supabaseCreateAccount } from '@/lib/dashboard/teamAccounts'
+import { makeInviteDelivery } from '@/lib/dashboard/inviteDelivery'
 import { APPLICATION_TRACKS } from '@/lib/automation/rulesAdmin'
 import { ACCESS_REVOKED, ACCESS_SYNC, emitAutomationEvent, supersedeSuccesses } from '@/lib/automation/server'
 import { brand } from '@nextrium/brand'
@@ -32,6 +33,7 @@ export interface InvitedUserRow {
   is_team_member: boolean
   /** Set when the track was filled in from their application's screening. */
   track?: string | null
+  onboarded?: boolean
 }
 
 export async function inviteUser(
@@ -39,18 +41,17 @@ export async function inviteUser(
   role: string
 ): Promise<{ error?: string; notice?: string; added?: InvitedUserRow; teamMemberSet?: string; trackFor?: { userId: string; track: string } }> {
   try {
-    if (!(await requireAdmin())) return { error: NOT_ALLOWED }
+    const admin = await requireAdmin()
+    if (!admin) return { error: NOT_ALLOWED }
     if (!VALID_ROLES.includes(role)) return { error: 'Invalid role.' }
     email = (typeof email === 'string' ? email : '').trim().toLowerCase()
     if (!email.includes('@') || email.length > 254) return { error: 'Enter a valid email address.' }
 
-    const dashboardUrl = process.env.NEXT_PUBLIC_DASHBOARD_URL ?? brand.urls.dashboard
+    const db = createServiceClient()
     const outcome = await inviteAccount({ email, role, asTeamMember: role === 'member' }, {
-      db: createServiceClient(),
-      fetchFn: fetch,
-      supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      secret: process.env.SUPABASE_SECRET_KEY!,
-      redirectTo: `${dashboardUrl}/auth/callback`,
+      db,
+      createAccount: supabaseCreateAccount(db),
+      deliver: makeInviteDelivery(db, admin.userId),
     })
 
     if (outcome.kind === 'error') return { error: outcome.message }
@@ -74,13 +75,15 @@ export async function inviteUser(
 
     const row = (r: string): InvitedUserRow => ({
       user_id: outcome.userId, role: r, created_at: new Date().toISOString(), email,
-      archived: false, archived_at: null, is_team_member: r === 'member', track: tracks.trackSet ? tracks.track : null,
+      archived: false, archived_at: null, is_team_member: r === 'member', track: tracks.trackSet ? tracks.track : null, onboarded: false,
     })
     switch (outcome.kind) {
       case 'invited':
-        return { added: row(role), notice: trackNote ? `Invite sent to ${email}.${trackNote}` : undefined, trackFor }
+        return outcome.emailed
+          ? { added: row(role), notice: `Invite sent to ${email}. The link works for 5 days.${trackNote}`, trackFor }
+          : { added: row(role), notice: `${email} was added, but the invitation email could not be sent. Use "Send invite link" on their row to try again.${trackNote}`, trackFor }
       case 'reinvited':
-        return { notice: `${email} had not accepted their first invitation, so it was sent again.${trackNote}`, trackFor }
+        return { notice: `${email} had not accepted yet, so a new 5-day link was sent. The earlier link no longer works.${trackNote}`, trackFor }
       case 'added_existing':
         return { added: row(role), notice: `${email} already had an account, so they were added as ${role} directly. No invitation email was sent.${trackNote}`, trackFor }
       case 'already':
@@ -327,20 +330,33 @@ export async function syncPersonAccess(userId: string): Promise<{ error?: string
   }
 }
 
-/** Emails an existing dashboard user a single-use link to choose a password. Admin only; no public reset exists. */
+/**
+ * Emails a person a way in. Someone who hasn't finished onboarding gets a new
+ * 5-day invitation (it signs them in, then they choose a password and finish
+ * their profile); everyone else gets a single-use password reset link. Admin
+ * only; there is no public reset.
+ */
 export async function sendPasswordSetupLink(userId: string): Promise<{ error?: string; notice?: string }> {
   try {
-    if (!(await requireAdmin())) return { error: NOT_ALLOWED }
+    const admin = await requireAdmin()
+    if (!admin) return { error: NOT_ALLOWED }
     if (typeof userId !== 'string' || !UUID.test(userId)) return { error: 'Unknown person.' }
 
     const supabase = createServiceClient()
-    const { data: row } = await (supabase.from('dashboard_users') as any).select('archived').eq('user_id', userId).maybeSingle()
+    const { data: row } = await (supabase.from('dashboard_users') as any).select('archived, onboarding_completed_at').eq('user_id', userId).maybeSingle()
     if (!row) return { error: 'Unknown person.' }
     if (row.archived) return { error: 'This person is archived. Restore them first.' }
 
     const { data: authData, error: authError } = await supabase.auth.admin.getUserById(userId)
     const email = authData?.user?.email
     if (authError || !email) return { error: 'Could not find that account.' }
+
+    if (!row.onboarding_completed_at) {
+      const sent = await makeInviteDelivery(supabase, admin.userId)(userId, email)
+      if (!sent) return { error: 'The email could not be sent. Try again in a minute.' }
+      logActivity({ action: 'team_invite_link_sent', targetType: 'dashboard_user', targetId: userId }).catch(() => {})
+      return { notice: `Invitation link sent to ${email}. It works for 5 days; any earlier link stops working.` }
+    }
 
     const dashboardUrl = process.env.NEXT_PUBLIC_DASHBOARD_URL ?? brand.urls.dashboard
     const secret = process.env.SUPABASE_SECRET_KEY!

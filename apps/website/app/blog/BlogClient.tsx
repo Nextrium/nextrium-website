@@ -34,9 +34,12 @@ function formatDate(dateStr: string): string {
 
 interface BlogClientProps {
   posts: Post[]
+  /** Posts pinned on this site; they already come first in `posts`. */
+  pinnedIds?: string[]
 }
 
-export default function BlogClient({ posts }: BlogClientProps) {
+export default function BlogClient({ posts, pinnedIds = [] }: BlogClientProps) {
+  const pinned = new Set(pinnedIds)
   const [active, setActive] = useState<FilterType>('all')
 
   const filtered = active === 'all'
@@ -66,6 +69,7 @@ export default function BlogClient({ posts }: BlogClientProps) {
         .filter-btn.active { background: var(--orange); color: var(--white); border-color: var(--orange); }
 
         /* Featured post */
+        .blog-pinned { display: inline-block; margin-left: 8px; font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--orange-w); border: 1px solid rgba(219,103,39,0.4); padding: 3px 8px; vertical-align: middle; }
         .blog-featured { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: rgba(255,255,255,0.06); margin-bottom: 48px; text-decoration: none; position: relative; align-items: stretch; }
         .blog-featured::before, .blog-featured::after { content: ''; position: absolute; width: 14px; height: 14px; border-color: rgba(219,103,39,0); border-style: solid; transition: border-color var(--transition-slow); z-index: 2; }
         .blog-featured::before { top: -1px; left: -1px; border-width: 2px 0 0 2px; }
@@ -182,6 +186,7 @@ export default function BlogClient({ posts }: BlogClientProps) {
                     >
                       {TYPE_FILTERS.find((f) => f.value === featured.post_type)?.label}
                     </span>
+                    {pinned.has(featured.id) && <span className="blog-pinned">Pinned</span>}
                     <div className="blog-featured-title">{featured.title}</div>
                     {featured.excerpt && <div className="blog-featured-excerpt">{featured.excerpt}</div>}
                     <div className="blog-featured-meta">
@@ -216,6 +221,7 @@ export default function BlogClient({ posts }: BlogClientProps) {
                           >
                             {TYPE_FILTERS.find((f) => f.value === post.post_type)?.label}
                           </span>
+                          {pinned.has(post.id) && <span className="blog-pinned">Pinned</span>}
                           <div className="blog-card-title">{post.title}</div>
                           {post.excerpt && <div className="blog-card-excerpt">{post.excerpt}</div>}
                           <div className="blog-card-footer">
