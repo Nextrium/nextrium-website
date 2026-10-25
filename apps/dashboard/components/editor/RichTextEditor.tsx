@@ -151,9 +151,13 @@ export default function RichTextEditor({ content, onChange, placeholder = 'Start
         .tiptap-editor em { font-style: italic; }
         .tiptap-editor u { text-decoration: underline; }
         .tiptap-editor s { text-decoration: line-through; }
-        .tiptap-editor code { font-family: var(--font-mono, 'Space Mono', monospace); font-size: 0.85em; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); padding: 2px 6px; border-radius: 2px; color: var(--teal); }
-        .tiptap-editor pre { background: var(--navy-deep); border: 1px solid rgba(255,255,255,0.06); padding: 16px 20px; overflow-x: auto; }
-        .tiptap-editor pre code { background: none; border: none; padding: 0; font-size: 13px; color: var(--teal); }
+        .tiptap-editor code { font-family: var(--font-mono, 'Space Mono', monospace); font-size: 0.85em; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); padding: 2px 6px; border-radius: 2px; color: var(--teal-l); }
+        /* Code blocks keep their lines and columns: no wrapping, scroll sideways instead. */
+        .tiptap-editor pre { background: var(--navy-deep); border: 1px solid rgba(255,255,255,0.06); padding: 16px 20px; overflow-x: auto; white-space: pre; tab-size: 2; }
+        .tiptap-editor pre code { background: none; border: none; padding: 0; font-size: 13px; line-height: 1.7; color: var(--off-white); white-space: pre; word-break: normal; overflow-wrap: normal; }
+        /* A code block inside a table cell reads as a compact label. */
+        .tiptap-editor td pre, .tiptap-editor th pre { display: inline-block; max-width: 100%; margin: 0; padding: 3px 8px; vertical-align: middle; }
+        .tiptap-editor td pre code, .tiptap-editor th pre code { font-size: 12px; line-height: 1.5; }
         .tiptap-editor blockquote { border-left: 3px solid var(--orange); padding-left: 16px; color: var(--grey-mid); font-style: italic; }
         .tiptap-editor ul { list-style: disc; padding-left: 24px; }
         .tiptap-editor ol { list-style: decimal; padding-left: 24px; }
