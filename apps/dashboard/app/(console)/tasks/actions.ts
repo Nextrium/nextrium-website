@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { createServiceClient } from '@nextrium/supabase/server'
 import { logActivity } from '@/lib/activityLog'
 import { isContributorRole, requireStaff, type Caller } from '@/lib/contributions/auth'
-import { groupDeadline, groupOutcome, parseGroupAssignees } from '@/lib/contributions/groupRules'
+import { deleteTaskRule, groupDeadline, groupOutcome, openCopyIds, parseGroupAssignees } from '@/lib/contributions/groupRules'
 import { getMemberDirectory } from '@/lib/contributions/members'
 import { parseAssignment, parseTaskInput } from '@nextrium/contributions-core/taskInput'
 import { describeDbError } from '@nextrium/contributions-core/errors'
@@ -337,6 +337,120 @@ export async function assignDraftToGroup(taskId: string, assigneeIds: unknown, d
   revalidatePath(`/tasks/${taskId}`)
   if (outcome.assigned === 0) return { ok: false, error: `No one could be assigned. ${groupOutcome(0, outcome.failed)}` }
   return { ok: true, firstId: taskId, assigned: outcome.assigned, total: group.ids.length, message: groupOutcome(outcome.assigned, outcome.failed) }
+}
+
+/** A copy's group and its live copies, with the ones that ever had a submission. */
+async function loadGroup(taskId: string): Promise<{ task: Task; copies: { id: string; status: string }[]; withSubmission: Set<string> } | { error: string }> {
+  const supabase = db()
+  const { data: task }: { data: Task | null } = await supabase.from('tasks').select('*').eq('id', taskId).maybeSingle()
+  if (!task) return { error: 'That task could not be found.' }
+  if (!task.group_id) return { error: 'This task is not shared with a group.' }
+  const { data: copies }: { data: { id: string; status: string }[] | null } = await supabase.from('tasks').select('id, status').eq('group_id', task.group_id)
+  const ids = (copies ?? []).map((c) => c.id)
+  const { data: subs }: { data: { task_id: string }[] | null } = ids.length
+    ? await supabase.from('contributions').select('task_id').in('task_id', ids)
+    : { data: [] }
+  return { task, copies: copies ?? [], withSubmission: new Set((subs ?? []).map((s) => s.task_id)) }
+}
+
+/**
+ * Cancels every copy of a shared task that nobody has submitted work for.
+ * Copies with a submission carry on through review and are left as they are.
+ */
+export async function cancelTaskGroup(taskId: string): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
+  const auth = await requireStaff()
+  if ('error' in auth) return { ok: false, error: auth.error }
+  if (!UUID.test(taskId)) return { ok: false, error: 'That task could not be found.' }
+  const group = await loadGroup(taskId)
+  if ('error' in group) return { ok: false, error: group.error }
+
+  const open = openCopyIds(group.copies, group.withSubmission)
+  const kept = group.copies.filter((c) => c.status !== 'cancelled' && !open.includes(c.id)).length
+  if (open.length === 0) return { ok: false, error: 'No copy can be cancelled: every live copy already has a submission.' }
+
+  // Status is re-checked in the same statement, so a copy submitted meanwhile is left alone.
+  const { data: done, error } = await db().from('tasks').update({ status: 'cancelled' })
+    .in('id', open).in('status', ['draft', 'assigned']).select('id')
+  if (error) {
+    console.error('[tasks] group cancel failed:', error.message)
+    return { ok: false, error: 'Could not cancel the copies.' }
+  }
+  const cancelled = (done ?? []).length
+  await logActivity({
+    action: 'task_group_cancelled', targetType: 'task', targetId: taskId,
+    details: { title: group.task.title, group: group.task.group_id, cancelled, kept },
+    actorId: auth.caller.userId, actorEmail: auth.caller.email ?? undefined,
+  })
+  revalidatePath('/tasks')
+  revalidatePath(`/tasks/${taskId}`)
+  const rest = kept + (open.length - cancelled)
+  return { ok: true, message: `Cancelled ${cancelled} cop${cancelled === 1 ? 'y' : 'ies'}.${rest ? ` ${rest} with a submission carr${rest === 1 ? 'ies' : 'y'} on through review.` : ''}` }
+}
+
+/**
+ * Saves the title, brief and links to every copy of a shared task that has not
+ * been submitted yet. Copies already submitted keep the brief their owner worked from.
+ */
+export async function updateTaskGroup(taskId: string, raw: unknown): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
+  const auth = await requireStaff()
+  if ('error' in auth) return { ok: false, error: auth.error }
+  if (!UUID.test(taskId)) return { ok: false, error: 'That task could not be found.' }
+  const parsed = parseTaskInput(raw)
+  if ('error' in parsed) return { ok: false, error: parsed.error }
+  const group = await loadGroup(taskId)
+  if ('error' in group) return { ok: false, error: group.error }
+  if (parsed.fields.category !== group.task.category || parsed.fields.complexity !== group.task.complexity) {
+    return { ok: false, error: 'Category and complexity set the points, so they can only change on a single draft copy, not across the group.' }
+  }
+
+  const open = openCopyIds(group.copies, group.withSubmission)
+  if (open.length === 0) return { ok: false, error: 'Every copy has been submitted, so the brief can no longer change.' }
+  const { title, description, links } = parsed.fields
+  const { data: saved, error } = await db().from('tasks').update({ title, description, links })
+    .in('id', open).in('status', ['draft', 'assigned']).select('id')
+  if (error) {
+    console.error('[tasks] group update failed:', error.message)
+    return { ok: false, error: 'Could not save the copies.' }
+  }
+  const n = (saved ?? []).length
+  await logActivity({
+    action: 'task_group_updated', targetType: 'task', targetId: taskId,
+    details: { title, group: group.task.group_id, updated: n },
+    actorId: auth.caller.userId, actorEmail: auth.caller.email ?? undefined,
+  })
+  revalidatePath('/tasks')
+  for (const id of open) revalidatePath(`/tasks/${id}`)
+  const skipped = group.copies.filter((c) => c.status !== 'cancelled').length - n
+  return { ok: true, message: `Saved to ${n} cop${n === 1 ? 'y' : 'ies'}.${skipped ? ` ${skipped} already submitted kept their brief.` : ''}` }
+}
+
+/** Deletes a cancelled task nobody submitted work for. Admins only; anything with a submission is kept. */
+export async function deleteTask(taskId: string): Promise<Result> {
+  const auth = await requireStaff()
+  if ('error' in auth) return { ok: false, error: auth.error }
+  if (!UUID.test(taskId)) return { ok: false, error: 'That task could not be found.' }
+  const supabase = db()
+  const { data: task }: { data: Pick<Task, 'status' | 'title' | 'group_id'> | null } = await supabase
+    .from('tasks').select('status, title, group_id').eq('id', taskId).maybeSingle()
+  if (!task) return { ok: false, error: 'That task could not be found.' }
+  const { count } = await supabase.from('contributions').select('id', { count: 'exact', head: true }).eq('task_id', taskId)
+  const rule = deleteTaskRule(auth.caller.role, task.status, count ?? 0)
+  if (!rule.ok) return { ok: false, error: rule.error }
+
+  const { data: gone, error } = await supabase.from('tasks').delete().eq('id', taskId).eq('status', 'cancelled').select('id')
+  if (error) {
+    // A submission added meanwhile still points at the task, so the database refuses.
+    console.error('[tasks] delete failed:', error.message)
+    return { ok: false, error: 'Could not delete the task.' }
+  }
+  if (!gone || gone.length === 0) return { ok: false, error: 'This task changed meanwhile. Reload and try again.' }
+  await logActivity({
+    action: 'task_deleted', targetType: 'task', targetId: taskId,
+    details: { title: task.title, ...(task.group_id ? { group: task.group_id } : {}) },
+    actorId: auth.caller.userId, actorEmail: auth.caller.email ?? undefined,
+  })
+  revalidatePath('/tasks')
+  return { ok: true }
 }
 
 /** Returns an assigned task (with no submission) to draft. */

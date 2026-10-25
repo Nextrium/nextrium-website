@@ -52,12 +52,13 @@ export default function TeamAccessClient({ users: initial, tracks }: { users: Da
     setInviteError('')
     setInviteSuccess('')
 
-    const { error, notice, added, teamMemberSet } = await inviteUser(inviteEmail.trim(), inviteRole)
+    const { error, notice, added, teamMemberSet, trackFor } = await inviteUser(inviteEmail.trim(), inviteRole)
     if (error) {
       setInviteError(error)
     } else {
       if (added) setUsers((prev) => [...prev, added])
       if (teamMemberSet) setUsers((prev) => prev.map((u) => u.user_id === teamMemberSet ? { ...u, is_team_member: true } : u))
+      if (trackFor) setUsers((prev) => prev.map((u) => u.user_id === trackFor.userId ? { ...u, track: trackFor.track } : u))
       setInviteSuccess(notice ?? `Invite sent to ${inviteEmail.trim()}.`)
       setInviteEmail('')
       setInviteRole('content')
@@ -168,7 +169,7 @@ export default function TeamAccessClient({ users: initial, tracks }: { users: Da
         .team-user-row { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center; padding: 14px 20px; border-bottom: 1px solid rgba(255,255,255,0.04); }
         .team-user-row:last-child { border-bottom: none; }
         .team-user-email { font-size: 13px; color: var(--white); }
-        .team-user-date { font-size: 11px; color: var(--grey-dark); font-family: var(--font-mono); margin-top: 3px; }
+        .team-user-date { font-size: 11px; color: var(--grey-mid); font-family: var(--font-mono); margin-top: 3px; }
         .team-role-badge { font-family: var(--font-mono); font-size: 7.5px; letter-spacing: 0.12em; text-transform: uppercase; padding: 3px 8px; display: inline-block; }
         .team-role-select { background: var(--navy-mid); border: 1px solid rgba(255,255,255,0.08); color: var(--white); font-family: var(--font-dm); font-size: 12px; padding: 6px 10px; outline: none; cursor: pointer; }
         .team-remove-btn { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase; padding: 6px 10px; background: none; border: 1px solid color-mix(in srgb, var(--error) 30%, transparent); color: var(--error); cursor: pointer; transition: all 0.15s ease; white-space: nowrap; }
@@ -184,7 +185,7 @@ export default function TeamAccessClient({ users: initial, tracks }: { users: Da
         .invite-label { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--grey-mid); }
         .invite-success { padding: 10px 14px; font-size: 12px; background: color-mix(in srgb, var(--success) 8%, transparent); border: 1px solid color-mix(in srgb, var(--success) 20%, transparent); color: var(--success); }
         .invite-error { padding: 10px 14px; font-size: 12px; background: color-mix(in srgb, var(--error) 8%, transparent); border: 1px solid color-mix(in srgb, var(--error) 30%, transparent); color: var(--error); }
-        .team-empty { padding: 48px 20px; text-align: center; font-size: 13px; color: var(--grey-dark); }
+        .team-empty { padding: 48px 20px; text-align: center; font-size: 13px; color: var(--grey-mid); }
         @media (max-width: 900px) { .team-access-layout { grid-template-columns: 1fr; } }
       `}</style>
 
@@ -354,7 +355,7 @@ export default function TeamAccessClient({ users: initial, tracks }: { users: Da
             >
               {inviting ? 'Sending invite...' : 'Send invite'}
             </button>
-            <div style={{ fontSize: '11px', color: 'var(--grey-dark)', lineHeight: '1.6' }}>
+            <div style={{ fontSize: '11px', color: 'var(--grey-mid)', lineHeight: '1.6' }}>
               The invited person will receive an email to set their password and access the dashboard. Their role can be changed at any time.
             </div>
           </div>

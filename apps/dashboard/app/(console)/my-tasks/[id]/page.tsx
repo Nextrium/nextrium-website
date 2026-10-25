@@ -42,6 +42,10 @@ export default async function MyTaskPage({ params }: Props) {
     : { data: [] }
   const reviews: ContributionReview[] = reviewRows ?? []
   const submissionNo = contribution ? (await loadSubmissionNumbers(supabase)).get(contribution.id) : undefined
+  // On a shared task the member learns only how many have it: never who, never their work.
+  const { count: sharedWith } = task.group_id
+    ? await supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('group_id', task.group_id).neq('status', 'cancelled')
+    : { count: 0 }
 
   const now = new Date()
   const deadline = effectiveDeadline(task)
@@ -117,6 +121,9 @@ export default async function MyTaskPage({ params }: Props) {
             <div className="mt-panel">
               <div className="mt-panel-title">Details</div>
               <div className="mt-kv"><span>Points</span><span>{task.point_range_min}–{task.point_range_max}</span></div>
+              {(sharedWith ?? 0) > 1 && (
+                <span className="mt-hint">You&apos;re one of {sharedWith} people working on this task. Each person submits their own work and earns their own points.</span>
+              )}
               <div className="mt-kv"><span>Deadline</span><span>{deadline ? deadline.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '—'}</span></div>
               {open && <div className="mt-kv"><span>Time left</span><span className={isOverdue(task, now) ? 'bad' : ''}>{deadlineLabel(task, now)}</span></div>}            </div>
 

@@ -6,7 +6,8 @@ import { fetchAgentsEngine } from '@nextrium/agents-engine'
 import { logActivity } from '@/lib/activityLog'
 import { getVerifiedDashboardRole } from '@/lib/dashboard/getRole'
 import { roleDenial, STAFF_ROLES } from '@/lib/dashboard/requireRole'
-import { findAuthUserIdByEmail, grantDashboardAccess, isEmailAlreadyRegistered } from '@/lib/dashboard/teamAccounts'
+import { inviteAccount } from '@/lib/dashboard/teamAccounts'
+import { ACCESS_SYNC, emitAutomationEvent } from '@/lib/automation/server'
 import type { AgentScreeningResult } from '@nextrium/supabase/database'
 import { brand } from '@nextrium/brand'
 
@@ -601,67 +602,20 @@ export async function inviteApplicantToTeam(
     if (application.status !== 'accepted') throw new Error('Only accepted applicants can be invited to the team.')
     if (application.invited_to_team_at) throw new Error('This applicant has already been invited.')
 
-    const supabaseUrl    = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const supabaseSecret = process.env.SUPABASE_SECRET_KEY!
-    const dashboardUrl        = process.env.NEXT_PUBLIC_DASHBOARD_URL ?? brand.urls.dashboard
-    const redirectTo     = `${dashboardUrl}/auth/callback`
-
-    const res = await fetch(`${supabaseUrl}/auth/v1/invite?redirect_to=${encodeURIComponent(redirectTo)}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type':  'application/json',
-        'apikey':        supabaseSecret,
-        'Authorization': `Bearer ${supabaseSecret}`,
-      },
-      body: JSON.stringify({
-        email: application.email,
-        data: { role: 'member' },
-        redirect_to: redirectTo,
-      }),
+    const dashboardUrl = process.env.NEXT_PUBLIC_DASHBOARD_URL ?? brand.urls.dashboard
+    const outcome = await inviteAccount({ email: application.email, role: 'member', applicationId, asTeamMember: true }, {
+      db: supabase,
+      fetchFn: fetch,
+      supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      secret: process.env.SUPABASE_SECRET_KEY!,
+      redirectTo: `${dashboardUrl}/auth/callback`,
     })
-
-    const rawText = await res.text()
-    let json: any = {}
-    try {
-      json = JSON.parse(rawText)
-    } catch {
-      throw new Error(`Supabase returned unexpected response (${res.status}): ${rawText.slice(0, 200)}`)
-    }
-    let existingAccount = false
-    let existingRole: string | undefined
-
-    if (!res.ok) {
-      if (!isEmailAlreadyRegistered(json)) {
-        throw new Error(json.message ?? json.error_description ?? json.msg ?? 'Failed to invite applicant.')
-      }
-      // The applicant already has an account: give it team access directly
-      // (an account that already has a dashboard role keeps that role).
-      const existingId = await findAuthUserIdByEmail(application.email)
-      if (!existingId) throw new Error('This email already has an account that could not be found. Please try again.')
-      const grant = await grantDashboardAccess(existingId, 'member', applicationId, true)
-      if (grant.status === 'archived') {
-        throw new Error('This person has an archived team account. Unarchive it in Team Access first.')
-      }
-      existingAccount = true
-      if (grant.status === 'exists') existingRole = grant.role
-    } else {
-      const userId = json.id
-      if (!userId) throw new Error('Invite succeeded but no user ID was returned.')
-      const { error: insertError } = await (supabase.from('dashboard_users') as any).insert({
-        user_id: userId,
-        role: 'member',
-        is_team_member: true,
-        application_id: applicationId,
-      })
-      if (insertError) {
-        // The invite email has already gone out by this point, so say so instead of
-        // showing a raw database error that implies nothing happened.
-        throw new Error(
-          `The invitation email was sent, but dashboard access could not be saved (${insertError.message}). ` +
-          'Click Invite to Team again to finish granting access; the applicant does not need a new email.'
-        )
-      }
-    }
+    if (outcome.kind === 'error') throw new Error(outcome.message)
+    if (outcome.kind === 'archived') throw new Error('This person has an archived team account. Unarchive it in Team Access first.')
+    // An account that already existed keeps its role; a new or re-sent invitation means an email went out.
+    const existingAccount = outcome.kind === 'added_existing' || outcome.kind === 'already'
+    const existingRole = outcome.kind === 'already' ? outcome.role : undefined
+    if (outcome.tracks.trackSet) await emitAutomationEvent(ACCESS_SYNC, outcome.userId)
 
     const now = new Date().toISOString()
 

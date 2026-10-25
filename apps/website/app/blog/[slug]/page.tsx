@@ -107,7 +107,11 @@ export default async function BlogPostPage({ params }: Props) {
         .post-content li { margin-bottom: 0.5em; }
         .post-content blockquote { border-left: 3px solid var(--orange); padding-left: 20px; color: var(--grey-mid); font-style: italic; margin: 2em 0; }
         .post-content pre { background: var(--navy-deep); color: var(--off-white); padding: 24px; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 1.5em; font-family: var(--font-mono); font-size: 13px; line-height: 1.7; white-space: pre; word-break: normal; }
-        .post-content code { font-family: var(--font-mono); font-size: 13px; background: rgba(7,22,40,0.08); padding: 2px 6px; border-radius: 2px; word-break: break-all; }
+        .post-content code { font-family: var(--font-mono); font-size: 13px; background: rgba(7,22,40,0.08); padding: 2px 6px; border-radius: 2px; overflow-wrap: anywhere; }
+        /* Inside a code block the inline-code look must not apply: its padding pushed the
+           first line right and broke column alignment. */
+        .post-content pre code { display: block; padding: 0; background: none; border-radius: 0; font-size: inherit; line-height: inherit; color: inherit; white-space: inherit; word-break: normal; overflow-wrap: normal; }
+        .post-content td pre, .post-content th pre { display: inline-block; max-width: 100%; margin: 0; padding: 4px 10px; font-size: 12px; line-height: 1.5; vertical-align: middle; }
         .post-content img { max-width: 100%; display: block; margin: 2em 0; }
         .post-content hr { border: none; border-top: 1px solid var(--grey-light); margin: 3em 0; }
         .post-content .table-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 2em 0; }
@@ -144,7 +148,7 @@ export default async function BlogPostPage({ params }: Props) {
           .post-sidebar { position: static; }
           .related-grid { grid-template-columns: 1fr; }
           .post-content { min-width: 0; overflow: hidden; }
-          .post-content pre { white-space: pre-wrap; word-break: break-word; }
+          /* Code blocks keep their columns on phones too; they scroll sideways. */
           .post-content code { word-break: break-word; overflow-wrap: anywhere; }
         }
       `}</style>

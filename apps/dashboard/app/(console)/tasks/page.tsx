@@ -6,6 +6,7 @@ import { requireStaff } from '@/lib/contributions/auth'
 import { getMemberDirectory } from '@/lib/contributions/members'
 import { CATEGORIES, CATEGORY_LABELS, COMPLEXITY_LABELS, TASK_STATUSES, isCategory } from '@nextrium/contributions-core/constants'
 import { TASK_STATUS_LABELS, deadlineLabel, isOverdue } from '@nextrium/contributions-core/taskView'
+import { groupProgress } from '@/lib/contributions/groupRules'
 import type { Task } from '@nextrium/supabase/database'
 
 export const dynamic = 'force-dynamic'
@@ -23,7 +24,10 @@ export default async function TasksPage({ searchParams }: Props) {
   const filters = await searchParams
   const supabase = createServiceClient() as any
   let query = supabase.from('tasks').select('*').order('created_at', { ascending: false }).limit(500)
-  if (filters.status && (TASK_STATUSES as readonly string[]).includes(filters.status)) query = query.eq('status', filters.status)
+  const status = filters.status && (TASK_STATUSES as readonly string[]).includes(filters.status) ? filters.status : null
+  if (status) query = query.eq('status', status)
+  // Cancelled tasks stay on record but out of the way: shown only when asked for.
+  else query = query.neq('status', 'cancelled')
   if (isCategory(filters.category)) query = query.eq('category', filters.category)
   if (filters.assignee && /^[0-9a-f-]{36}$/i.test(filters.assignee)) query = query.eq('assigned_to', filters.assignee)
   const group = filters.group && /^[0-9a-f-]{36}$/i.test(filters.group) ? filters.group : null
@@ -36,13 +40,27 @@ export default async function TasksPage({ searchParams }: Props) {
   const members = await getMemberDirectory()
   const nameOf = new Map(members.map((m) => [m.userId, m.name]))
 
-  // How many people share each group shown, counting every live copy, not just this page's.
+  // Every copy of each group shown (not just this page's), for its size and progress.
   const groupIds = [...new Set(tasks.map((t) => t.group_id).filter((g): g is string => !!g))]
   const { data: copies } = groupIds.length
-    ? await supabase.from('tasks').select('group_id').in('group_id', groupIds).neq('status', 'cancelled')
+    ? await supabase.from('tasks').select('group_id, status').in('group_id', groupIds)
     : { data: [] }
-  const groupSize = new Map<string, number>()
-  for (const c of (copies ?? []) as { group_id: string }[]) groupSize.set(c.group_id, (groupSize.get(c.group_id) ?? 0) + 1)
+  const groupStatuses = new Map<string, string[]>()
+  for (const c of (copies ?? []) as { group_id: string; status: string }[]) groupStatuses.set(c.group_id, [...(groupStatuses.get(c.group_id) ?? []), c.status])
+
+  // A shared task is one row, unless one group or one person is being looked at.
+  const collapse = !group && !(filters.assignee && /^[0-9a-f-]{36}$/i.test(filters.assignee))
+  type Row = { kind: 'task'; t: Task } | { kind: 'group'; t: Task; copies: Task[] }
+  const rows: Row[] = []
+  const seen = new Map<string, Row & { kind: 'group' }>()
+  for (const t of tasks) {
+    if (!collapse || !t.group_id) { rows.push({ kind: 'task', t }); continue }
+    const g = seen.get(t.group_id)
+    if (g) { g.copies.push(t); continue }
+    const row = { kind: 'group' as const, t, copies: [t] }
+    seen.set(t.group_id, row)
+    rows.push(row)
+  }
 
   return (
     <>
@@ -78,7 +96,7 @@ export default async function TasksPage({ searchParams }: Props) {
         <form className="tasks-filters" method="get">
           <label>Status
             <select name="status" defaultValue={filters.status ?? ''}>
-              <option value="">All</option>
+              <option value="">All but cancelled</option>
               {TASK_STATUSES.map((s) => <option key={s} value={s}>{TASK_STATUS_LABELS[s]}</option>)}
             </select>
           </label>
@@ -103,6 +121,7 @@ export default async function TasksPage({ searchParams }: Props) {
         </form>
 
         {group && <p className="tasks-muted" style={{ marginBottom: 12 }}>Showing the copies of one shared task, one per person.</p>}
+        {!status && <p className="tasks-muted" style={{ marginBottom: 12 }}>Cancelled tasks are hidden. <Link href="/tasks?status=cancelled" style={{ color: 'var(--orange-w)' }}>Show cancelled</Link></p>}
         {tasks.length === 0 ? (
           <div className="tasks-empty">No tasks match. Create one with “New task”.</div>
         ) : (
@@ -119,14 +138,36 @@ export default async function TasksPage({ searchParams }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {tasks.map((t) => {
+                {rows.map((row) => {
+                  const t = row.t
+                  if (row.kind === 'group') {
+                    const progress = groupProgress(groupStatuses.get(t.group_id!) ?? row.copies.map((c) => c.status))
+                    const overdue = row.copies.some((c) => isOverdue(c, now))
+                    const extension = row.copies.some((c) => c.extension_status === 'requested')
+                    return (
+                      <tr key={`g-${t.group_id}`}>
+                        <td>
+                          <Link className="title" href={`/tasks?group=${t.group_id}`}>{t.title}</Link>{' '}
+                          <span className="tasks-badge">Group of {progress.total}</span>
+                        </td>
+                        <td>{CATEGORY_LABELS[t.category]} <span className="tasks-muted">· {COMPLEXITY_LABELS[t.complexity]}</span></td>
+                        <td>
+                          <span className={`tasks-badge ${progress.total > 0 && progress.completed === progress.total ? 'good' : 'warn'}`}>{progress.label}</span>
+                          {extension && <> <span className="tasks-badge warn">Extension requested</span></>}
+                        </td>
+                        <td>{progress.total} {progress.total === 1 ? 'person' : 'people'}</td>
+                        <td>{overdue ? <span className="tasks-badge bad">{deadlineLabel(t, now)}</span> : <span className="tasks-muted">{deadlineLabel(t, now)}</span>}</td>
+                        <td className="tasks-muted">{t.point_range_min}–{t.point_range_max} each</td>
+                      </tr>
+                    )
+                  }
                   const overdue = isOverdue(t, now)
                   return (
                     <tr key={t.id}>
                       <td>
                         <Link className="title" href={`/tasks/${t.id}`}>{t.title}</Link>
                         {t.group_id && !group && (
-                          <> <Link className="tasks-badge" href={`/tasks?group=${t.group_id}`} style={{ textDecoration: 'none' }}>Group of {groupSize.get(t.group_id) ?? 1}</Link></>
+                          <> <Link className="tasks-badge" href={`/tasks?group=${t.group_id}`} style={{ textDecoration: 'none' }}>Group of {groupProgress(groupStatuses.get(t.group_id) ?? []).total}</Link></>
                         )}
                       </td>
                       <td>{CATEGORY_LABELS[t.category]} <span className="tasks-muted">· {COMPLEXITY_LABELS[t.complexity]}</span></td>

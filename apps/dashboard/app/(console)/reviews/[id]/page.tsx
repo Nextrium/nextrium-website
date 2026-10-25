@@ -10,6 +10,7 @@ import { SCOPE_CHECK, hasMemberFixableFailure } from '@nextrium/contributions-co
 import { requireStaff } from '@/lib/contributions/auth'
 import { OWN_SUBMISSION_MESSAGE, canDecideOnSubmission } from '@nextrium/contributions-core/decisionRules'
 import { getMemberDirectory } from '@/lib/contributions/members'
+import { findSimilar } from '@/lib/contributions/groupRules'
 import { sanitizeBrief } from '@nextrium/contributions-core/sanitize'
 import { CATEGORY_LABELS, COMPLEXITY_LABELS } from '@nextrium/contributions-core/constants'
 import { QUEUE_TABS, effectiveDeadline, isReviewStale } from '@nextrium/contributions-core/taskView'
@@ -53,6 +54,21 @@ export default async function ReviewDetailPage({ params }: Props) {
   const deadline = effectiveDeadline(task)
   const stale = isReviewStale(c)
   const submissionNo = (await loadSubmissionNumbers(supabase)).get(c.id)
+
+  // On a shared task, other people's submissions that look like this one (staff only).
+  let similar: { id: string; name: string; score: number; sameLink: boolean }[] = []
+  if (task?.group_id) {
+    const { data: copies } = await supabase.from('tasks').select('id').eq('group_id', task.group_id).neq('id', task.id)
+    const copyIds = (copies ?? []).map((t: { id: string }) => t.id)
+    const { data: others } = copyIds.length
+      ? await supabase.from('contributions').select('id, contributor_id, description, evidence_url').in('task_id', copyIds)
+      : { data: [] }
+    const byId = new Map<string, { contributor_id: string }>((others ?? []).map((o: { id: string; contributor_id: string }) => [o.id, o]))
+    similar = findSimilar(c, others ?? []).map((r) => ({
+      ...r,
+      name: members.find((m) => m.userId === byId.get(r.id)?.contributor_id)?.name ?? 'Another member',
+    }))
+  }
 
   const statusLabel = QUEUE_TABS.find((t) => t.key === c.status)?.label ?? c.status
   const fmt = (iso: string | null) => iso ? new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '—'
@@ -111,6 +127,22 @@ export default async function ReviewDetailPage({ params }: Props) {
               {c.review_score !== null && <div className="mt-kv"><span>Automated score</span><span>{Math.round(Number(c.review_score))}/100</span></div>}
               {c.final_points !== null && <div className="mt-kv"><span>Points awarded</span><span>{c.final_points}</span></div>}
             </div>
+            {similar.length > 0 && (
+              <div className="mt-panel">
+                <div className="mt-alert warn">
+                  This task was given to several people, and this submission looks like {similar.length === 1 ? 'another one' : `${similar.length} others`} on it. Compare them before deciding.
+                </div>
+                {similar.map((s) => (
+                  <div key={s.id} className="mt-kv">
+                    <span>{s.name}</span>
+                    <span>
+                      {s.sameLink ? 'Same evidence link' : `${Math.round(s.score * 100)}% same wording`}
+                      {' · '}<Link href={`/reviews/${s.id}`} className="mt-link">Open</Link>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
             {rejectedWithoutMemberFailure && (
               <div className="mt-panel">
                 <div className="mt-alert warn">
