@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Header from '@/components/dashboard/Header'
 import RichTextEditor from '@/components/editor/RichTextEditor'
-import { cancelTask, createAndAssignTask, createTask, createTaskForGroup, updateTask } from '../actions'
+import { cancelTask, cancelTaskGroup, createAndAssignTask, createTask, createTaskForGroup, deleteTask, updateTask, updateTaskGroup } from '../actions'
 import { taskHasChanges, type TaskFormValues } from '@nextrium/contributions-core/taskInput'
 import AssignmentPanel from './AssignmentPanel'
 import GroupPicker from './GroupPicker'
@@ -29,9 +29,12 @@ interface Props {
   groupSize: number
   /** Set just after this task was created for several people. */
   sharedWith?: number | null
+  /** For a shared task: progress across the copies and how many are still open. */
+  group?: { label: string; open: number } | null
+  isAdmin?: boolean
 }
 
-export default function TaskEditor({ task, members, hasSubmission, groupSize, sharedWith = null }: Props) {
+export default function TaskEditor({ task, members, hasSubmission, groupSize, sharedWith = null, group = null, isAdmin = false }: Props) {
   const router = useRouter()
   const isNew = !task
   const isDraft = isNew || task.status === 'draft'
@@ -57,6 +60,9 @@ export default function TaskEditor({ task, members, hasSubmission, groupSize, sh
   const [mode, setMode] = useState<'one' | 'group'>('one')
   const [groupIds, setGroupIds] = useState<string[]>([])
   const [confirmGroup, setConfirmGroup] = useState(false)
+  // Shared-task and clean-up actions, each behind its own confirmation.
+  const [confirmAction, setConfirmAction] = useState<'save-all' | 'cancel-group' | 'delete' | null>(null)
+  const [acting, setActing] = useState(false)
   const activeMembers = useMemo(
     () => members.filter((m) => m.active)
       .sort((a, b) => Number(b.categories.includes(category)) - Number(a.categories.includes(category)) || a.openTasks - b.openTasks),
@@ -117,6 +123,37 @@ export default function TaskEditor({ task, members, hasSubmission, groupSize, sh
     router.refresh()
   }
 
+  async function handleSaveAll() {
+    if (!task) return
+    setError(null); setSuccess(null); setActing(true)
+    const res = await updateTaskGroup(task.id, { title, description, category, complexity, links })
+    setActing(false); setConfirmAction(null)
+    if (!res.ok) { setError(res.error); return }
+    setSuccess(res.message)
+    setSaved(current)
+    router.refresh()
+  }
+
+  async function handleCancelGroup() {
+    if (!task) return
+    setError(null); setSuccess(null); setActing(true)
+    const res = await cancelTaskGroup(task.id)
+    setActing(false); setConfirmAction(null)
+    if (!res.ok) { setError(res.error); return }
+    setSuccess(res.message)
+    router.refresh()
+  }
+
+  async function handleDelete() {
+    if (!task) return
+    setError(null); setSuccess(null); setActing(true)
+    const res = await deleteTask(task.id)
+    setActing(false); setConfirmAction(null)
+    if (!res.ok) { setError(res.error); return }
+    router.push('/tasks')
+    router.refresh()
+  }
+
   async function handleCancel() {
     if (!task) return
     setError(null); setCancelling(true)
@@ -127,6 +164,8 @@ export default function TaskEditor({ task, members, hasSubmission, groupSize, sh
   }
 
   const canCancel = !isNew && !hasSubmission && (task.status === 'draft' || task.status === 'assigned')
+  const canDelete = !isNew && isAdmin && task.status === 'cancelled' && !hasSubmission
+  const canSaveAll = !isNew && !isClosed && !!group && group.open > 0
 
   const ActionButtons = (
     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -157,8 +196,28 @@ export default function TaskEditor({ task, members, hasSubmission, groupSize, sh
         </>
       ) : !isClosed && (
         <button type="button" className="task-btn" onClick={handleSave} disabled={saving || !dirty}>
-          {saving ? 'Saving…' : 'Save changes'}
+          {saving ? 'Saving…' : groupSize > 0 ? 'Save this copy' : 'Save changes'}
         </button>
+      )}
+      {canSaveAll && confirmAction !== 'save-all' && (
+        <button type="button" className="task-btn" onClick={() => setConfirmAction('save-all')} disabled={saving || acting || !dirty}>Save to all copies</button>
+      )}
+      {canSaveAll && confirmAction === 'save-all' && (
+        <>
+          <span className="task-hint-strong">Save this brief to {group!.open} cop{group!.open === 1 ? 'y' : 'ies'} not yet submitted?</span>
+          <button type="button" className="task-btn" onClick={handleSaveAll} disabled={acting}>{acting ? 'Saving…' : 'Yes, save all'}</button>
+          <button type="button" className="task-btn ghost" onClick={() => setConfirmAction(null)} disabled={acting}>Back</button>
+        </>
+      )}
+      {canDelete && confirmAction !== 'delete' && (
+        <button type="button" className="task-btn danger" onClick={() => setConfirmAction('delete')}>Delete task</button>
+      )}
+      {canDelete && confirmAction === 'delete' && (
+        <>
+          <span className="task-hint-strong">Delete this cancelled task for good?</span>
+          <button type="button" className="task-btn danger" onClick={handleDelete} disabled={acting}>{acting ? 'Deleting…' : 'Yes, delete'}</button>
+          <button type="button" className="task-btn ghost" onClick={() => setConfirmAction(null)} disabled={acting}>Keep</button>
+        </>
       )}
     </div>
   )
@@ -201,6 +260,7 @@ export default function TaskEditor({ task, members, hasSubmission, groupSize, sh
         .group-note { font-size: 11px; color: var(--grey-mid); }
         .group-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
         .group-confirm { display: flex; flex-direction: column; gap: 10px; padding: 12px; font-size: 12px; color: var(--off-white); border: 1px solid color-mix(in srgb, var(--orange) 40%, transparent); background: color-mix(in srgb, var(--orange) 6%, transparent); }
+        .task-hint-strong { font-size: 12px; color: var(--off-white); }
         .task-alert.info { background: color-mix(in srgb, var(--orange) 6%, transparent); border-color: color-mix(in srgb, var(--orange) 30%, transparent); color: var(--off-white); }
         @media (max-width: 1100px) { .task-layout { grid-template-columns: 1fr; } .task-side { position: static; } }
       `}</style>
@@ -216,7 +276,7 @@ export default function TaskEditor({ task, members, hasSubmission, groupSize, sh
         {success && <div className="task-alert success" role="status">{success}</div>}
         {!isNew && groupSize > 0 && (
           <div className="task-alert info">
-            Shared task: this is one of {groupSize} copies, one per person. Changes here apply to this copy only.{' '}
+            Shared task: this is one of {groupSize} copies, one per person.{!isClosed && ' “Save this copy” changes only this one; “Save to all copies” updates every copy not yet submitted.'}{' '}
             <a href={`/tasks?group=${task.group_id}`} style={{ color: 'var(--orange-w)' }}>See all copies</a>
           </div>
         )}
@@ -326,6 +386,24 @@ export default function TaskEditor({ task, members, hasSubmission, groupSize, sh
                     {strandedDraftId === 'list' ? 'Open the drafts' : 'Open the draft to assign it'}
                   </a>
                 )}
+              </div>
+            )}
+            {!isNew && group && (
+              <div className="task-panel">
+                <div className="task-panel-title">Shared task</div>
+                <div className="task-kv"><span>Progress</span><span>{group.label}</span></div>
+                <a href={`/tasks?group=${task.group_id}`} className="task-btn ghost" style={{ textDecoration: 'none', width: 'fit-content' }}>See all copies</a>
+                {group.open > 0 && (confirmAction === 'cancel-group' ? (
+                  <div className="group-confirm" role="alertdialog" aria-label="Confirm">
+                    <span>Cancel the {group.open} cop{group.open === 1 ? 'y' : 'ies'} nobody has submitted yet? Copies with a submission carry on through review.</span>
+                    <span style={{ display: 'flex', gap: 8 }}>
+                      <button type="button" className="task-btn danger" onClick={handleCancelGroup} disabled={acting}>{acting ? 'Cancelling…' : 'Yes, cancel them'}</button>
+                      <button type="button" className="task-btn ghost" onClick={() => setConfirmAction(null)} disabled={acting}>Keep</button>
+                    </span>
+                  </div>
+                ) : (
+                  <button type="button" className="task-btn danger" style={{ width: 'fit-content' }} onClick={() => setConfirmAction('cancel-group')}>Cancel whole group</button>
+                ))}
               </div>
             )}
             {!isNew && !isClosed && <AssignmentPanel task={task} members={members} hasSubmission={hasSubmission} groupSize={groupSize} />}

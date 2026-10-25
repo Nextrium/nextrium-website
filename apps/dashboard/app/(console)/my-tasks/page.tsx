@@ -31,7 +31,7 @@ export default async function MyTasksPage() {
     <Link href={`/my-tasks/${t.id}`} className="mytask-row">
       <div>
         <div className="mytask-title">{t.title}</div>
-        <div className="mytask-meta">{CATEGORY_LABELS[t.category]} · {COMPLEXITY_LABELS[t.complexity]} · {t.point_range_min}–{t.point_range_max} points</div>
+        <div className="mytask-meta">{CATEGORY_LABELS[t.category]} · {COMPLEXITY_LABELS[t.complexity]} · {t.point_range_min}–{t.point_range_max} points{t.group_id ? ' · Shared task' : ''}</div>
       </div>
       <div className="mytask-right">
         <span className={`mytask-badge ${t.status === 'changes_requested' ? 'warn' : t.status === 'completed' ? 'good' : ''}`}>{TASK_STATUS_LABELS[t.status]}</span>
