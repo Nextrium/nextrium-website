@@ -92,48 +92,45 @@ export async function grantDashboardAccess(
 
 export interface InviteDeps {
   db: any
-  fetchFn: typeof fetch
-  supabaseUrl: string
-  secret: string
-  /** Where the invitation link lands, e.g. https://dashboard.example.org/auth/callback */
-  redirectTo: string
+  /**
+   * Creates the sign-in account without sending Supabase's own email (its
+   * links last at most 24 hours); `exists` when the email already has one.
+   */
+  createAccount: (email: string, role: string) => Promise<{ ok: true; id: string } | { ok: false; exists: boolean; message: string }>
+  /** Issues a 5-day invitation link and emails it. False when the email could not be sent. */
+  deliver: (userId: string, email: string) => Promise<boolean>
 }
 
 export type InviteOutcome =
-  | { kind: 'invited'; userId: string; tracks: TrackOutcome }
+  | { kind: 'invited'; userId: string; emailed: boolean; tracks: TrackOutcome }
   | { kind: 'reinvited'; userId: string; role: string; tracks: TrackOutcome }
   | { kind: 'added_existing'; userId: string; tracks: TrackOutcome }
   | { kind: 'already'; userId: string; role: string; becameMember: boolean; tracks: TrackOutcome }
   | { kind: 'archived'; userId: string }
   | { kind: 'error'; message: string }
 
-async function sendInvite(email: string, role: string, deps: InviteDeps): Promise<{ ok: true; id: string } | { ok: false; exists: boolean; message: string }> {
-  let res: Response
-  try {
-    res = await deps.fetchFn(`${deps.supabaseUrl}/auth/v1/invite?redirect_to=${encodeURIComponent(deps.redirectTo)}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', apikey: deps.secret, Authorization: `Bearer ${deps.secret}` },
-      body: JSON.stringify({ email, data: { role }, redirect_to: deps.redirectTo }),
-    })
-  } catch {
-    return { ok: false, exists: false, message: 'The invitation could not be sent. Try again in a minute.' }
+/** Supabase admin call that creates an invited (unconfirmed) account without emailing it. */
+export function supabaseCreateAccount(service: any) {
+  return async (email: string, role: string): Promise<{ ok: true; id: string } | { ok: false; exists: boolean; message: string }> => {
+    try {
+      const { data, error } = await service.auth.admin.generateLink({ type: 'invite', email, options: { data: { role } } })
+      if (data?.user?.id) return { ok: true, id: data.user.id }
+      if (error && isEmailAlreadyRegistered({ msg: error.message, error_code: (error as any).code })) return { ok: false, exists: true, message: 'exists' }
+      return { ok: false, exists: false, message: 'The account could not be created. Try again in a minute.' }
+    } catch {
+      return { ok: false, exists: false, message: 'The account could not be created. Try again in a minute.' }
+    }
   }
-  let json: any = {}
-  try { json = await res.json() } catch { /* not JSON */ }
-  if (res.ok && json?.id) return { ok: true, id: json.id }
-  if (res.ok) return { ok: false, exists: false, message: 'The invitation was sent but no account was returned. Try again.' }
-  if (isEmailAlreadyRegistered(json)) return { ok: false, exists: true, message: 'exists' }
-  return { ok: false, exists: false, message: json.msg ?? json.message ?? json.error_description ?? 'The invitation could not be sent.' }
 }
 
 /**
  * Invites someone to the dashboard, or gives an existing account access,
  * without ever adding a second row for the same person:
  * - archived: refused, and no email is sent;
- * - invited before but not yet accepted: the invitation is sent again;
+ * - invited before but not yet accepted: a new 5-day link is sent (the old one stops working);
  * - already has access: left as is (or made a team member when asked);
  * - has an account but no access: given access, no email;
- * - new: invited by email.
+ * - new: account created and a 5-day invitation emailed.
  * Afterwards their application is linked and their track set, where empty.
  */
 export async function inviteAccount(
@@ -144,40 +141,40 @@ export async function inviteAccount(
   if (!email.includes('@')) return { kind: 'error', message: 'Enter a valid email address.' }
   const finish = async (userId: string) => linkApplicationAndTrack(deps.db, userId, email)
 
+  const existingAccess = async (id: string): Promise<InviteOutcome> => {
+    const grant = await grantDashboardAccess(id, input.role, input.applicationId, input.asTeamMember, deps.db)
+    if (grant.status === 'archived') return { kind: 'archived', userId: id }
+    const tracks = await finish(id)
+    return grant.status === 'exists'
+      ? { kind: 'already', userId: id, role: grant.role, becameMember: grant.becameMember, tracks }
+      : { kind: 'added_existing', userId: id, tracks }
+  }
+
   const account = await findAuthUserByEmail(email, deps.db)
   if (account) {
     const { data: row, error } = await deps.db.from('dashboard_users').select('role, archived').eq('user_id', account.id).maybeSingle()
-    if (error) return { kind: 'error', message: 'Could not read this person\'s dashboard access.' }
+    if (error) return { kind: 'error', message: "Could not read this person's dashboard access." }
     if (row?.archived) return { kind: 'archived', userId: account.id }
     if (row && !hasAccepted(account)) {
-      // They never opened the first invitation: send it again (same account, same row).
-      const sent = await sendInvite(email, row.role, deps)
-      if (!sent.ok && !sent.exists) return { kind: 'error', message: sent.message }
+      // They never accepted: send a fresh link (same account, same row).
       const grant = await grantDashboardAccess(account.id, input.role, input.applicationId, input.asTeamMember, deps.db)
       if (grant.status === 'archived') return { kind: 'archived', userId: account.id }
+      if (!(await deps.deliver(account.id, email))) return { kind: 'error', message: 'The invitation email could not be sent. Try again in a minute.' }
       return { kind: 'reinvited', userId: account.id, role: grant.status === 'exists' ? grant.role : input.role, tracks: await finish(account.id) }
     }
-    const grant = await grantDashboardAccess(account.id, input.role, input.applicationId, input.asTeamMember, deps.db)
-    if (grant.status === 'archived') return { kind: 'archived', userId: account.id }
-    const tracks = await finish(account.id)
-    if (grant.status === 'exists') return { kind: 'already', userId: account.id, role: grant.role, becameMember: grant.becameMember, tracks }
-    return { kind: 'added_existing', userId: account.id, tracks }
+    return existingAccess(account.id)
   }
 
-  const sent = await sendInvite(email, input.role, deps)
-  if (!sent.ok) {
-    if (!sent.exists) return { kind: 'error', message: sent.message }
+  const created = await deps.createAccount(email, input.role)
+  if (!created.ok) {
+    if (!created.exists) return { kind: 'error', message: created.message }
     // Created a moment ago by someone else: treat it as an existing account.
     const now = await findAuthUserByEmail(email, deps.db)
     if (!now) return { kind: 'error', message: 'This email already has an account that could not be found. Please try again.' }
-    const grant = await grantDashboardAccess(now.id, input.role, input.applicationId, input.asTeamMember, deps.db)
-    if (grant.status === 'archived') return { kind: 'archived', userId: now.id }
-    const tracks = await finish(now.id)
-    return grant.status === 'exists'
-      ? { kind: 'already', userId: now.id, role: grant.role, becameMember: grant.becameMember, tracks }
-      : { kind: 'added_existing', userId: now.id, tracks }
+    return existingAccess(now.id)
   }
-  const grant = await grantDashboardAccess(sent.id, input.role, input.applicationId, input.asTeamMember, deps.db)
-  if (grant.status === 'archived') return { kind: 'archived', userId: sent.id }
-  return { kind: 'invited', userId: sent.id, tracks: await finish(sent.id) }
+  const grant = await grantDashboardAccess(created.id, input.role, input.applicationId, input.asTeamMember, deps.db)
+  if (grant.status === 'archived') return { kind: 'archived', userId: created.id }
+  const emailed = await deps.deliver(created.id, email)
+  return { kind: 'invited', userId: created.id, emailed, tracks: await finish(created.id) }
 }

@@ -53,6 +53,7 @@ async function getDashboardUsers(): Promise<DashboardUserRow[]> {
     track:            u.staff_track_id ? (trackNames[u.staff_track_id] ?? null) : null,
     application_track: u.application_id ? (screenedTrack[u.application_id] ?? null) : null,
     has_application:  !!u.application_id,
+    onboarded:        !!u.onboarding_completed_at,
     discord_linked:   !!u.discord_user_id,
     user_id:     u.user_id,
     role:        u.role,

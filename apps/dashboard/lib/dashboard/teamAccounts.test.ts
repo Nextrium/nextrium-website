@@ -5,30 +5,26 @@ import { createFakeSupabase, type FakeAuthUser } from '../testing/fakeSupabase'
 
 const unique = { dashboard_users: ['user_id'] }
 
-/** A fake auth server: /invite creates (or re-sends to) an unconfirmed account. */
-function fakeAuth(authUsers: FakeAuthUser[], behaviour: 'ok' | 'fail' | 'network' | 'exists' | 'no-id' = 'ok') {
-  const sent: { email: string; role: string }[] = []
-  const fetchFn = (async (url: string, init: any) => {
-    if (behaviour === 'network') throw new Error('ECONNRESET')
-    assert.match(String(url), /\/auth\/v1\/invite\?redirect_to=/)
-    const body = JSON.parse(init.body)
-    sent.push({ email: body.email, role: body.data.role })
-    const json = (status: number, data: unknown) => ({ ok: status < 300, status, json: async () => data }) as Response
-    if (behaviour === 'fail') return json(500, { msg: 'Email rate limit exceeded' })
-    if (behaviour === 'exists') return json(422, { error_code: 'email_exists', msg: 'A user with this email address has already been registered' })
-    if (behaviour === 'no-id') return json(200, {})
-    let u = authUsers.find((x) => x.email === body.email)
-    if (u && (u as any).email_confirmed_at) return json(422, { error_code: 'email_exists' })
-    if (!u) { u = { id: `auth-${authUsers.length + 1}`, email: body.email }; authUsers.push(u) }
-    return json(200, { id: u.id })
-  }) as unknown as typeof fetch
-  return { fetchFn, sent }
+/** Fake account creation and email delivery, recording what happened. */
+function fakeAuth(authUsers: FakeAuthUser[], behaviour: 'ok' | 'fail' | 'exists' | 'throw' = 'ok', deliverOk = true) {
+  const sent: { userId: string; email: string }[] = []
+  const created: string[] = []
+  const createAccount: InviteDeps['createAccount'] = async (email) => {
+    if (behaviour === 'throw') throw new Error('network down')
+    if (behaviour === 'fail') return { ok: false, exists: false, message: 'The account could not be created. Try again in a minute.' }
+    if (behaviour === 'exists') return { ok: false, exists: true, message: 'exists' }
+    const u = { id: `auth-${authUsers.length + 1}`, email }
+    authUsers.push(u); created.push(email)
+    return { ok: true, id: u.id }
+  }
+  const deliver: InviteDeps['deliver'] = async (userId, email) => { if (!deliverOk) return false; sent.push({ userId, email }); return true }
+  return { createAccount, deliver, sent, created }
 }
 
-function setup(seed: Record<string, any[]>, authUsers: FakeAuthUser[], behaviour?: Parameters<typeof fakeAuth>[1]) {
+function setup(seed: Record<string, any[]>, authUsers: FakeAuthUser[], behaviour?: Parameters<typeof fakeAuth>[1], deliverOk = true) {
   const fake = createFakeSupabase({ applications: [], agent_screening_results: [], staff_tracks: [], dashboard_users: [], ...seed }, { unique }, authUsers)
-  const auth = fakeAuth(authUsers, behaviour)
-  const deps: InviteDeps = { db: fake.client, fetchFn: auth.fetchFn, supabaseUrl: 'https://sb.test', secret: 'k', redirectTo: 'https://dash.test/auth/callback' }
+  const auth = fakeAuth(authUsers, behaviour, deliverOk)
+  const deps: InviteDeps = { db: fake.client, createAccount: auth.createAccount, deliver: auth.deliver }
   return { ...fake, ...auth, deps }
 }
 
@@ -149,17 +145,30 @@ test('invite: an archived person is refused, nothing sent, nothing changed', asy
   }
 })
 
-test('invite: auth server failure, network failure or a missing id → error and no row', async () => {
-  for (const b of ['fail', 'network', 'no-id'] as const) {
-    const s = setup({}, [], b)
-    const r = await inviteAccount({ email: 'ada@x.com', role: 'member', asTeamMember: true }, s.deps)
-    assert.equal(r.kind, 'error', b)
-    assert.equal(s.tables.dashboard_users.length, 0, b)
-  }
+test('invite: the account cannot be created → error, no row, no email', async () => {
+  const s = setup({}, [], 'fail')
+  const r = await inviteAccount({ email: 'ada@x.com', role: 'member', asTeamMember: true }, s.deps)
+  assert.equal(r.kind, 'error')
+  assert.equal(s.tables.dashboard_users.length, 0)
+  assert.equal(s.sent.length, 0)
 })
 
-test('invite: re-sending fails (e.g. rate limit) → error, existing row untouched', async () => {
-  const s = setup({ dashboard_users: [{ user_id: 'u1', role: 'member', archived: false, is_team_member: true }] }, [pending('u1', 'ada@x.com')], 'fail')
+test('invite: account creation throws → the error surfaces, no row', async () => {
+  const s = setup({}, [], 'throw')
+  await assert.rejects(() => inviteAccount({ email: 'ada@x.com', role: 'member', asTeamMember: true }, s.deps))
+  assert.equal(s.tables.dashboard_users.length, 0)
+})
+
+test('invite: account made but the email fails → still one row, reported as not emailed', async () => {
+  const s = setup({}, [], 'ok', false)
+  const r = await inviteAccount({ email: 'ada@x.com', role: 'member', asTeamMember: true }, s.deps)
+  assert.equal(r.kind, 'invited')
+  assert.equal((r as any).emailed, false)
+  assert.equal(s.tables.dashboard_users.length, 1)
+})
+
+test('invite: re-sending fails (e.g. email provider down) → error, existing row untouched', async () => {
+  const s = setup({ dashboard_users: [{ user_id: 'u1', role: 'member', archived: false, is_team_member: true }] }, [pending('u1', 'ada@x.com')], 'ok', false)
   const r = await inviteAccount({ email: 'ada@x.com', role: 'member', asTeamMember: true }, s.deps)
   assert.equal(r.kind, 'error')
   assert.equal(s.tables.dashboard_users.length, 1)

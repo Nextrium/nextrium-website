@@ -4,9 +4,10 @@ import { createClient, createServiceClient } from '@nextrium/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { fetchAgentsEngine } from '@nextrium/agents-engine'
 import { logActivity } from '@/lib/activityLog'
-import { getVerifiedDashboardRole } from '@/lib/dashboard/getRole'
+import { getVerifiedDashboardRole, getVerifiedIdentity } from '@/lib/dashboard/getRole'
 import { roleDenial, STAFF_ROLES } from '@/lib/dashboard/requireRole'
-import { inviteAccount } from '@/lib/dashboard/teamAccounts'
+import { inviteAccount, supabaseCreateAccount } from '@/lib/dashboard/teamAccounts'
+import { makeInviteDelivery } from '@/lib/dashboard/inviteDelivery'
 import { ACCESS_SYNC, emitAutomationEvent } from '@/lib/automation/server'
 import type { AgentScreeningResult } from '@nextrium/supabase/database'
 import { brand } from '@nextrium/brand'
@@ -602,15 +603,16 @@ export async function inviteApplicantToTeam(
     if (application.status !== 'accepted') throw new Error('Only accepted applicants can be invited to the team.')
     if (application.invited_to_team_at) throw new Error('This applicant has already been invited.')
 
-    const dashboardUrl = process.env.NEXT_PUBLIC_DASHBOARD_URL ?? brand.urls.dashboard
+    const me = await getVerifiedIdentity()
     const outcome = await inviteAccount({ email: application.email, role: 'member', applicationId, asTeamMember: true }, {
       db: supabase,
-      fetchFn: fetch,
-      supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      secret: process.env.SUPABASE_SECRET_KEY!,
-      redirectTo: `${dashboardUrl}/auth/callback`,
+      createAccount: supabaseCreateAccount(supabase),
+      deliver: makeInviteDelivery(supabase, me?.userId ?? null),
     })
     if (outcome.kind === 'error') throw new Error(outcome.message)
+    if (outcome.kind === 'invited' && !outcome.emailed) {
+      throw new Error('Their account was created, but the invitation email could not be sent. Use "Send invite link" in Team Access to send it.')
+    }
     if (outcome.kind === 'archived') throw new Error('This person has an archived team account. Unarchive it in Team Access first.')
     // An account that already existed keeps its role; a new or re-sent invitation means an email went out.
     const existingAccount = outcome.kind === 'added_existing' || outcome.kind === 'already'

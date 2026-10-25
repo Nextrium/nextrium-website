@@ -95,6 +95,8 @@ export async function proxy(request: NextRequest) {
   if (pathname === '/login')        return NextResponse.next()
   if (pathname === '/set-password') return NextResponse.next()
   if (pathname.startsWith('/auth/')) return NextResponse.next()
+  // Invitation links are opened before the person has a session; the page checks the link itself.
+  if (pathname.startsWith('/invite/')) return NextResponse.next()
   // API routes verify the caller themselves (and return 401, not a login page).
   if (pathname.startsWith('/api/')) return NextResponse.next()
 
