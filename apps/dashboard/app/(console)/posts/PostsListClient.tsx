@@ -4,6 +4,8 @@ import Link from 'next/link'
 import type { Post } from '@nextrium/supabase/database'
 import { useDashboardSearch } from '@/lib/dashboard/useDashboardSearch'
 import DashboardSearchBox from '@/components/dashboard/DashboardSearchBox'
+import { MAX_PINS, PIN_SITES, canPinOn, type PinSite } from '@/lib/dashboard/pins'
+import PinnedPanel, { PIN_CSS, usePins } from './PinnedPanel'
 
 const TYPE_LABELS: Record<Post['post_type'], string> = {
   editorial:      'Editorial',
@@ -23,7 +25,9 @@ const TYPE_STYLES: Record<Post['post_type'], { bg: string; color: string }> = {
   recruitment:    { bg: 'color-mix(in srgb, var(--success) 10%, transparent)',  color: 'var(--success)'  },
 }
 
-export default function PostsListClient({ posts }: { posts: Post[] }) {
+export default function PostsListClient({ posts, pins: initialPins }: { posts: Post[]; pins: Record<PinSite, string[]> }) {
+  const pinState = usePins(initialPins)
+  const { pins, busy, change } = pinState
   const { query, setQuery, results } = useDashboardSearch(
     posts,
     (post) => [post.title, post.excerpt, post.author, TYPE_LABELS[post.post_type]]
@@ -31,6 +35,8 @@ export default function PostsListClient({ posts }: { posts: Post[] }) {
 
   return (
     <>
+      <style>{PIN_CSS}</style>
+      <PinnedPanel posts={posts} state={pinState} />
       <div className="dash-list-header">
         <span className="dash-list-count">{posts.length} post{posts.length !== 1 ? 's' : ''}</span>
       </div>
@@ -95,7 +101,21 @@ export default function PostsListClient({ posts }: { posts: Post[] }) {
                       </div>
                     </td>
                     <td>
-                      <Link href={`/posts/${post.slug}`} className="dash-edit-link">Edit →</Link>
+                      <div className="pin-row-actions">
+                        <Link href={`/posts/${post.slug}`} className="dash-edit-link">Edit →</Link>
+                        {(Object.keys(PIN_SITES) as PinSite[]).filter((site) => canPinOn(site, post)).map((site) => {
+                          const pinned = pins[site].includes(post.id)
+                          const full = !pinned && pins[site].length >= MAX_PINS
+                          return (
+                            <button key={site} type="button" className={`pin-row-btn ${pinned ? 'on' : ''}`} disabled={!!busy || full}
+                              aria-pressed={pinned}
+                              title={full ? `${MAX_PINS} posts are already pinned on the ${PIN_SITES[site]}. Unpin one first.` : undefined}
+                              onClick={() => change(site, pinned ? { kind: 'unpin', id: post.id } : { kind: 'pin', id: post.id }, pinned ? `Unpinned from the ${PIN_SITES[site]}.` : `Pinned on the ${PIN_SITES[site]}.`)}>
+                              {pinned ? `Unpin · ${PIN_SITES[site]}` : `Pin · ${PIN_SITES[site]}`}
+                            </button>
+                          )
+                        })}
+                      </div>
                     </td>
                   </tr>
                 )

@@ -16,6 +16,8 @@ export interface FakeOptions {
   unique?: Record<string, string[]>
   /** Make the next write to a table fail with this error (once). */
   failNextWrite?: Record<string, { code: string; message: string }>
+  /** Database functions callable with client.rpc(name, args); they get the tables to work on. */
+  rpc?: Record<string, (args: any, tables: Record<string, Row[]>) => Result | Promise<Result>>
 }
 
 let seq = 0
@@ -136,6 +138,12 @@ export function createFakeSupabase(seed: Record<string, Row[]> = {}, opts: FakeO
 
   const client: any = {
     from: (t: string) => builder(t),
+    async rpc(name: string, args: any): Promise<Result> {
+      calls.push({ table: `rpc:${name}`, op: 'rpc', payload: args })
+      const fn = opts.rpc?.[name]
+      if (!fn) return { data: null, error: { code: 'PGRST202', message: `Could not find the function ${name}` } }
+      return fn(args, tables)
+    },
     auth: {
       admin: {
         async listUsers({ page = 1, perPage = 50 }: { page?: number; perPage?: number } = {}) {
