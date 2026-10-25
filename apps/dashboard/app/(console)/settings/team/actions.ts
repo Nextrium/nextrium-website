@@ -4,7 +4,7 @@ import { createServiceClient } from '@nextrium/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { logActivity } from '@/lib/activityLog'
 import { getVerifiedIdentity } from '@/lib/dashboard/getRole'
-import { findAuthUserIdByEmail, grantDashboardAccess, isEmailAlreadyRegistered } from '@/lib/dashboard/teamAccounts'
+import { inviteAccount } from '@/lib/dashboard/teamAccounts'
 import { APPLICATION_TRACKS } from '@/lib/automation/rulesAdmin'
 import { ACCESS_REVOKED, ACCESS_SYNC, emitAutomationEvent, supersedeSuccesses } from '@/lib/automation/server'
 import { brand } from '@nextrium/brand'
@@ -30,105 +30,73 @@ export interface InvitedUserRow {
   archived: boolean
   archived_at: string | null
   is_team_member: boolean
+  /** Set when the track was filled in from their application's screening. */
+  track?: string | null
 }
 
 export async function inviteUser(
   email: string,
   role: string
-): Promise<{ error?: string; notice?: string; added?: InvitedUserRow; teamMemberSet?: string }> {
+): Promise<{ error?: string; notice?: string; added?: InvitedUserRow; teamMemberSet?: string; trackFor?: { userId: string; track: string } }> {
   try {
     if (!(await requireAdmin())) return { error: NOT_ALLOWED }
     if (!VALID_ROLES.includes(role)) return { error: 'Invalid role.' }
-    email = (email ?? '').trim().toLowerCase()
-    if (!email.includes('@')) return { error: 'Enter a valid email address.' }
+    email = (typeof email === 'string' ? email : '').trim().toLowerCase()
+    if (!email.includes('@') || email.length > 254) return { error: 'Enter a valid email address.' }
 
-    const supabaseUrl    = process.env.NEXT_PUBLIC_SUPABASE_URL!
-    const supabaseSecret = process.env.SUPABASE_SECRET_KEY!
-    const dashboardUrl        = process.env.NEXT_PUBLIC_DASHBOARD_URL ?? brand.urls.dashboard
-
-    const redirectTo = `${dashboardUrl}/auth/callback`
-
-    const res = await fetch(`${supabaseUrl}/auth/v1/invite?redirect_to=${encodeURIComponent(redirectTo)}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type':  'application/json',
-        'apikey':        supabaseSecret,
-        'Authorization': `Bearer ${supabaseSecret}`,
-      },
-      body: JSON.stringify({
-        email,
-        data: { role },
-        redirect_to: redirectTo,
-      }),
+    const dashboardUrl = process.env.NEXT_PUBLIC_DASHBOARD_URL ?? brand.urls.dashboard
+    const outcome = await inviteAccount({ email, role, asTeamMember: role === 'member' }, {
+      db: createServiceClient(),
+      fetchFn: fetch,
+      supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      secret: process.env.SUPABASE_SECRET_KEY!,
+      redirectTo: `${dashboardUrl}/auth/callback`,
     })
 
-    const rawText = await res.text()
-
-    let json: any = {}
-    try {
-      json = JSON.parse(rawText)
-    } catch {
-      throw new Error(`Supabase returned unexpected response (${res.status}): ${rawText.slice(0, 200)}`)
+    if (outcome.kind === 'error') return { error: outcome.message }
+    if (outcome.kind === 'archived') return { error: 'This person has an archived account. Unarchive it from the list below instead.' }
+    if (outcome.kind === 'already' && !(role === 'member')) {
+      return { error: `This person already has dashboard access as ${outcome.role}. Change their role from the list below.` }
     }
 
-    let userId: string
-    let notice: string | undefined
-
-    if (!res.ok) {
-      if (!isEmailAlreadyRegistered(json)) {
-        throw new Error(json.message ?? json.error_description ?? json.msg ?? 'Failed to invite user.')
-      }
-      // The email already has an account: give that account dashboard access
-      // directly instead of refusing. No invitation email is sent.
-      const existingId = await findAuthUserIdByEmail(email)
-      if (!existingId) throw new Error('This email already has an account that could not be found. Please try again.')
-      const grant = await grantDashboardAccess(existingId, role, undefined, role === 'member')
-      if (grant.status === 'exists') {
-        // Choosing Member for someone who already has a role adds team
-        // membership on top of it; their access level does not change.
-        if (role === 'member') {
-          return {
-            notice: grant.becameMember
-              ? `${email} keeps their ${grant.role} access and is now also a team member. No invitation email was sent.`
-              : `${email} is already a team member.`,
-            teamMemberSet: existingId,
-          }
-        }
-        return { error: `This person already has dashboard access as ${grant.role}. Change their role from the list below.` }
-      }
-      if (grant.status === 'archived') {
-        return { error: 'This person has an archived account. Unarchive it from the list below instead.' }
-      }
-      userId = existingId
-      notice = `${email} already had an account, so they were added as ${role} directly. No invitation email was sent.`
-    } else {
-      if (!json.id) throw new Error('Invite succeeded but no user ID was returned.')
-      userId = json.id
-      const supabase = createServiceClient()
-      const { error: insertError } = await (supabase.from('dashboard_users') as any).insert({
-        user_id: userId,
-        role,
-        is_team_member: role === 'member',
-      })
-      if (insertError) throw new Error(insertError.message)
-    }
+    const tracks = outcome.tracks
+    if (tracks.trackSet) await emitAutomationEvent(ACCESS_SYNC, outcome.userId)
+    const trackNote = tracks.trackSet ? ` Track set to ${tracks.track} from their application.` : ''
+    const trackFor = tracks.trackSet && tracks.track ? { userId: outcome.userId, track: tracks.track } : undefined
 
     revalidatePath('/settings/team')
     logActivity({
-      action: 'team_user_invited',
+      action: outcome.kind === 'reinvited' ? 'team_user_reinvited' : 'team_user_invited',
       targetType: 'dashboard_user',
-      targetId: userId,
-      details: { email, role, existingAccount: !!notice },
+      targetId: outcome.userId,
+      details: { email, role, outcome: outcome.kind, ...(tracks.trackSet ? { track: tracks.track } : {}) },
     }).catch(() => {})
-    return {
-      notice,
-      added: {
-        user_id: userId, role, created_at: new Date().toISOString(), email,
-        archived: false, archived_at: null, is_team_member: role === 'member',
-      },
+
+    const row = (r: string): InvitedUserRow => ({
+      user_id: outcome.userId, role: r, created_at: new Date().toISOString(), email,
+      archived: false, archived_at: null, is_team_member: r === 'member', track: tracks.trackSet ? tracks.track : null,
+    })
+    switch (outcome.kind) {
+      case 'invited':
+        return { added: row(role), notice: trackNote ? `Invite sent to ${email}.${trackNote}` : undefined, trackFor }
+      case 'reinvited':
+        return { notice: `${email} had not accepted their first invitation, so it was sent again.${trackNote}`, trackFor }
+      case 'added_existing':
+        return { added: row(role), notice: `${email} already had an account, so they were added as ${role} directly. No invitation email was sent.${trackNote}`, trackFor }
+      case 'already':
+        // Choosing Member for someone who already has a role adds team
+        // membership on top of it; their access level does not change.
+        return {
+          notice: outcome.becameMember
+            ? `${email} keeps their ${outcome.role} access and is now also a team member. No invitation email was sent.${trackNote}`
+            : `${email} is already a team member.${trackNote}`,
+          teamMemberSet: outcome.userId,
+          trackFor,
+        }
     }
   } catch (err) {
-    return { error: err instanceof Error ? err.message : 'Failed to invite user.' }
+    console.error('[team] invite failed:', err instanceof Error ? err.message : err)
+    return { error: 'Failed to invite user. Try again.' }
   }
 }
 

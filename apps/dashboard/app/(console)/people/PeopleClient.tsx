@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
+import { filterPeople, readPeopleFilters } from '@/lib/dashboard/peopleFilters'
 
 export interface PersonCard {
   userId:          string
@@ -67,13 +68,8 @@ function PersonCardItem({ person }: { person: PersonCard }) {
 export default function PeopleClient({ staff, members, canSeeStaff }: { staff: PersonCard[]; members: PersonCard[]; canSeeStaff: boolean }) {
   const searchParams = useSearchParams()
   const view = canSeeStaff ? (searchParams.get('view') ?? 'staff') : 'members'
-  const category = searchParams.get('category') ?? ''
-  const status = searchParams.get('status') ?? ''
-  const list = view === 'members'
-    ? members.filter((m) =>
-        (!category || m.contribution?.categories.includes(category)) &&
-        (!status || m.contribution?.status === status))
-    : staff
+  const { category, status } = readPeopleFilters(searchParams)
+  const list = view === 'members' ? filterPeople(members, { category, status }) : staff
 
   return (
     <>
@@ -90,8 +86,13 @@ export default function PeopleClient({ staff, members, canSeeStaff }: { staff: P
         .person-card-email { font-size: 11px; color: var(--grey-mid); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }
         .person-card-meta { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
         .person-card-role { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--orange); }
-        .person-card-track { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--grey-dark); }
+        .person-card-track { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--grey-mid); }
         .person-card-badges { display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; font-size: 13px; }
+        .person-filters { display: flex; flex-wrap: wrap; gap: 12px 28px; margin: -8px 0 20px; }
+        .person-filter-group { display: flex; flex-direction: column; gap: 6px; }
+        .person-filter-label { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--grey-mid); }
+        .person-filter-group .person-tabs { margin-bottom: 0; }
+        .person-tab:focus-visible { outline: 1px solid var(--orange); outline-offset: -1px; }
         .person-empty { padding: 40px; text-align: center; color: var(--grey-mid); font-size: 13px; }
       `}</style>
 
@@ -101,15 +102,26 @@ export default function PeopleClient({ staff, members, canSeeStaff }: { staff: P
       </div>
 
       {view === 'members' && (
-        <div className="person-tabs" style={{ marginTop: -8 }}>
-          {[['', 'All'], ...CONTRIB_CATEGORIES.map((c) => [c, c])].map(([value, label]) => (
-            <Link key={`c-${value}`} className={`person-tab ${category === value ? 'active' : ''}`}
-              href={`/people?view=members${value ? `&category=${value}` : ''}${status ? `&status=${status}` : ''}`}>{label}</Link>
-          ))}
-          {[['', 'Any status'], ['active', 'Active'], ['invited', 'Invited']].map(([value, label]) => (
-            <Link key={`s-${value}`} className={`person-tab ${status === value ? 'active' : ''}`}
-              href={`/people?view=members${category ? `&category=${category}` : ''}${value ? `&status=${value}` : ''}`}>{label}</Link>
-          ))}
+        // Two separate filters, each with its own selection, so they are drawn apart and labelled.
+        <div className="person-filters">
+          <div className="person-filter-group" role="group" aria-labelledby="people-filter-area">
+            <span id="people-filter-area" className="person-filter-label">Area</span>
+            <div className="person-tabs">
+              {[['', 'All areas'], ...CONTRIB_CATEGORIES.map((c) => [c, c])].map(([value, label]) => (
+                <Link key={`c-${value}`} className={`person-tab ${category === value ? 'active' : ''}`} aria-current={category === value ? 'true' : undefined}
+                  href={`/people?view=members${value ? `&category=${value}` : ''}${status ? `&status=${status}` : ''}`}>{label}</Link>
+              ))}
+            </div>
+          </div>
+          <div className="person-filter-group" role="group" aria-labelledby="people-filter-status">
+            <span id="people-filter-status" className="person-filter-label">Status</span>
+            <div className="person-tabs">
+              {[['', 'Any status'], ['active', 'Active'], ['invited', 'Invited']].map(([value, label]) => (
+                <Link key={`s-${value}`} className={`person-tab ${status === value ? 'active' : ''}`} aria-current={status === value ? 'true' : undefined}
+                  href={`/people?view=members${category ? `&category=${category}` : ''}${value ? `&status=${value}` : ''}`}>{label}</Link>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
