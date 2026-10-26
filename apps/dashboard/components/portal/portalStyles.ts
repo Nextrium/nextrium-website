@@ -37,6 +37,10 @@ export const PORTAL_CSS = `
   .pt-kv { display: grid; grid-template-columns: 150px 1fr; gap: 12px; font-size: 13px; color: var(--off-white); line-height: 1.6; }
   .pt-kv dt { color: var(--grey-mid); }
   .pt-kv dd { overflow-wrap: anywhere; white-space: pre-wrap; }
+  .pt-copies { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; }
+  .pt-copies li { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 6px 8px; background: rgba(255,255,255,0.02); font-size: 13px; }
+  .pt-copies a { color: var(--orange-w); text-decoration: none; }
+  .pt-chip { font-family: var(--font-mono); font-size: 7.5px; letter-spacing: 0.12em; text-transform: uppercase; padding: 3px 7px; margin-left: 6px; border: 1px solid color-mix(in srgb, var(--orange) 35%, transparent); color: var(--orange-w); white-space: nowrap; }
   .pt-link { color: var(--orange); overflow-wrap: anywhere; }
   .pt-hint { font-size: 12px; color: var(--grey-mid); line-height: 1.5; }
   .pt-btn { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.12em; text-transform: uppercase; padding: 9px 18px; background: var(--orange); border: 1px solid var(--orange); color: var(--white); cursor: pointer; text-decoration: none; display: inline-flex; width: fit-content; }
@@ -46,6 +50,7 @@ export const PORTAL_CSS = `
   .pt-alert { padding: 10px 14px; font-size: 12px; border: 1px solid; line-height: 1.5; }
   .pt-alert.error { background: color-mix(in srgb, var(--error) 8%, transparent); border-color: color-mix(in srgb, var(--error) 30%, transparent); color: var(--error); }
   .pt-alert.success { background: color-mix(in srgb, var(--success) 8%, transparent); border-color: color-mix(in srgb, var(--success) 30%, transparent); color: var(--success); }
+  .pt-alert.warn { background: color-mix(in srgb, var(--gold) 8%, transparent); border-color: color-mix(in srgb, var(--gold) 30%, transparent); color: var(--gold-l); line-height: 1.5; }
   .pt-alert.info { background: color-mix(in srgb, var(--slate-l) 8%, transparent); border-color: color-mix(in srgb, var(--slate-l) 30%, transparent); color: var(--off-white); }
   @media (max-width: 1100px) { .pt-layout { grid-template-columns: 1fr; } .pt-side { position: static; } }
   @media (max-width: 600px) { .pt-kv { grid-template-columns: 1fr; gap: 2px; } .pt-input { min-width: 0; width: 100%; } }

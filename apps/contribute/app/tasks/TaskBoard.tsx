@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { claimersLabel, sharedState, windowLabel } from '@/lib/sharedTasks'
 import Link from 'next/link'
 import { CATEGORIES, CATEGORY_LABELS, COMPLEXITIES, COMPLEXITY_LABELS } from '@nextrium/contributions-core/constants'
 import type { TaskCard } from '@/lib/publicData'
@@ -86,6 +87,7 @@ export default function TaskBoard({ tasks, basePath = '/tasks' }: { tasks: TaskC
                 <div className="flex items-center gap-2 flex-wrap">
                   <CategoryBadge category={task.category} />
                   <ComplexityBadge complexity={task.complexity} />
+                  {task.shared && <span className="shared-chip" data-shared-chip>Open to several</span>}
                 </div>
 
                 <h2 style={{ fontFamily: F.display, fontWeight: 600, fontSize: 15, color: C.light, lineHeight: 1.3, flex: 1 }}>
@@ -95,6 +97,11 @@ export default function TaskBoard({ tasks, basePath = '/tasks' }: { tasks: TaskC
                 <p style={{ fontFamily: F.body, fontWeight: 300, fontSize: 12.5, color: C.mute, lineHeight: 1.65, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                   {task.excerpt}
                 </p>
+                {task.shared && (
+                  <p style={{ fontFamily: F.body, fontSize: 12, color: C.light }} data-shared-line>
+                    {windowLabel(task.shared.closesAt)} · {claimersLabel(task.shared)}
+                  </p>
+                )}
 
                 <div className="flex items-center justify-between gap-3 pt-4" style={{ borderTop: `1px solid ${C.border}` }}>
                   <div className="flex flex-col gap-0.5">
@@ -107,9 +114,11 @@ export default function TaskBoard({ tasks, basePath = '/tasks' }: { tasks: TaskC
                     <Link href={`${basePath}/${task.id}`} className="btn-outline" style={{ fontSize: 11, padding: '8px 16px', whiteSpace: 'nowrap' }} aria-label={`Read more about ${task.title}`}>
                       Read more
                     </Link>
-                    <Link href={`${basePath}/${task.id}#claim`} className="btn-primary" style={{ fontSize: 11, padding: '8px 16px', whiteSpace: 'nowrap' }} aria-label={`Claim ${task.title}`}>
-                      Claim
-                    </Link>
+                    {!(task.shared && sharedState(task.shared) === 'full') && (
+                      <Link href={`${basePath}/${task.id}#claim`} className="btn-primary" style={{ fontSize: 11, padding: '8px 16px', whiteSpace: 'nowrap' }} aria-label={`Claim ${task.title}`}>
+                        Claim
+                      </Link>
+                    )}
                   </div>
                 </div>
               </article>

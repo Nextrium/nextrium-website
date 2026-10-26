@@ -23,13 +23,16 @@ export default async function PortalTasksPage({ searchParams }: Props) {
 
   const db = community()
   const [{ data: all, error: e1 }, { data: people, error: e2 }] = await Promise.all([
-    db.from('tasks').select('id, title, category, complexity, point_range_min, point_range_max, status, assigned_to, deadline_at, extended_deadline_at, extension_granted, extension_requested_at, created_at').order('created_at', { ascending: false }).limit(1000),
+    db.from('tasks').select('id, title, category, complexity, point_range_min, point_range_max, status, assigned_to, deadline_at, extended_deadline_at, extension_granted, extension_requested_at, created_at, shared, claim_closes_at, shared_from').order('created_at', { ascending: false }).limit(1000),
     db.from('contributors').select('id, name, contributor_type, team_name'),
   ])
   if (e1 || e2) throw new Error('Could not load tasks')
 
   const nameOf = new Map((people ?? []).map((p) => [p.id, contributorName(p)]))
   const tasks = all ?? []
+  // Claimers per shared task (their copies).
+  const copiesOf = new Map<string, number>()
+  for (const t of tasks) if (t.shared_from) copiesOf.set(t.shared_from, (copiesOf.get(t.shared_from) ?? 0) + 1)
   const pendingExt = (t: (typeof tasks)[number]) => t.status === 'assigned' && extensionState(t) === 'requested'
   const counts: Record<Tab, number> = {
     open: tasks.filter((t) => t.status === 'open').length,
@@ -86,7 +89,15 @@ export default async function PortalTasksPage({ searchParams }: Props) {
                   const ext = extensionState(t)
                   return (
                     <tr key={t.id}>
-                      <td><Link href={`/portal/tasks/${t.id}`} className="title">{t.title}</Link></td>
+                      <td>
+                        <Link href={`/portal/tasks/${t.id}`} className="title">{t.title}</Link>
+                        {t.shared && (
+                          <span className="pt-chip">
+                            Shared · {t.claim_closes_at && new Date(t.claim_closes_at).getTime() > now ? 'claims open' : 'claims closed'} · {copiesOf.get(t.id) ?? 0} claimed
+                          </span>
+                        )}
+                        {t.shared_from && <span className="pt-chip">Shared copy</span>}
+                      </td>
                       <td className="pt-muted">{CATEGORY_LABELS[t.category as keyof typeof CATEGORY_LABELS] ?? t.category} · {COMPLEXITY_LABELS[t.complexity as Complexity] ?? t.complexity}</td>
                       <td className="pt-muted">{t.point_range_min}–{t.point_range_max}</td>
                       <td className="pt-muted">{tab === 'open' || tab === 'completed' ? fmt(t.created_at) : (t.assigned_to ? nameOf.get(t.assigned_to) ?? '—' : '—')}</td>

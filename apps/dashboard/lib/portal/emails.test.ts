@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { applicationApprovedEmail, applicationRejectedEmail, portalDeadlineReminderEmail, portalRejectedEmail, portalVerifiedEmail, portalExtensionDecidedEmail, portalTaskAssignedEmail, portalTaskUnassignedEmail, portalUrl, revisionRequestedEmail } from './emails'
+import { applicationApprovedEmail, applicationRejectedEmail, portalDeadlineReminderEmail, portalRejectedEmail, portalVerifiedEmail, portalExtensionDecidedEmail, portalTaskAssignedEmail, portalTaskUnassignedEmail, portalSharedCopyRemovedEmail, portalUrl, revisionRequestedEmail } from './emails'
 
 test('links point at the contributor portal', () => {
   assert.match(portalUrl('/tasks'), /^https?:\/\/[^/]+\/tasks$/)
@@ -53,4 +53,12 @@ test('reminder emails: overdue and upcoming read differently', () => {
   assert.ok(up.html.includes('less than a day'))
   assert.match(od.subject, /^Overdue/)
   assert.ok(od.html.includes('unclaim'))
+})
+
+test('shared copy withdrawn: title and reason escaped, no empty reason paragraph', () => {
+  const e = portalSharedCopyRemovedEmail({ taskTitle: 'Build <b>x</b> {{email}}', reason: 'Closed <i>early</i>' })
+  assert.match(e.subject, /^Shared task withdrawn: /)
+  assert.ok(!e.html.includes('<b>x</b>') && !e.html.includes('<i>early</i>') && !e.html.includes('{{email}}'))
+  assert.ok(e.html.includes('&lt;b&gt;x&lt;/b&gt;'))
+  assert.ok(!portalSharedCopyRemovedEmail({ taskTitle: 'T', reason: null }).html.includes('<p></p>'))
 })

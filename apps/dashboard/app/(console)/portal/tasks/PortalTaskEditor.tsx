@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import RichTextEditor from '@/components/editor/RichTextEditor'
 import { CATEGORIES, CATEGORY_LABELS, COMPLEXITIES, COMPLEXITY_LABELS, taskDefaults, type Category, type Complexity } from '@nextrium/contributions-core/constants'
 import { createPortalTask, updatePortalTask } from './actions'
+import { SHARED_WINDOW_DEFAULT_HOURS, SHARED_WINDOW_MAX_HOURS } from '@/lib/portal/sharedRules'
 
 export interface PortalTaskValues {
   id?: string
@@ -31,7 +32,9 @@ export default function PortalTaskEditor({ initial, contributors }: { initial: P
   const isNew = !initial.id
   const sizingLocked = !isNew && initial.status !== 'open'
   const [v, setV] = useState(initial)
-  const [mode, setMode] = useState<'open' | 'assign'>('open')
+  const [mode, setMode] = useState<'open' | 'shared' | 'assign'>('open')
+  const [windowHours, setWindowHours] = useState(String(SHARED_WINDOW_DEFAULT_HOURS))
+  const [maxClaimers, setMaxClaimers] = useState('')
   const [assignee, setAssignee] = useState('')
   const [deadline, setDeadline] = useState('')
   const [busy, setBusy] = useState(false)
@@ -49,7 +52,11 @@ export default function PortalTaskEditor({ initial, contributors }: { initial: P
     setResult(null)
     const input = { title: v.title, description: v.description, category: v.category, complexity: v.complexity, links: v.links.filter((l) => l.url.trim()), tags: v.tags }
     const res = isNew
-      ? await createPortalTask({ ...input, ...(mode === 'assign' ? { assigneeId: assignee, deadlineAt: deadline ? new Date(deadline).toISOString() : null } : {}) })
+      ? await createPortalTask({
+          ...input,
+          ...(mode === 'assign' ? { assigneeId: assignee, deadlineAt: deadline ? new Date(deadline).toISOString() : null } : {}),
+          ...(mode === 'shared' ? { shared: { windowHours, maxClaimers } } : {}),
+        })
       : await updatePortalTask(initial.id!, input)
     setBusy(false)
     if (!res.ok) { setResult({ ok: false, text: res.error }); return }
@@ -108,6 +115,23 @@ export default function PortalTaskEditor({ initial, contributors }: { initial: P
             <input type="radio" name="pt-mode" checked={mode === 'open'} onChange={() => setMode('open')} /> Open for claiming (first come, first served)
           </label>
           <label className="pt-hint" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input type="radio" name="pt-mode" checked={mode === 'shared'} onChange={() => setMode('shared')} /> Open to several contributors (each claims their own copy)
+          </label>
+          {mode === 'shared' && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <label className="pt-hint" htmlFor="pt-window">Claim window (hours)</label>
+                <input id="pt-window" className="pt-input" inputMode="numeric" value={windowHours} onChange={(e) => setWindowHours(e.target.value)} />
+                <span className="pt-hint">Default {SHARED_WINDOW_DEFAULT_HOURS}; up to {SHARED_WINDOW_MAX_HOURS / 24} days. After it closes nobody new can claim.</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <label className="pt-hint" htmlFor="pt-cap">Places (optional)</label>
+                <input id="pt-cap" className="pt-input" inputMode="numeric" value={maxClaimers} placeholder="No limit" onChange={(e) => setMaxClaimers(e.target.value)} />
+                <span className="pt-hint">Each claimer gets their own copy, their own {d.deadlineDays}-day deadline from claiming, and earns points individually.</span>
+              </div>
+            </div>
+          )}
+          <label className="pt-hint" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <input type="radio" name="pt-mode" checked={mode === 'assign'} onChange={() => setMode('assign')} /> Assign to a contributor
           </label>
           {mode === 'assign' && (
@@ -128,7 +152,7 @@ export default function PortalTaskEditor({ initial, contributors }: { initial: P
       )}
 
       <button type="button" className="pt-btn" disabled={busy || !v.title.trim() || (isNew && mode === 'assign' && !assignee)} onClick={save}>
-        {busy ? 'Saving…' : isNew ? (mode === 'assign' ? 'Create and assign' : 'Create task') : 'Save changes'}
+        {busy ? 'Saving…' : isNew ? (mode === 'assign' ? 'Create and assign' : mode === 'shared' ? 'Create shared task' : 'Create task') : 'Save changes'}
       </button>
     </div>
   )

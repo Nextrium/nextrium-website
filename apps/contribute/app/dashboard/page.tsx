@@ -238,6 +238,7 @@ function MyTasks({ me, tasks, plans }: { me: MyProfile; tasks: MyTask[]; plans: 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-2 flex-wrap">
                       <CategoryBadge category={task.category} />
+                      {task.shared_from && <span className="shared-chip">Shared task</span>}
                       <ComplexityBadge complexity={task.complexity} />
                       {task.extension_granted && <StatusBadge tone="pending">Extended</StatusBadge>}
                       {task.extension_requested_at && !task.extension_granted && (task.extended_deadline_at

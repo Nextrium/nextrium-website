@@ -16,9 +16,11 @@ interface Props {
   deleteRemoves: number
   /** Why an open task cannot be deleted, shown to admins. */
   deleteBlocked: string | null
+  /** A contributor's copy of a shared task: unassigning withdraws it instead of reopening it. */
+  isCopy?: boolean
 }
 
-export default function TaskManagePanel({ taskId, status, extensionPending, extendedTo, canUnassign, canDelete, deleteRemoves, deleteBlocked }: Props) {
+export default function TaskManagePanel({ taskId, status, extensionPending, extendedTo, canUnassign, canDelete, deleteRemoves, deleteBlocked, isCopy = false }: Props) {
   const router = useRouter()
   const [busy, setBusy] = useState<string | null>(null)
   const [confirm, setConfirm] = useState<'unassign' | 'delete' | null>(null)
@@ -56,14 +58,14 @@ export default function TaskManagePanel({ taskId, status, extensionPending, exte
         <>
           <label className="pt-hint" htmlFor="pt-unassign-reason">Note for the contributor (optional)</label>
           <textarea id="pt-unassign-reason" className="pt-input pt-textarea" maxLength={1000} value={reason} onChange={(e) => setReason(e.target.value)} />
-          <span className="pt-hint">The task goes back to the open board. The contributor is emailed and can claim other tasks straight away.</span>
+          <span className="pt-hint">{isCopy ? 'This copy is withdrawn (it does not go back on the board). The contributor is emailed and can claim other tasks straight away.' : 'The task goes back to the open board. The contributor is emailed and can claim other tasks straight away.'}</span>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button type="button" className="pt-btn danger" disabled={!!busy} onClick={() => run('unassign', () => unassignPortalTask(taskId, reason))}>{busy === 'unassign' ? 'Unassigning…' : 'Yes, unassign'}</button>
+            <button type="button" className="pt-btn danger" disabled={!!busy} onClick={() => run('unassign', () => unassignPortalTask(taskId, reason))}>{busy === 'unassign' ? (isCopy ? 'Withdrawing…' : 'Unassigning…') : (isCopy ? 'Yes, withdraw' : 'Yes, unassign')}</button>
             <button type="button" className="pt-btn ghost" disabled={!!busy} onClick={() => setConfirm(null)}>Keep</button>
           </div>
         </>
       ) : (
-        <button type="button" className="pt-btn danger" disabled={!!busy} onClick={() => setConfirm('unassign')}>Unassign</button>
+        <button type="button" className="pt-btn danger" disabled={!!busy} onClick={() => setConfirm('unassign')}>{isCopy ? 'Withdraw this copy' : 'Unassign'}</button>
       ))}
       {status === 'assigned' && !canUnassign && <span className="pt-hint">A submission is waiting for review, so this task cannot be unassigned.</span>}
 

@@ -4,6 +4,7 @@ import { BackLink } from '@/components/PageHeader'
 import { CategoryBadge, ComplexityBadge, NeutralBadge } from '@/components/Badges'
 import ClaimPanel, { type ClaimView } from '@/app/tasks/[id]/ClaimPanel'
 import { DEFAULT_MAX_CLAIMS, cooldownHoursLeft } from '@/lib/claims'
+import { sharedState } from '@/lib/sharedTasks'
 import type { PortalIdentity } from '@/lib/portal'
 import type { TaskDetail } from '@/lib/publicData'
 import { C, F, categoryToken } from '@/lib/theme'
@@ -14,11 +15,24 @@ export function deadlineDays(task: TaskDetail): number {
 
 /** What the claim box offers this visitor, worked out on the server. */
 export async function claimView(task: TaskDetail, me: PortalIdentity | null, mine = false): Promise<ClaimView> {
+  // A shared task whose window closed (or whose places are taken) can't be claimed by anyone.
+  if (task.shared && sharedState(task.shared) === 'closed') return { kind: 'shared_closed' }
   if (!me) return { kind: 'signed_out' }
   if (!me.contributor || me.contributor.status !== 'active') return { kind: 'not_approved', registered: !!me.contributor }
-  if (mine) return { kind: 'mine' }
 
   const db = createCommunityServiceClient()
+  if (mine) {
+    // On a copy of a shared task: how many people have it (a count, never names).
+    if (!task.sharedFrom) return { kind: 'mine' }
+    const { count } = await db.from('tasks').select('id', { count: 'exact', head: true }).eq('shared_from', task.sharedFrom)
+    return { kind: 'mine', sharedWith: count ?? 0 }
+  }
+  if (task.shared) {
+    const { data: copy } = await db.from('tasks').select('id').eq('shared_from', task.id).eq('assigned_to', me.contributor.id).limit(1)
+    if (copy && copy.length > 0) return { kind: 'shared_mine', copyId: copy[0].id }
+    if (sharedState(task.shared) === 'full') return { kind: 'shared_full' }
+  }
+
   const [{ count, error: countError }, { data: row, error: rowError }] = await Promise.all([
     db.from('tasks').select('id', { count: 'exact', head: true }).eq('assigned_to', me.contributor.id).eq('status', 'assigned'),
     db.from('contributors').select('max_claims').eq('id', me.contributor.id).maybeSingle(),
@@ -94,7 +108,7 @@ export default function TaskDetailView({ task, view, boardHref, boardLabel }: { 
         </div>
       )}
 
-      <ClaimPanel taskId={task.id} title={task.title} deadlineDays={days} view={view} boardHref={boardHref} />
+      <ClaimPanel taskId={task.id} title={task.title} deadlineDays={days} view={view} boardHref={boardHref} shared={task.shared} />
     </>
   )
 }

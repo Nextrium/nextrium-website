@@ -322,6 +322,12 @@ export type CommunityDatabase = {
           unclaimed_at: string[] | null
           primitives: string[] | null
           links: Json | null
+          /** Open to several contributors during the claim window; each claim makes a copy. */
+          shared: boolean
+          claim_closes_at: string | null
+          max_claimers: number | null
+          /** On a copy: the shared task it was claimed from. */
+          shared_from: string | null
         }
         Insert: {
           id?: string
@@ -344,6 +350,10 @@ export type CommunityDatabase = {
           unclaimed_at?: string[] | null
           primitives?: string[] | null
           links?: Json | null
+          shared?: boolean
+          claim_closes_at?: string | null
+          max_claimers?: number | null
+          shared_from?: string | null
         }
         Update: {
           id?: string
@@ -366,6 +376,10 @@ export type CommunityDatabase = {
           unclaimed_at?: string[] | null
           primitives?: string[] | null
           links?: Json | null
+          shared?: boolean
+          claim_closes_at?: string | null
+          max_claimers?: number | null
+          shared_from?: string | null
         }
         Relationships: []
       }
@@ -382,6 +396,20 @@ export type CommunityDatabase = {
       unclaim_task: {
         Args: { task_id: string; contributor_id: string }
         Returns: undefined
+      }
+      // Shared tasks: a claim makes the caller's own copy (returns its id); unclaim removes an unsubmitted copy.
+      claim_shared_task: {
+        Args: { p_task_id: string; p_contributor_id: string }
+        Returns: string
+      }
+      unclaim_shared_copy: {
+        Args: { p_copy_id: string; p_contributor_id: string }
+        Returns: undefined
+      }
+      /** Staff only: removes a running copy with no submitted work; returns who held it. */
+      remove_shared_copy: {
+        Args: { p_copy_id: string }
+        Returns: string
       }
       check_claim_cooldown: {
         Args: { task_id: string; contributor_id: string }

@@ -8,6 +8,8 @@ import { assignableContributors } from '@/lib/portal/tasks'
 import { EXTENSION_LABELS, PORTAL_TASK_STATUS_LABELS, deleteRule, extendedDeadline, extensionState, type PortalTaskStatus } from '@/lib/portal/taskRules'
 import PortalTaskEditor from '../PortalTaskEditor'
 import TaskManagePanel from './TaskManagePanel'
+import SharedPanel, { type SharedCopyView } from './SharedPanel'
+import { sharedProgress } from '@/lib/portal/sharedRules'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Portal task' }
@@ -36,6 +38,34 @@ export default async function PortalTaskPage({ params }: { params: Promise<{ id:
   const waiting = (subs ?? []).some((s) => ['submitted', 'under_review', 'ai_approved'].includes(s.status ?? ''))
   const links = Array.isArray(t.links) ? (t.links as { label?: string; url?: string }[]).filter((l) => typeof l?.url === 'string').map((l) => ({ label: l.label ?? '', url: l.url! })) : []
 
+  // A shared task: its copies (one per claimer) and which have submitted work.
+  let shared: { copies: SharedCopyView[]; progress: string } | null = null
+  if (t.shared) {
+    const { data: copies } = await db.from('tasks').select('id, status, assigned_to, deadline_at, extended_deadline_at, extension_granted').eq('shared_from', id)
+    const rows = copies ?? []
+    const ids = rows.map((c) => c.id)
+    const people = rows.map((c) => c.assigned_to).filter((x): x is string => !!x)
+    const [{ data: subRows }, { data: names }] = await Promise.all([
+      ids.length ? db.from('contributions').select('task_id').in('task_id', ids) : Promise.resolve({ data: [] }),
+      people.length ? db.from('contributors').select('id, name, contributor_type, team_name').in('id', people) : Promise.resolve({ data: [] }),
+    ])
+    const withSub = new Set(((subRows ?? []) as { task_id: string }[]).map((r) => r.task_id))
+    const nameOf = new Map(((names ?? []) as { id: string; name: string; contributor_type: string | null; team_name: string | null }[]).map((c) => [c.id, contributorName(c)]))
+    shared = {
+      progress: sharedProgress(rows, withSub),
+      copies: rows.map((c) => ({
+        id: c.id,
+        name: (c.assigned_to && nameOf.get(c.assigned_to)) || 'A contributor',
+        status: c.status ?? 'assigned',
+        deadline: c.extension_granted && c.extended_deadline_at ? c.extended_deadline_at : c.deadline_at,
+        submitted: withSub.has(c.id),
+      })),
+    }
+  }
+  // A copy: the shared task it came from.
+  const { data: parent } = t.shared_from ? await db.from('tasks').select('id, title').eq('id', t.shared_from).maybeSingle() : { data: null }
+  const hasCopies = !!shared && shared.copies.length > 0
+
   return (
     <>
       <style>{PORTAL_CSS}</style>
@@ -44,6 +74,11 @@ export default async function PortalTaskPage({ params }: { params: Promise<{ id:
         <div className="pt-layout">
           <div className="pt-main">
             {status === 'completed' && <div className="pt-alert info">This task is completed and can no longer be edited.</div>}
+            {parent && (
+              <div className="pt-alert info">
+                {holder ? `${contributorName(holder)}'s copy` : 'A copy'} of the shared task <Link href={`/portal/tasks/${parent.id}`}>{parent.title}</Link>. Changes here apply to this copy only.
+              </div>
+            )}
             <PortalTaskEditor
               initial={{
                 id: t.id,
@@ -71,15 +106,26 @@ export default async function PortalTaskPage({ params }: { params: Promise<{ id:
                 <dt>Submissions</dt><dd>{(subs ?? []).length}</dd>
               </dl>
             </div>
+            {t.shared && shared && t.claim_closes_at && (
+              <SharedPanel
+                taskId={t.id}
+                closesAt={t.claim_closes_at}
+                maxClaimers={t.max_claimers}
+                progress={shared.progress}
+                copies={shared.copies}
+                brief={{ title: t.title, description: t.description ?? '', category: t.category, complexity: t.complexity, links, tags: (t.primitives ?? []).join(', ') }}
+              />
+            )}
             <TaskManagePanel
               taskId={t.id}
               status={status}
               extensionPending={status === 'assigned' && ext === 'requested'}
               extendedTo={status === 'assigned' && ext === 'requested' && t.deadline_at ? fmt(extendedDeadline(t.deadline_at, t.complexity)) : null}
               canUnassign={status === 'assigned' && !waiting}
-              canDelete={auth.caller.role === 'admin' && del.ok}
+              canDelete={auth.caller.role === 'admin' && del.ok && !hasCopies}
               deleteRemoves={del.ok ? del.removeSubmissionIds.length : 0}
-              deleteBlocked={auth.caller.role === 'admin' && status === 'open' && !del.ok ? del.error : null}
+              deleteBlocked={auth.caller.role === 'admin' && status === 'open' ? (hasCopies ? 'This shared task has copies, so it is kept. Close it, or withdraw the copies nobody has submitted.' : !del.ok ? del.error : null) : null}
+              isCopy={!!t.shared_from}
             />
           </div>
         </div>
