@@ -111,10 +111,10 @@ export function portalTaskUnassignedEmail(p: { taskTitle: string; reason: string
 /** A contributor's copy of a shared task was withdrawn by the core team (cancelled or taken back). */
 export function portalSharedCopyRemovedEmail(p: { taskTitle: string; reason: string | null }): EmailContent {
   return {
-    subject: subject(`Shared task withdrawn: ${p.taskTitle}`),
+    subject: subject(`Task withdrawn: ${p.taskTitle}`),
     html:
       '<p>Hi {{name}},</p>' +
-      `<p>The core team has withdrawn your copy of the shared task <strong>${escapeHtml(p.taskTitle)}</strong>. It is no longer one of your running tasks.</p>` +
+      `<p>The core team has taken <strong>${escapeHtml(p.taskTitle)}</strong> off your running tasks.</p>` +
       (p.reason ? paragraph(p.reason) : '') +
       '<p>This does not count against you; you can claim other tasks straight away.</p>' +
       button(portalUrl('/dashboard/tasks'), 'Browse open tasks'),

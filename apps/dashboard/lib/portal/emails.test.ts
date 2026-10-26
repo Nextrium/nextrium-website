@@ -57,7 +57,8 @@ test('reminder emails: overdue and upcoming read differently', () => {
 
 test('shared copy withdrawn: title and reason escaped, no empty reason paragraph', () => {
   const e = portalSharedCopyRemovedEmail({ taskTitle: 'Build <b>x</b> {{email}}', reason: 'Closed <i>early</i>' })
-  assert.match(e.subject, /^Shared task withdrawn: /)
+  assert.match(e.subject, /^Task withdrawn: /)
+  assert.doesNotMatch(e.html, /cop(y|ies)/i, 'contributors never see the word copy')
   assert.ok(!e.html.includes('<b>x</b>') && !e.html.includes('<i>early</i>') && !e.html.includes('{{email}}'))
   assert.ok(e.html.includes('&lt;b&gt;x&lt;/b&gt;'))
   assert.ok(!portalSharedCopyRemovedEmail({ taskTitle: 'T', reason: null }).html.includes('<p></p>'))

@@ -48,7 +48,7 @@ export function oneOfLabel(n: number): string | null {
 export function sharedClaimMessage(errorMessage: string | undefined, ctx: { maxClaims?: number } = {}): string {
   const m = errorMessage ?? ''
   if (/claim_window_closed/.test(m)) return 'Claims for this task have closed.'
-  if (/already_claimed/.test(m)) return 'You have already claimed this task. Find your copy on your dashboard.'
+  if (/already_claimed/.test(m)) return 'You have already claimed this task. You will find it in your tasks on your dashboard.'
   if (/claimers_full/.test(m)) return 'All places on this task have been taken.'
   if (/cooldown/.test(m)) return 'You gave this task back recently. You can claim it again 48 hours after you did.'
   if (/claim_limit_reached/.test(m)) {

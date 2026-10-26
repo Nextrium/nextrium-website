@@ -46,3 +46,13 @@ test('every database refusal has its own message', () => {
   assert.match(sharedUnclaimMessage('not_yours'), /not one of your/)
   assert.match(sharedUnclaimMessage(undefined), /went wrong/)
 })
+
+test('contributors never read the word "copy": everyone simply holds the task', () => {
+  const codes = ['claim_window_closed', 'already_claimed', 'claimers_full', 'cooldown', 'claim_limit_reached', 'not_active', 'not_shared', 'other']
+  const texts = [
+    ...codes.map((c) => sharedClaimMessage(c)),
+    ...['has_submission', 'not_yours', 'other'].map((c) => sharedUnclaimMessage(c)),
+    oneOfLabel(5)!, claimersLabel({ closesAt: at(60), claimers: 3, maxClaimers: null }), windowLabel(at(60), NOW),
+  ]
+  for (const t of texts) assert.doesNotMatch(t, /\bcop(y|ies)\b/i, t)
+})

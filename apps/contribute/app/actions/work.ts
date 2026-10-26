@@ -177,7 +177,7 @@ export async function unclaimTask(_prev: WorkState, formData: FormData): Promise
     // A copy of a shared task: removed (if no work was submitted), and the 48h cooldown starts.
     const { error } = await db.rpc('unclaim_shared_copy', { p_copy_id: task.id, p_contributor_id: me.id })
     if (error) return { status: 'error', message: sharedUnclaimMessage(error.message) }
-    return { status: 'done', message: 'Your copy was removed. You can claim this task again 48 hours from now, if it is still open.' }
+    return { status: 'done', message: 'You have given this task back. You can claim it again 48 hours from now, if it is still open.' }
   }
 
   const { data: waiting } = await db

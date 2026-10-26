@@ -37,7 +37,7 @@ export default function ClaimPanel({ taskId, title, deadlineDays, view, boardHre
         </div>
         <h2 style={{ fontFamily: F.display, fontWeight: 600, fontSize: 24, color: C.light, marginBottom: 12 }}>Task claimed</h2>
         <p style={{ ...text, fontSize: 15, marginBottom: 28, maxWidth: 420 }}>
-          You have claimed <span style={{ color: C.accent }}>{state.title}</span>.{state.shared ? ' This is your own copy: you submit your work and earn your points individually.' : ''} Go to your dashboard to track your deadline and submit your work.
+          You have claimed <span style={{ color: C.accent }}>{state.title}</span>.{state.shared ? ' Several people are working on it; you submit your work and earn your points individually.' : ''} Go to your dashboard to track your deadline and submit your work.
         </p>
         <div className="flex gap-3 flex-wrap justify-center">
           <Link href="/dashboard" className="btn-primary" style={{ fontSize: 13 }}>Go to dashboard</Link>
@@ -102,7 +102,7 @@ export default function ClaimPanel({ taskId, title, deadlineDays, view, boardHre
 
       {view.kind === 'shared_closed' && (
         <div className="flex flex-col gap-3">
-          <p style={text}>Claims for this task have closed. Everyone who claimed it in time is working on their own copy.</p>
+          <p style={text}>Claims for this task have closed. Everyone who claimed it in time is working on it.</p>
           <div><Link href={boardHref} className="btn-outline" style={{ fontSize: 13 }}>Back to tasks</Link></div>
         </div>
       )}
@@ -116,8 +116,8 @@ export default function ClaimPanel({ taskId, title, deadlineDays, view, boardHre
 
       {view.kind === 'shared_mine' && (
         <div className="flex flex-col gap-3">
-          <p style={text}>You have claimed this task. Your own copy is on your dashboard.</p>
-          <div><Link href={`/dashboard/tasks/${view.copyId}`} className="btn-primary" style={{ fontSize: 13 }}>Open my copy</Link></div>
+          <p style={text}>You are working on this task. Track your deadline and submit your work from your dashboard.</p>
+          <div><Link href={`/dashboard/tasks/${view.copyId}`} className="btn-primary" style={{ fontSize: 13 }}>Go to my task</Link></div>
         </div>
       )}
 
@@ -134,7 +134,7 @@ export default function ClaimPanel({ taskId, title, deadlineDays, view, boardHre
           <input type="hidden" name="taskId" value={taskId} />
           <p style={text}>
             {shared
-              ? `Claiming gives you your own copy of this task, and your ${deadlineDays}-day deadline starts immediately. You submit and earn points individually.`
+              ? `Several contributors can work on this task. Your ${deadlineDays}-day deadline starts when you claim it, and you submit your work and earn your points individually.`
               : `Claiming this task starts your ${deadlineDays}-day deadline immediately. Submit your work from your dashboard before the deadline.`}
           </p>
           <div className="flex gap-3 flex-wrap">
