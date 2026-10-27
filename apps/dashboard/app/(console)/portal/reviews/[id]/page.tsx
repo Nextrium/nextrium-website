@@ -8,6 +8,7 @@ import { PORTAL_CSS } from '@/components/portal/portalStyles'
 import { UUID, community, contributorName, requirePortalStaff } from '@/lib/portal/server'
 import { QUEUE_TABS, canDecideOnPortalSubmission, isDecidable, queueTab } from '@/lib/portal/reviewRules'
 import PortalDecisionPanel from './PortalDecisionPanel'
+import { findSimilar } from '@/lib/contributions/groupRules'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Portal submission' }
@@ -31,7 +32,7 @@ export default async function PortalSubmissionPage({ params }: { params: Promise
   if (!s) notFound()
   const [{ data: c }, { data: task }] = await Promise.all([
     s.contributor_id ? db.from('contributors').select('id, name, email, contributor_type, team_name, total_points, verified_contributions').eq('id', s.contributor_id).maybeSingle() : Promise.resolve({ data: null }),
-    s.task_id ? db.from('tasks').select('id, title, description, point_range_min, point_range_max, status').eq('id', s.task_id).maybeSingle() : Promise.resolve({ data: null }),
+    s.task_id ? db.from('tasks').select('id, title, description, point_range_min, point_range_max, status, shared_from').eq('id', s.task_id).maybeSingle() : Promise.resolve({ data: null }),
   ])
 
   const tab = queueTab(s)
@@ -43,6 +44,24 @@ export default async function PortalSubmissionPage({ params }: { params: Promise
   const checks = fb.checks && typeof fb.checks === 'object' ? Object.entries(fb.checks as Record<string, unknown>).filter(([, v]) => typeof v === 'boolean') : []
   const security: { severity?: string; description?: string; message?: string; file?: string }[] = Array.isArray(fb.code_audit?.security_issues) ? fb.code_audit.security_issues : []
   const evidence = safeHref(s.evidence_url)
+
+  // On a copy of a shared task: other claimers' submissions that look like this one (staff only).
+  let similar: { id: string; name: string; score: number; sameLink: boolean }[] = []
+  if (task?.shared_from) {
+    const { data: copies } = await db.from('tasks').select('id').eq('shared_from', task.shared_from).neq('id', task.id)
+    const copyIds = (copies ?? []).map((x) => x.id)
+    const { data: others } = copyIds.length
+      ? await db.from('contributions').select('id, contributor_id, description, evidence_url').in('task_id', copyIds)
+      : { data: [] }
+    const found = findSimilar({ id: s.id, description: s.description ?? '', evidence_url: s.evidence_url }, (others ?? []).map((o) => ({ id: o.id, description: o.description ?? '', evidence_url: o.evidence_url })))
+    if (found.length) {
+      const owners = new Map((others ?? []).map((o) => [o.id, o.contributor_id]))
+      const ids = [...new Set(found.map((f) => owners.get(f.id)).filter((x): x is string => !!x))]
+      const { data: people } = await db.from('contributors').select('id, name, contributor_type, team_name').in('id', ids)
+      const nameOf = new Map((people ?? []).map((p) => [p.id, contributorName(p)]))
+      similar = found.map((f) => ({ ...f, name: nameOf.get(owners.get(f.id) ?? '') ?? 'Another contributor' }))
+    }
+  }
   const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : '—')
 
   return (
@@ -104,6 +123,17 @@ export default async function PortalSubmissionPage({ params }: { params: Promise
           </div>
 
           <div className="pt-side">
+            {similar.length > 0 && (
+              <div className="pt-panel" data-similar>
+                <div className="pt-alert warn">This task was open to several contributors, and this submission looks like {similar.length === 1 ? 'another one' : `${similar.length} others`} on it. Compare them before deciding.</div>
+                {similar.map((x) => (
+                  <div key={x.id} className="pt-kv" style={{ gridTemplateColumns: '1fr auto' }}>
+                    <span>{x.name}</span>
+                    <span>{x.sameLink ? 'Same evidence link' : `${Math.round(x.score * 100)}% same wording`} · <Link href={`/portal/reviews/${x.id}`}>Open</Link></span>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="pt-panel">
               <div className="pt-panel-title">Details</div>
               <dl className="pt-kv" style={{ gridTemplateColumns: '110px 1fr' }}>

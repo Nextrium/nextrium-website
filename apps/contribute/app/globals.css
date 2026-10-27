@@ -142,6 +142,13 @@
   .portal-input { outline: none; transition: border-color 0.2s ease; }
   .portal-input:focus { border-color: var(--orange) !important; }
   .portal-input::placeholder { color: var(--slate-l); opacity: 0.8; }
+  /* Marks a task open to several contributors. */
+  .shared-chip {
+    display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 9999px;
+    font-family: var(--font-dm), sans-serif; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--orange-w); border: 1px solid color-mix(in srgb, var(--orange) 40%, transparent);
+    background: color-mix(in srgb, var(--orange) 8%, transparent);
+  }
   /* A card that lifts on hover; set --accent on it to tint the hover border. */
   .lift {
     transition: border-color 0.3s ease, transform 0.3s ease;

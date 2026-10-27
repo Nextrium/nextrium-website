@@ -4,10 +4,11 @@ import { createCommunityServiceClient } from '@nextrium/supabase/community/serve
 import { getActiveContributor } from '@/lib/portal'
 import { isUuid } from '@/lib/publicData'
 import { DEFAULT_MAX_CLAIMS, cooldownHoursLeft, cooldownMessage, limitMessage } from '@/lib/claims'
+import { sharedClaimMessage } from '@/lib/sharedTasks'
 
 export type ClaimState =
   | { status: 'idle' }
-  | { status: 'claimed'; title: string }
+  | { status: 'claimed'; title: string; shared?: boolean }
   | { status: 'error'; message: string }
 
 /**
@@ -24,6 +25,22 @@ export async function claimTask(_prev: ClaimState, formData: FormData): Promise<
   if (!me) return { status: 'error', message: 'Only approved contributors can claim tasks. Sign in, or check your application status on your dashboard.' }
 
   const db = createCommunityServiceClient()
+
+  // A shared task: the claim creates this contributor's own copy.
+  const { data: kind } = await db.from('tasks').select('title, shared').eq('id', taskId).maybeSingle()
+  if (kind?.shared) {
+    const { data: copyId, error: sharedError } = await db.rpc('claim_shared_task', { p_task_id: taskId, p_contributor_id: me.id })
+    if (sharedError || !copyId) {
+      let maxClaims: number | undefined
+      if (/claim_limit_reached/.test(sharedError?.message ?? '')) {
+        const { data: row } = await db.from('contributors').select('max_claims').eq('id', me.id).maybeSingle()
+        maxClaims = row?.max_claims ?? DEFAULT_MAX_CLAIMS
+      } else if (sharedError) console.error('[contribute] shared claim refused:', sharedError.message.slice(0, 80))
+      return { status: 'error', message: sharedClaimMessage(sharedError?.message, { maxClaims }) }
+    }
+    return { status: 'claimed', title: kind.title, shared: true }
+  }
+
   const { data: claimed, error } = await db.rpc('claim_task', {
     task_id: taskId,
     contributor_id: me.id,

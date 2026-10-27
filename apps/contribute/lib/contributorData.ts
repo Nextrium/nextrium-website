@@ -66,11 +66,13 @@ export interface MyTask {
   extension_granted: boolean | null
   extension_requested_at: string | null
   extended_deadline_at: string | null
+  /** Set on a copy of a shared task. */
+  shared_from: string | null
 }
 
 const PROFILE_COLUMNS = 'id, name, email, contributor_type, team_name, categories, location, timezone, availability_hours_per_week, bio, skills, github_handle, twitter_handle, linkedin_url, portfolio_url, wallet_address, notification_email, total_points, verified_contributions, max_claims'
 const SUBMISSION_COLUMNS = 'id, task_id, title, description, category, complexity, base_points, final_points, status, notes, evidence_url, submission_count, review_decision, review_score, review_feedback, deadline_at, verified_at, created_at, updated_at'
-const TASK_COLUMNS = 'id, title, category, complexity, point_range_min, point_range_max, claimed_at, deadline_at, deadline_days, extension_granted, extension_requested_at, extended_deadline_at'
+const TASK_COLUMNS = 'id, title, category, complexity, point_range_min, point_range_max, claimed_at, deadline_at, deadline_days, extension_granted, extension_requested_at, extended_deadline_at, shared_from'
 
 /** Profile, submissions (newest first) and running tasks, once per request. */
 export const getMyDashboard = cache(async (contributorId: string) => {
