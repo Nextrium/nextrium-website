@@ -49,7 +49,7 @@ export default function FeedbackPanel({ feedback, score, attempt }: { feedback: 
                 <span style={{ padding: '2px 8px', borderRadius: 20, flexShrink: 0, fontFamily: F.body, fontSize: 9, fontWeight: 500, letterSpacing: '0.08em', textTransform: 'uppercase', background: tint('--orange', 12), color: C.accent }}>
                   {checkLabel(i.check)}
                 </span>
-                <p style={{ fontFamily: F.body, fontSize: 12, color: C.mist, lineHeight: 1.65 }}>{i.message}</p>
+                <p style={{ fontFamily: F.body, fontSize: 12, color: C.mist, lineHeight: 1.65, minWidth: 0, overflowWrap: 'anywhere' }}>{i.message}</p>
               </li>
             ))}
           </ul>
@@ -57,7 +57,7 @@ export default function FeedbackPanel({ feedback, score, attempt }: { feedback: 
       )}
 
       {feedback?.whatToDo && (
-        <p className="p-3 rounded-lg" style={{ fontFamily: F.body, fontSize: 12, color: C.mist, lineHeight: 1.65, background: C.void, border: `1px solid ${C.border}` }}>
+        <p className="p-3 rounded-lg" style={{ fontFamily: F.body, fontSize: 12, color: C.mist, lineHeight: 1.65, background: C.void, border: `1px solid ${C.border}`, overflowWrap: 'anywhere' }}>
           <span style={{ color: C.accent, fontWeight: 500 }}>What to do: </span>
           {feedback.whatToDo}
         </p>
@@ -74,7 +74,7 @@ export default function FeedbackPanel({ feedback, score, attempt }: { feedback: 
                 <span style={{ padding: '2px 8px', borderRadius: 20, flexShrink: 0, fontFamily: F.body, fontSize: 9, fontWeight: 500, letterSpacing: '0.08em', textTransform: 'uppercase', background: tint(token, 14), color: `var(${token})` }}>
                   {String(p.status ?? '').replace(/_/g, ' ')}
                 </span>
-                <div className="flex flex-col gap-1">
+                <div className="flex flex-col gap-1" style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
                   <p style={{ fontFamily: F.body, fontSize: 11, fontWeight: 500, color: C.light }}>{checkLabel(p.check)}</p>
                   <p style={{ fontFamily: F.body, fontSize: 11, color: C.mute, lineHeight: 1.6 }}>{p.explanation}</p>
                 </div>
