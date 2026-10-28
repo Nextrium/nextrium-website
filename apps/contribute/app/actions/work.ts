@@ -1,5 +1,6 @@
 'use server'
 
+import { after } from 'next/server'
 import { brand } from '@nextrium/brand'
 import { sharedUnclaimMessage } from '@/lib/sharedTasks'
 import { parseSubmission } from '@nextrium/contributions-core/submission'
@@ -11,6 +12,7 @@ import { reviewSubmission } from '@/lib/reviewService'
 import { basePointsFor } from '@/lib/submissionRules'
 import { submissionState } from '@/lib/submissionView'
 import { canRequestExtension, effectiveDeadline } from '@/lib/deadline'
+import { alertStaff } from '@/lib/staffAlert'
 
 // Everything a contributor does from their dashboard. Each action looks up
 // the approved contributor from the session and only ever touches that
@@ -119,6 +121,9 @@ export async function submitWork(_prev: WorkState, formData: FormData): Promise<
   }
 
   const outcome = await reviewSubmission(contributionId)
+  // Tell the task's creator if the work now waits on them (sent after the response).
+  const submitted = contributionId
+  after(() => alertStaff('submission', submitted))
   const key = outcome.kind === 'reviewed' ? outcome.status : 'pending'
   return { status: 'done', outcome: key, message: REVIEW_MESSAGES[key] }
 }
@@ -158,6 +163,7 @@ export async function retryReview(_prev: WorkState, formData: FormData): Promise
   if (outcome.kind === 'failed') {
     await db.from('contributions').update({ status: 'submitted' }).eq('id', c.id).eq('status', 'under_review').is('review_decision', null)
   }
+  after(() => alertStaff('submission', c.id))
   const key = outcome.kind === 'reviewed' ? outcome.status : 'pending'
   return { status: 'done', outcome: key, message: REVIEW_MESSAGES[key] }
 }
@@ -223,6 +229,7 @@ export async function requestExtension(_prev: WorkState, formData: FormData): Pr
     .select('id')
   if (error) return GENERIC
   if (!updated || updated.length === 0) return { status: 'error', message: 'An extension has already been requested for this task.' }
+  after(() => alertStaff('extension', task.id))
   return { status: 'done', message: 'Extension requested. The core team will review it.' }
 }
 

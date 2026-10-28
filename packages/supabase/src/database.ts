@@ -487,6 +487,11 @@ export type Database = {
           updated_at?: string
         }
       }
+      task_alerts_sent: {
+        Row: { key: string; kind: string; sent_at: string }
+        Insert: { key: string; kind: string; sent_at?: string }
+        Update: { key?: string; kind?: string; sent_at?: string }
+      }
       dashboard_users: {
         Row: {
           id: string

@@ -9,6 +9,8 @@ import { describeDbError } from '@nextrium/contributions-core/errors'
 import { parseSubmission } from '@nextrium/contributions-core/submission'
 import { reviewContribution } from '@/lib/contributions/reviewService'
 import { notifyReviewResult } from '@/lib/contributions/notify'
+import { liveAlertDeps } from '@/lib/alerts/live'
+import { alertTeamExtension, alertTeamSubmission } from '@/lib/alerts/server'
 
 type Result = { ok: true } | { ok: false; error: string }
 
@@ -36,6 +38,9 @@ export async function requestExtension(taskId: string, reason: string): Promise<
     action: 'task_extension_requested', targetType: 'task', targetId: taskId, details: { title: data?.title },
     actorId: auth.caller.userId, actorEmail: auth.caller.email ?? undefined,
   })
+  // Tell the task's creator (sent after the response).
+  const actor = auth.caller.email
+  after(() => alertTeamExtension(liveAlertDeps(), taskId, actor))
   revalidatePath('/my-tasks')
   revalidatePath(`/my-tasks/${taskId}`)
   return { ok: true }
@@ -88,6 +93,8 @@ export async function submitContribution(taskId: string, raw: unknown): Promise<
     } catch (err) {
       console.error('[review] background review failed:', err instanceof Error ? err.message : err)
     }
+    // Whatever the review did, tell the task's creator if the work now waits on them.
+    await alertTeamSubmission(liveAlertDeps(), contributionId, auth.caller.email)
   })
 
   revalidatePath('/my-tasks')
