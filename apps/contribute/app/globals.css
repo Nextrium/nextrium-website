@@ -142,6 +142,12 @@
   .portal-input { outline: none; transition: border-color 0.2s ease; }
   .portal-input:focus { border-color: var(--orange) !important; }
   .portal-input::placeholder { color: var(--slate-l); opacity: 0.8; }
+  /* Safety net for text written by people or the review service (links, file paths,
+     code names): a word too long for the screen wraps instead of widening the page.
+     `anywhere` also lets flex and grid items shrink below such a word. Code blocks
+     opt out below and scroll sideways instead. */
+  main { overflow-wrap: anywhere; }
+  main pre, main pre * { overflow-wrap: normal; }
   /* Marks a task open to several contributors. */
   .shared-chip {
     display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 9999px;
