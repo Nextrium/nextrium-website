@@ -11,6 +11,7 @@ import { notifyMember, notifyReviewResult, dashboardUrl } from '@/lib/contributi
 import { isReviewStale } from '@nextrium/contributions-core/taskView'
 import { POINT_RANGES, isComplexity } from '@nextrium/contributions-core/constants'
 import { OWN_SUBMISSION_MESSAGE, canDecideOnSubmission } from '@nextrium/contributions-core/decisionRules'
+import { staffAlreadyRequestedChanges } from '@/lib/contributions/decisionState'
 
 /** Null when the caller may decide on this submission, otherwise the reason they can't. */
 async function decisionDenial(caller: { userId: string; role: string }, contributionId: string): Promise<string | null> {
@@ -85,7 +86,8 @@ export async function requestChanges(contributionId: string, notes: string): Pro
   if (!UUID.test(contributionId)) return { ok: false, error: 'That submission could not be found.' }
   const denied = await decisionDenial(auth.caller, contributionId)
   if (denied) return { ok: false, error: denied }
-  if (await alreadyIn(contributionId, 'changes_requested')) return { ok: true }
+  if (!(notes ?? '').trim()) return { ok: false, error: 'Write a note for the member first.' }
+  if (await staffAlreadyRequestedChanges(db(), contributionId)) return { ok: true }
 
   const { data, error } = await db().rpc('request_contribution_changes', {
     p_contribution_id: contributionId, p_actor: auth.caller.userId, p_notes: (notes ?? '').slice(0, NOTES_MAX),
