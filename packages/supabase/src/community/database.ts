@@ -328,6 +328,9 @@ export type CommunityDatabase = {
           max_claimers: number | null
           /** On a copy: the shared task it was claimed from. */
           shared_from: string | null
+          /** The dashboard account that created the task; it receives the task's alerts. */
+          created_by_user: string | null
+          created_by_email: string | null
         }
         Insert: {
           id?: string
@@ -354,6 +357,8 @@ export type CommunityDatabase = {
           claim_closes_at?: string | null
           max_claimers?: number | null
           shared_from?: string | null
+          created_by_user?: string | null
+          created_by_email?: string | null
         }
         Update: {
           id?: string
@@ -380,6 +385,8 @@ export type CommunityDatabase = {
           claim_closes_at?: string | null
           max_claimers?: number | null
           shared_from?: string | null
+          created_by_user?: string | null
+          created_by_email?: string | null
         }
         Relationships: []
       }

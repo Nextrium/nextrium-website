@@ -70,6 +70,9 @@ export async function createPortalTask(raw: { title?: unknown; description?: unk
     Object.assign(row, { status: 'assigned', assigned_to: a.assigneeId, claimed_at: new Date().toISOString(), deadline_at: assignmentDeadline(f.deadline_days, a.deadline) })
   }
 
+  // Who created it: they receive the task's alerts (review ready, extension, missed deadline).
+  Object.assign(row, { created_by_user: auth.caller.userId, created_by_email: auth.caller.email ?? null })
+
   const { data, error } = await community().from('tasks').insert(row as never).select('id, deadline_at').single()
   if (error || !data) {
     console.error('[portal] task create failed:', error?.code)

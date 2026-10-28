@@ -16,7 +16,8 @@
     "./submission": "./src/submission.ts",
     "./submissionNumber": "./src/submissionNumber.ts",
     "./taskInput": "./src/taskInput.ts",
-    "./taskView": "./src/taskView.ts"
+    "./taskView": "./src/taskView.ts",
+    "./alertSignature": "./src/alertSignature.ts"
   },
   "scripts": {
     "type-check": "tsc --noEmit",
