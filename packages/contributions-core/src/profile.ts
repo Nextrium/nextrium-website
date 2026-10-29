@@ -13,17 +13,22 @@ export interface ContributorProfileInput {
   notifyEmail: boolean
 }
 
+/** The name shown to other contributors on the leaderboard: printable text, single spaces. Pure. */
+export function parseDisplayName(raw: unknown): { displayName: string } | { error: string } {
+  const displayName = typeof raw === 'string' ? raw.replace(/[\p{C}]/gu, '').replace(/\s+/g, ' ').trim() : ''
+  if (displayName.length < DISPLAY_NAME_MIN) return { error: 'Add the name you want shown on the leaderboard.' }
+  if (displayName.length > DISPLAY_NAME_MAX) return { error: `Keep your display name under ${DISPLAY_NAME_MAX} characters.` }
+  return { displayName }
+}
+
 /** Validates the contributor section of the profile form. Pure. */
 export function parseContributorProfile(raw: unknown): { profile: ContributorProfileInput } | { error: string } {
   if (!raw || typeof raw !== 'object') return { error: 'Invalid profile.' }
   const r = raw as Record<string, unknown>
 
-  // Shown to other contributors on the leaderboard: printable text, single spaces.
-  const displayName = typeof r.displayName === 'string'
-    ? r.displayName.replace(/[\p{C}]/gu, '').replace(/\s+/g, ' ').trim()
-    : ''
-  if (displayName.length < DISPLAY_NAME_MIN) return { error: 'Add the name you want shown on the leaderboard.' }
-  if (displayName.length > DISPLAY_NAME_MAX) return { error: `Keep your display name under ${DISPLAY_NAME_MAX} characters.` }
+  const name = parseDisplayName(r.displayName)
+  if ('error' in name) return name
+  const displayName = name.displayName
 
   const categories = Array.isArray(r.categories)
     ? [...new Set(r.categories.filter((c): c is Category => (CATEGORIES as readonly unknown[]).includes(c)))]

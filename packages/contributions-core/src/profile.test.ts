@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { parseContributorProfile, splitSkills, SKILLS_MAX, DISPLAY_NAME_MAX } from './profile'
+import { parseContributorProfile, parseDisplayName, splitSkills, SKILLS_MAX, DISPLAY_NAME_MAX } from './profile'
 
 const base = { displayName: 'Bola A.' }
 
@@ -46,4 +46,12 @@ test('display name is required, cleaned and length-limited', () => {
 
 test('splitSkills splits on commas and trims', () => {
   assert.deepEqual(splitSkills(' React, Figma ,, events '), ['React', 'Figma', 'events'])
+})
+
+test('parseDisplayName: a name on its own, with the same cleaning and limits', () => {
+  assert.deepEqual(parseDisplayName('  Glory ​  Ade '), { displayName: 'Glory Ade' })
+  assert.ok('error' in parseDisplayName('G'))
+  assert.ok('error' in parseDisplayName('  '))
+  assert.ok('error' in parseDisplayName(42))
+  assert.ok('error' in parseDisplayName('x'.repeat(61)))
 })

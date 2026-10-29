@@ -6,6 +6,9 @@ import { requireMember } from '@/lib/contributions/auth'
 import { CATEGORY_LABELS, COMPLEXITY_LABELS } from '@nextrium/contributions-core/constants'
 import { TASK_STATUS_LABELS, deadlineLabel, isOverdue } from '@nextrium/contributions-core/taskView'
 import type { Task } from '@nextrium/supabase/database'
+import NameNotice from '@/components/dashboard/NameNotice'
+import { getMemberDirectory } from '@/lib/contributions/members'
+import { leaderboardName } from '@nextrium/contributions-core/leaderboard'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'My tasks' }
@@ -20,12 +23,17 @@ export default async function MyTasksPage() {
   const [{ data: taskRows }, { data: profile }] = await Promise.all([
     // Only tasks assigned to the caller, filtered on the server.
     supabase.from('tasks').select('*').eq('assigned_to', auth.caller.userId).neq('status', 'draft').order('deadline_at', { ascending: true }),
-    supabase.from('contributor_profiles').select('total_points, verified_contributions').eq('user_id', auth.caller.userId).maybeSingle(),
+    supabase.from('contributor_profiles').select('total_points, verified_contributions, display_name').eq('user_id', auth.caller.userId).maybeSingle(),
   ])
   const tasks: Task[] = taskRows ?? []
   const current = tasks.filter((t) => CURRENT.includes(t.status))
   const past = tasks.filter((t) => !CURRENT.includes(t.status))
   const now = new Date()
+  // Anyone doing tasks without a chosen name is asked for one (and told what others see now).
+  const needsName = tasks.length > 0 && !profile?.display_name?.trim()
+  const shownAs = needsName
+    ? leaderboardName(null, (await getMemberDirectory(supabase)).find((m) => m.userId === auth.caller.userId)?.publicName)
+    : ''
 
   const Row = ({ t }: { t: Task }) => (
     <Link href={`/my-tasks/${t.id}`} className="mytask-row">
@@ -65,6 +73,7 @@ export default async function MyTasksPage() {
       `}</style>
       <Header title="My tasks" description="Tasks assigned to you, their deadlines and reviews" />
       <div className="dash-content">
+        {needsName && <NameNotice shownAs={shownAs} />}
         <div className="mytask-stats">
           <div className="mytask-stat"><b>{profile?.total_points ?? 0}</b><span>Points</span></div>
           <div className="mytask-stat"><b>{profile?.verified_contributions ?? 0}</b><span>Verified contributions</span></div>

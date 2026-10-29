@@ -4,8 +4,10 @@ import { createServiceClient } from '@nextrium/supabase/server'
 import Header from '@/components/dashboard/Header'
 import { CONTRIBUTOR_ROLES, requireMember, requireStaff } from '@/lib/contributions/auth'
 import {
-  leaderboardName, leaderboardStats, pointsBarPercent, rankLeaderboard, type LeaderboardEntry,
+  TIE_RULE, leaderboardName, leaderboardStats, pointsBarPercent, rankLeaderboard, submissionMarks, submittedLabel, type LeaderboardEntry,
 } from '@nextrium/contributions-core/leaderboard'
+import { getMemberDirectory } from '@/lib/contributions/members'
+import NameNotice from '@/components/dashboard/NameNotice'
 import { CATEGORIES, CATEGORY_LABELS, COMPLEXITY_LABELS, isCategory, type Category, type Complexity } from '@nextrium/contributions-core/constants'
 import { color } from '@nextrium/brand'
 
@@ -40,6 +42,7 @@ interface Delivered {
   task_id: string
   final_points: number | null
   verified_at: string | null
+  submitted_at: string | null
 }
 
 export default async function LeaderboardPage({ searchParams }: Props) {
@@ -62,28 +65,47 @@ export default async function LeaderboardPage({ searchParams }: Props) {
 
   let entries: LeaderboardEntry[] = []
   let profileMap = new Map<string, Profile>()
+  let publicNames = new Map<string, string | null>()
   if (ids.length) {
-    // Names come from the contributor's own display name, never their email.
-    const { data: profileRows } = await supabase.from('contributor_profiles')
-      .select('user_id, display_name, total_points, verified_contributions, categories').in('user_id', ids)
+    // Names: the contributor's own display name, else a name from their
+    // application or account. Never their email.
+    const [{ data: profileRows }, directory] = await Promise.all([
+      supabase.from('contributor_profiles')
+        .select('user_id, display_name, total_points, verified_contributions, categories').in('user_id', ids),
+      getMemberDirectory(supabase),
+    ])
     const profiles = (profileRows ?? []) as Profile[]
     profileMap = new Map(profiles.map((p) => [p.user_id, p]))
-    const nameOf = (id: string) => leaderboardName(profileMap.get(id)?.display_name)
+    publicNames = new Map(directory.map((m) => [m.userId, m.publicName]))
+    const nameOf = (id: string) => leaderboardName(profileMap.get(id)?.display_name, publicNames.get(id))
+    // Equal scores are ordered by when the counted work was submitted (not verified).
     if (monthly) {
       const { data: ledger } = await supabase.from('points_ledger')
-        .select('contributor_id, final_points').in('contributor_id', ids).gte('created_at', monthStart.toISOString())
+        .select('contributor_id, contribution_id, final_points').in('contributor_id', ids).gte('created_at', monthStart.toISOString())
+      const rows = (ledger ?? []) as { contributor_id: string; contribution_id: string; final_points: number }[]
       const sums = new Map<string, { points: number; verified: number }>()
-      for (const l of (ledger ?? []) as { contributor_id: string; final_points: number }[]) {
+      for (const l of rows) {
         const s = sums.get(l.contributor_id) ?? { points: 0, verified: 0 }
         sums.set(l.contributor_id, { points: s.points + l.final_points, verified: s.verified + 1 })
       }
-      entries = [...sums].map(([userId, s]) => ({ userId, name: nameOf(userId), ...s }))
+      const counted = [...new Set(rows.map((l) => l.contribution_id))]
+      const { data: subs } = counted.length
+        ? await supabase.from('contributions').select('contributor_id, submitted_at').in('id', counted)
+        : { data: [] }
+      const marks = submissionMarks(subs ?? [])
+      entries = [...sums].map(([userId, s]) => ({ userId, name: nameOf(userId), ...s, ...marks.get(userId) }))
     } else {
-      entries = profiles.map((p) => ({ userId: p.user_id, name: nameOf(p.user_id), points: p.total_points, verified: p.verified_contributions }))
+      const { data: subs } = await supabase.from('contributions')
+        .select('contributor_id, submitted_at').in('contributor_id', ids).eq('status', 'verified')
+      const marks = submissionMarks(subs ?? [])
+      entries = profiles.map((p) => ({ userId: p.user_id, name: nameOf(p.user_id), points: p.total_points, verified: p.verified_contributions, ...marks.get(p.user_id) }))
     }
   }
 
   const ranked = rankLeaderboard(entries)
+  // The viewer hasn't chosen a name: ask, once they're on the board or able to be.
+  const myNameMissing = ids.includes(caller.userId) && !profileMap.get(caller.userId)?.display_name?.trim()
+  const myShownAs = ranked.find((e) => e.userId === caller.userId)?.name ?? leaderboardName(null, publicNames.get(caller.userId))
   const stats = leaderboardStats(ranked)
   const areasOf = (id: string) => (profileMap.get(id)?.categories ?? []).filter(isCategory)
   const shown = category ? ranked.filter((e) => areasOf(e.userId).includes(category)) : ranked
@@ -95,7 +117,7 @@ export default async function LeaderboardPage({ searchParams }: Props) {
   const taskInfo = new Map<string, { title: string; category: Category; complexity: Complexity }>()
   if (shown.length) {
     let q = supabase.from('contributions')
-      .select('id, contributor_id, task_id, final_points, verified_at')
+      .select('id, contributor_id, task_id, final_points, verified_at, submitted_at')
       .in('contributor_id', shown.map((e) => e.userId)).eq('status', 'verified')
       .order('verified_at', { ascending: false }).limit(1000)
     if (monthly) q = q.gte('verified_at', monthStart.toISOString())
@@ -121,7 +143,6 @@ export default async function LeaderboardPage({ searchParams }: Props) {
     const s = qs.toString()
     return `/leaderboard${s ? `?${s}` : ''}`
   }
-  const fmtDate = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString(undefined, { dateStyle: 'medium' }) : '—')
 
   return (
     <>
@@ -138,6 +159,7 @@ export default async function LeaderboardPage({ searchParams }: Props) {
         .lb-stat-value { font-family: var(--font-exo2); font-weight: 800; font-size: 30px; line-height: 1; color: var(--orange); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
         .lb-stat-label { font-size: 13px; color: var(--grey-mid); }
 
+        .lb-rule { margin: -10px 0 18px; font-size: 12px; line-height: 1.55; color: var(--grey-mid); max-width: 70ch; }
         .lb-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
         .lb-chip { padding: 7px 16px; border-radius: 999px; font-size: 13px; text-decoration: none; color: var(--grey-mid); border: 1px solid rgba(255,255,255,0.1); transition: border-color .15s ease, color .15s ease; }
         .lb-chip:hover { color: var(--off-white); border-color: rgba(255,255,255,0.22); }
@@ -215,6 +237,9 @@ export default async function LeaderboardPage({ searchParams }: Props) {
             <div className="lb-stat"><span className="lb-stat-value">{stats.verified}</span><span className="lb-stat-label">Verified contributions</span></div>
           </div>
 
+          {myNameMissing && <NameNotice shownAs={myShownAs} />}
+          <p className="lb-rule">{TIE_RULE}</p>
+
           <div className="lb-chips">
             <Link href={href({ category: null })} className={`lb-chip ${!category ? 'active' : ''}`}>All</Link>
             {CATEGORIES.map((c) => (
@@ -255,6 +280,7 @@ export default async function LeaderboardPage({ searchParams }: Props) {
                           <span className="lb-sub">
                             {isMe && <span className="lb-you">You · </span>}
                             {e.verified} contribution{e.verified === 1 ? '' : 's'}
+                            {e.tied && e.reachedAt && <> · reached {e.points.toLocaleString()} pts with work submitted {submittedLabel(e.reachedAt)}</>}
                           </span>
                         </div>
                         <div className="lb-score">
@@ -276,7 +302,7 @@ export default async function LeaderboardPage({ searchParams }: Props) {
                                 <span>
                                   <span className="lb-work-title">{t?.title ?? 'Task'}</span>
                                   <span className="lb-work-sub">
-                                    {t ? `${CATEGORY_LABELS[t.category]} · ${COMPLEXITY_LABELS[t.complexity]} · ` : ''}{fmtDate(w.verified_at)}
+                                    {t ? `${CATEGORY_LABELS[t.category]} · ${COMPLEXITY_LABELS[t.complexity]} · ` : ''}Submitted {submittedLabel(w.submitted_at)}
                                   </span>
                                 </span>
                                 <span className="lb-work-points">{w.final_points ?? 0} pts</span>
