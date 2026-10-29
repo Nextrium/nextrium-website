@@ -3,7 +3,8 @@ import { notFound } from 'next/navigation'
 import { createServiceClient } from '@nextrium/supabase/server'
 import Header from '@/components/dashboard/Header'
 import { CONTRIBUTOR_ROLES, requireMember, requireStaff } from '@/lib/contributions/auth'
-import { leaderboardName } from '@nextrium/contributions-core/leaderboard'
+import { leaderboardName, submittedLabel } from '@nextrium/contributions-core/leaderboard'
+import { getMemberDirectory } from '@/lib/contributions/members'
 import { sanitizeBrief } from '@nextrium/contributions-core/sanitize'
 import { CATEGORY_LABELS, COMPLEXITY_LABELS, type Category, type Complexity } from '@nextrium/contributions-core/constants'
 
@@ -22,6 +23,7 @@ interface Delivery {
   evidence_url: string | null
   final_points: number | null
   verified_at: string | null
+  submitted_at: string | null
 }
 
 interface TaskSummary {
@@ -50,11 +52,12 @@ export default async function ContributorDeliveriesPage({ params }: Props) {
     .limit(1).maybeSingle()
   if (!person) notFound()
 
-  const [{ data: profile }, { data: rows }] = await Promise.all([
+  const [{ data: profile }, { data: rows }, directory] = await Promise.all([
     supabase.from('contributor_profiles').select('display_name, total_points, verified_contributions').eq('user_id', id).maybeSingle(),
     supabase.from('contributions')
-      .select('id, task_id, title, description, evidence_url, final_points, verified_at')
+      .select('id, task_id, title, description, evidence_url, final_points, verified_at, submitted_at')
       .eq('contributor_id', id).eq('status', 'verified').order('verified_at', { ascending: false }),
+    getMemberDirectory(supabase),
   ])
   const deliveries: Delivery[] = rows ?? []
   const taskIds = deliveries.map((d) => d.task_id)
@@ -63,7 +66,7 @@ export default async function ContributorDeliveriesPage({ params }: Props) {
     : { data: [] }
   const tasks = new Map<string, TaskSummary>((taskRows ?? []).map((t: TaskSummary) => [t.id, t]))
 
-  const name = leaderboardName(profile?.display_name)
+  const name = leaderboardName(profile?.display_name, directory.find((m) => m.userId === id)?.publicName)
   const awarded = deliveries.reduce((s, d) => s + (d.final_points ?? 0), 0)
   const total: number = profile?.total_points ?? awarded
   const fmt = (iso: string | null) => iso ? new Date(iso).toLocaleDateString(undefined, { dateStyle: 'medium' }) : '—'
@@ -115,7 +118,7 @@ export default async function ContributorDeliveriesPage({ params }: Props) {
                     <span className="cd-points">{d.final_points ?? 0} pts</span>
                   </div>
                   <span className="cd-meta">
-                    {task ? `${CATEGORY_LABELS[task.category]} · ${COMPLEXITY_LABELS[task.complexity]} · ` : ''}Verified {fmt(d.verified_at)}
+                    {task ? `${CATEGORY_LABELS[task.category]} · ${COMPLEXITY_LABELS[task.complexity]} · ` : ''}Submitted {submittedLabel(d.submitted_at)} · Verified {fmt(d.verified_at)}
                   </span>
 
                   {task && (

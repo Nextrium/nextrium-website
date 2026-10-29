@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { saveProfile, unlinkDiscord, syncMyDiscordAccess, type AccessCheckResult } from '../actions'
-import { saveContributorProfile } from '@/lib/contributions/profileActions'
+import { saveContributorProfile, saveDisplayName } from '@/lib/contributions/profileActions'
 import { splitSkills } from '@nextrium/contributions-core/profile'
 import ContributorFields, { type ContributorFieldsValue } from './ContributorFields'
 import { profileHasChanges, type ProfileValues } from '@/lib/dashboard/profileForm'
@@ -114,6 +114,10 @@ export default function ProfileEditClient({
         notifyEmail: contrib.notifyEmail,
       })
       if (c.error) { setSaving(false); setError(c.error); return }
+    } else if (contrib && contrib.displayName.trim() && contrib.displayName.trim() !== (contributor?.displayName ?? '').trim()) {
+      // Staff who skip the rest still get the name they typed on the leaderboard.
+      const n = await saveDisplayName(contrib.displayName)
+      if (n.error) { setSaving(false); setError(n.error); return }
     }
     const res = await saveProfile({ bio, socialHandles: handles })
     setSaving(false)

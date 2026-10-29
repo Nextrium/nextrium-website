@@ -6,6 +6,8 @@ export interface MemberSummary {
   userId: string
   /** Best name available (see memberDisplayName). Staff-only lists use this. */
   name: string
+  /** Their own display name, else a name from their application or account. Never from their email, so safe to show other members. */
+  publicName: string | null
   active: boolean          // onboarded and not archived
   categories: Category[]
   skills: string[]
@@ -81,15 +83,16 @@ export async function getMemberDirectory(service: any = createServiceClient()): 
   return rows
     .map((r) => {
       const account = accounts.get(r.user_id)
+      const names = {
+        profileName: profileMap.get(r.user_id)?.displayName,
+        linkedAppName: r.application_id ? linkedName.get(r.application_id) : null,
+        emailAppName: account?.email ? emailName.get(account.email.toLowerCase()) : null,
+        accountName: account?.name,
+      }
       return {
         userId: r.user_id,
-        name: memberDisplayName({
-          profileName: profileMap.get(r.user_id)?.displayName,
-          linkedAppName: r.application_id ? linkedName.get(r.application_id) : null,
-          emailAppName: account?.email ? emailName.get(account.email.toLowerCase()) : null,
-          accountName: account?.name,
-          email: account?.email,
-        }),
+        name: memberDisplayName({ ...names, email: account?.email }),
+        publicName: [names.profileName, names.linkedAppName, names.emailAppName, names.accountName].map((v) => v?.trim()).find(Boolean)?.slice(0, 120) ?? null,
         active: !r.archived && !!r.onboarding_completed_at,
         categories: profileMap.get(r.user_id)?.categories ?? [],
         skills: profileMap.get(r.user_id)?.skills ?? [],

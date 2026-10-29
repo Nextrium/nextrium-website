@@ -2,7 +2,7 @@
 
 import { createServiceClient } from '@nextrium/supabase/server'
 import { getVerifiedIdentity } from '@/lib/dashboard/getRole'
-import { parseContributorProfile } from '@nextrium/contributions-core/profile'
+import { parseContributorProfile, parseDisplayName } from '@nextrium/contributions-core/profile'
 import { isContributorRole } from './auth'
 
 /**
@@ -34,6 +34,30 @@ export async function saveContributorProfile(raw: unknown): Promise<{ error?: st
   if (error) {
     console.error('[contributor profile] save failed:', error.message)
     return { error: 'Could not save your contributor preferences.' }
+  }
+  return {}
+}
+
+/**
+ * Saves only the caller's leaderboard name. For people who don't fill in the
+ * rest of the contributor section (it is optional for staff), so their work
+ * isn't listed as "Unnamed contributor". Always the caller's own row; points,
+ * areas and other preferences are left as they are.
+ */
+export async function saveDisplayName(raw: unknown): Promise<{ error?: string }> {
+  const me = await getVerifiedIdentity()
+  if (!me || !isContributorRole(me.role)) return { error: 'You do not have permission to do this.' }
+
+  const parsed = parseDisplayName(raw)
+  if ('error' in parsed) return { error: parsed.error }
+
+  const { error } = await (createServiceClient().from('contributor_profiles') as any).upsert(
+    { user_id: me.userId, display_name: parsed.displayName },
+    { onConflict: 'user_id' },
+  )
+  if (error) {
+    console.error('[contributor profile] name save failed:', error.message)
+    return { error: 'Could not save your name.' }
   }
   return {}
 }
