@@ -6,9 +6,6 @@ import { requireMember } from '@/lib/contributions/auth'
 import { CATEGORY_LABELS, COMPLEXITY_LABELS } from '@nextrium/contributions-core/constants'
 import { TASK_STATUS_LABELS, deadlineLabel, isOverdue } from '@nextrium/contributions-core/taskView'
 import type { Task } from '@nextrium/supabase/database'
-import NameNotice from '@/components/dashboard/NameNotice'
-import { getMemberDirectory } from '@/lib/contributions/members'
-import { leaderboardName } from '@nextrium/contributions-core/leaderboard'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'My tasks' }
@@ -29,11 +26,8 @@ export default async function MyTasksPage() {
   const current = tasks.filter((t) => CURRENT.includes(t.status))
   const past = tasks.filter((t) => !CURRENT.includes(t.status))
   const now = new Date()
-  // Anyone doing tasks without a chosen name is asked for one (and told what others see now).
-  const needsName = tasks.length > 0 && !profile?.display_name?.trim()
-  const shownAs = needsName
-    ? leaderboardName(null, (await getMemberDirectory(supabase)).find((m) => m.userId === auth.caller.userId)?.publicName)
-    : ''
+  // Anyone doing tasks without a display name is pointed to their profile.
+  const needsProfile = tasks.length > 0 && !profile?.display_name?.trim()
 
   const Row = ({ t }: { t: Task }) => (
     <Link href={`/my-tasks/${t.id}`} className="mytask-row">
@@ -69,11 +63,19 @@ export default async function MyTasksPage() {
         .mytask-badge.good { color: var(--success); border-color: color-mix(in srgb, var(--success) 30%, transparent); }
         .mytask-due { font-size: 12px; color: var(--off-white); }
         .mytask-due.bad { color: var(--error); }
+        .mytask-profile { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 20px; padding: 14px 18px; border: 1px solid color-mix(in srgb, var(--orange) 30%, transparent); background: color-mix(in srgb, var(--orange) 6%, transparent); color: var(--off-white); font-size: 13px; }
+        .mytask-profile a { color: var(--orange); font-weight: 600; text-decoration: none; white-space: nowrap; }
+        .mytask-profile a:hover { text-decoration: underline; }
         .mytask-empty { padding: 32px; background: var(--navy); border: 1px solid rgba(255,255,255,0.06); color: var(--grey-mid); font-size: 13px; }
       `}</style>
       <Header title="My tasks" description="Tasks assigned to you, their deadlines and reviews" />
       <div className="dash-content">
-        {needsName && <NameNotice shownAs={shownAs} />}
+        {needsProfile && (
+          <div className="mytask-profile" role="note">
+            <span>Complete your profile so your name appears with your work.</span>
+            <Link href="/people/me">Complete profile →</Link>
+          </div>
+        )}
         <div className="mytask-stats">
           <div className="mytask-stat"><b>{profile?.total_points ?? 0}</b><span>Points</span></div>
           <div className="mytask-stat"><b>{profile?.verified_contributions ?? 0}</b><span>Verified contributions</span></div>

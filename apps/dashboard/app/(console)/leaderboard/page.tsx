@@ -7,7 +7,6 @@ import {
   TIE_RULE, leaderboardName, leaderboardStats, pointsBarPercent, rankLeaderboard, submissionMarks, submittedLabel, type LeaderboardEntry,
 } from '@nextrium/contributions-core/leaderboard'
 import { getMemberDirectory } from '@/lib/contributions/members'
-import NameNotice from '@/components/dashboard/NameNotice'
 import { CATEGORIES, CATEGORY_LABELS, COMPLEXITY_LABELS, isCategory, type Category, type Complexity } from '@nextrium/contributions-core/constants'
 import { color } from '@nextrium/brand'
 
@@ -103,9 +102,6 @@ export default async function LeaderboardPage({ searchParams }: Props) {
   }
 
   const ranked = rankLeaderboard(entries)
-  // The viewer hasn't chosen a name: ask, once they're on the board or able to be.
-  const myNameMissing = ids.includes(caller.userId) && !profileMap.get(caller.userId)?.display_name?.trim()
-  const myShownAs = ranked.find((e) => e.userId === caller.userId)?.name ?? leaderboardName(null, publicNames.get(caller.userId))
   const stats = leaderboardStats(ranked)
   const areasOf = (id: string) => (profileMap.get(id)?.categories ?? []).filter(isCategory)
   const shown = category ? ranked.filter((e) => areasOf(e.userId).includes(category)) : ranked
@@ -159,7 +155,9 @@ export default async function LeaderboardPage({ searchParams }: Props) {
         .lb-stat-value { font-family: var(--font-exo2); font-weight: 800; font-size: 30px; line-height: 1; color: var(--orange); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
         .lb-stat-label { font-size: 13px; color: var(--grey-mid); }
 
-        .lb-rule { margin: -10px 0 18px; font-size: 12px; line-height: 1.55; color: var(--grey-mid); max-width: 70ch; }
+        .lb-rule-box { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; margin: 0 auto 24px; padding: 18px 24px; border-radius: 14px; border: 1px solid color-mix(in srgb, var(--orange) 28%, transparent); background: color-mix(in srgb, var(--orange) 6%, var(--navy)); }
+        .lb-rule-label { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--orange); }
+        .lb-rule { margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--off-white); max-width: 62ch; text-wrap: balance; }
         .lb-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
         .lb-chip { padding: 7px 16px; border-radius: 999px; font-size: 13px; text-decoration: none; color: var(--grey-mid); border: 1px solid rgba(255,255,255,0.1); transition: border-color .15s ease, color .15s ease; }
         .lb-chip:hover { color: var(--off-white); border-color: rgba(255,255,255,0.22); }
@@ -237,8 +235,10 @@ export default async function LeaderboardPage({ searchParams }: Props) {
             <div className="lb-stat"><span className="lb-stat-value">{stats.verified}</span><span className="lb-stat-label">Verified contributions</span></div>
           </div>
 
-          {myNameMissing && <NameNotice shownAs={myShownAs} />}
-          <p className="lb-rule">{TIE_RULE}</p>
+          <div className="lb-rule-box" role="note" aria-labelledby="lb-rule-label">
+            <span id="lb-rule-label" className="lb-rule-label">How equal points are ranked</span>
+            <p className="lb-rule">{TIE_RULE}</p>
+          </div>
 
           <div className="lb-chips">
             <Link href={href({ category: null })} className={`lb-chip ${!category ? 'active' : ''}`}>All</Link>
