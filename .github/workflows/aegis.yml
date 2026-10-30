@@ -1,0 +1,14 @@
+# Runs the Aegis security scanners on main and uploads results for /aegis audit.
+# Setup and what it checks: https://github.com/Nextrium/aegis-scan#readme
+name: Aegis scan
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions: {}
+jobs:
+  aegis:
+    permissions:
+      contents: read
+      id-token: write
+    uses: Nextrium/aegis-scan/.github/workflows/aegis-scan.yml@44a419dec3f206ca43d84eb344578cd587d0df8c
