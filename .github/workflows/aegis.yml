@@ -11,4 +11,4 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    uses: Nextrium/aegis-scan/.github/workflows/aegis-scan.yml@8774c7b7f4e17dc7c91434b6b3976e708165ef59
+    uses: Nextrium/aegis-scan/.github/workflows/aegis-scan.yml@152bbe161ae46dfe9a47d1f7f74820b0476b5407
