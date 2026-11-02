@@ -1,5 +1,5 @@
-import { createClient } from '@nextrium/supabase/server'
-import { notFound, redirect } from 'next/navigation'
+import { redirect } from 'next/navigation'
+import { getAuthorizedReport } from '@/lib/reportSession'
 import ReportRebuttalClient   from './ReportRebuttalClient'
 
 export const dynamic = 'force-dynamic'
@@ -10,15 +10,9 @@ interface Props {
 
 export default async function RebuttalPage({ params }: Props) {
   const { reportId } = await params
-  const supabase     = await createClient()
 
-  const { data: report, error } = await (supabase
-    .from('screening_reports') as any)
-    .select('id, rebuttal_submitted, rebuttal_locked, dimension_scores')
-    .eq('id', reportId.toUpperCase())
-    .single()
-
-  if (error || !report) notFound()
+  const report = await getAuthorizedReport(reportId)
+  if (!report) redirect(`/feedback/access?report=${encodeURIComponent(reportId)}`)
 
   if (report.rebuttal_submitted || report.rebuttal_locked) {
     redirect(`/feedback/${reportId}`)
