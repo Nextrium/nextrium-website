@@ -8,6 +8,10 @@ export const MAX_CODES_PER_EMAIL_WINDOW = 3
 export const IP_WINDOW_MS = 60 * 60 * 1000
 export const MAX_REQUESTS_PER_IP_WINDOW = 10
 
+export function isReportId(value: unknown): value is string {
+  return typeof value === 'string' && /^[A-Za-z0-9-]{4,40}$/.test(value)
+}
+
 export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase()
 }

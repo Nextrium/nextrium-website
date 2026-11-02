@@ -53,6 +53,12 @@ export async function updateCoreMember(id: string, role: unknown, department: un
   }
   const { error } = await db.from('core_team').update({ role: role as CoreRole, department: department as Department }).eq('id', id)
   if (error) return { ok: false, error: 'Could not save the change.' }
+  // Two admins can pass the check above at the same moment. Whichever write
+  // finishes last sees no founders left and restores its own change.
+  if (member.role === 'founder' && role !== 'founder' && member.is_active && (await activeFounders()) === 0) {
+    await db.from('core_team').update({ role: 'founder', department: member.department }).eq('id', id)
+    return { ok: false, error: 'The core team needs at least one active founder.' }
+  }
   await auditPortal(auth.caller, { action: 'core_team.role_updated', targetType: 'core_team', targetId: id, targetLabel: member.name, metadata: { from: { role: member.role, department: member.department }, to: { role, department } } })
   refresh()
   return { ok: true, message: `${member.name} updated.` }
@@ -76,6 +82,11 @@ export async function setCoreMemberActive(id: string, active: boolean): Promise<
 
   const { error } = await db.from('core_team').update({ is_active: active }).eq('id', id)
   if (error) return { ok: false, error: 'Could not save the change.' }
+  // Same simultaneous-request guard as updateCoreMember.
+  if (!active && member.role === 'founder' && (await activeFounders()) === 0) {
+    await db.from('core_team').update({ is_active: true }).eq('id', id)
+    return { ok: false, error: 'The core team needs at least one active founder.' }
+  }
   await auditPortal(auth.caller, { action: active ? 'core_team.member_reactivated' : 'core_team.member_deactivated', targetType: 'core_team', targetId: id, targetLabel: member.name })
   refresh()
   return { ok: true, message: `${member.name} ${active ? 'reactivated' : 'deactivated'}.` }

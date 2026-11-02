@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createServiceClient } from '@nextrium/supabase/server'
 import { normalizeUrl } from '@nextrium/utils/normalizeUrl'
 import { brand } from '@nextrium/brand'
+import { checkCvFile, type CheckedCv } from '@/lib/cvFile'
 
 const C = brand.colors
 
@@ -22,6 +23,7 @@ export async function POST(request: Request) {
 
     let phone = '', location = '', linkedin_url = '', portfolio_url = '', github_url = '', design_url = '', published_work_url = '', currently_building = ''
     let project_links: { url: string; description: string }[] = []
+    let cvFile: File | null = null
 
     if (contentType.includes('multipart/form-data')) {
       const formData = await request.formData()
@@ -49,24 +51,7 @@ export async function POST(request: Request) {
         }
       }
 
-      const cvFile = formData.get('cv') as File | null
-      if (cvFile && cvFile.size > 0) {
-        const supabase = await createServiceClient()
-        const ext      = cvFile.name.split('.').pop()
-        const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-        const path     = `applications/${filename}`
-        const arrayBuffer = await cvFile.arrayBuffer()
-        const buffer      = Buffer.from(arrayBuffer)
-
-        const { error: uploadError } = await supabase.storage
-          .from('documents')
-          .upload(path, buffer, { contentType: cvFile.type, upsert: false })
-
-        if (!uploadError) {
-          const { data } = supabase.storage.from('documents').getPublicUrl(path)
-          cv_url = data.publicUrl
-        }
-      }
+      cvFile = formData.get('cv') as File | null
     } else if (contentType.includes('application/x-www-form-urlencoded')) {
       const text   = await request.text()
       const params = new URLSearchParams(text)
@@ -86,6 +71,15 @@ export async function POST(request: Request) {
 
     if (!name.trim())  return NextResponse.json({ error: 'Name is required.' },  { status: 400 })
     if (!email.trim()) return NextResponse.json({ error: 'Email is required.' }, { status: 400 })
+
+    let cvBytes: Buffer | null = null
+    let checkedCv: CheckedCv | null = null
+    if (cvFile && cvFile.size > 0) {
+      cvBytes = Buffer.from(await cvFile.arrayBuffer())
+      const checked = checkCvFile(cvBytes)
+      if ('error' in checked) return NextResponse.json({ error: checked.error }, { status: 400 })
+      checkedCv = checked
+    }
 
     const supabase = createServiceClient()
 
@@ -129,6 +123,21 @@ export async function POST(request: Request) {
         { error: 'You have already submitted an application for this position.' },
         { status: 409 }
       )
+    }
+
+    // Stored last, so a refused application leaves no file behind.
+    if (cvBytes && checkedCv) {
+      const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${checkedCv.extension}`
+      const path     = `applications/${filename}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('documents')
+        .upload(path, cvBytes, { contentType: checkedCv.contentType, upsert: false })
+
+      if (!uploadError) {
+        const { data } = supabase.storage.from('documents').getPublicUrl(path)
+        cv_url = data.publicUrl
+      }
     }
 
     const { error: dbError } = await (supabase.from('applications') as any).insert({

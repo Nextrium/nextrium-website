@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "exports": {
-    "./normalizeUrl": "./src/normalizeUrl.ts"
+    "./normalizeUrl": "./src/normalizeUrl.ts",
+    "./safeNext": "./src/safeNext.ts"
   },
   "scripts": {
     "type-check": "tsc --noEmit"

@@ -1,5 +1,6 @@
-import { createClient, createServiceClient } from '@nextrium/supabase/server'
-import { notFound }     from 'next/navigation'
+import { createServiceClient } from '@nextrium/supabase/server'
+import { redirect }     from 'next/navigation'
+import { getAuthorizedReport } from '@/lib/reportSession'
 import ReportClient     from './ReportClient'
 
 export const dynamic = 'force-dynamic'
@@ -18,19 +19,13 @@ interface Props {
 
 export default async function ReportPage({ params }: Props) {
   const { reportId } = await params
-  const supabase     = await createClient()
 
-  const { data: report, error } = await supabase
-    .from('screening_reports')
-    .select('*')
-    .eq('id', reportId.toUpperCase())
-    .single()
+  // No session, an unknown report and someone else's report all take the same
+  // exit, so this page doesn't reveal which report IDs exist.
+  const reportData = await getAuthorizedReport(reportId) as any
+  if (!reportData) redirect(`/feedback/access?report=${encodeURIComponent(reportId)}`)
 
-  if (error || !report) notFound()
-  const reportData = report as any
-
-  // screening_rebuttals is service_role-only (no public RLS policy), so
-  // this candidate-facing page can't read it via the anon client above -
+  // screening_rebuttals is service_role-only (no public RLS policy) -
   // fetch just the status here, server-side, so the "under review" copy
   // can actually reflect what's happened instead of a static message
   // that never changes once a rebuttal is filed.
