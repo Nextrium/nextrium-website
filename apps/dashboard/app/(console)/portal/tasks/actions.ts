@@ -29,6 +29,14 @@ async function checkAssignee(assigneeId: string): Promise<{ ok: true; c: { id: s
   return { ok: true, c }
 }
 
+/** True when a contributor holds more running tasks than their limit. An unreadable count is treated as over. */
+async function assigneeOverLimit(assigneeId: string): Promise<boolean> {
+  const db = community()
+  const { data: c } = await db.from('contributors').select('max_claims').eq('id', assigneeId).maybeSingle()
+  const { count, error } = await db.from('tasks').select('id', { count: 'exact', head: true }).eq('assigned_to', assigneeId).eq('status', 'assigned')
+  return !!error || count == null || count > (c?.max_claims ?? 2)
+}
+
 /** Creates a portal task, open for claiming or assigned straight to a contributor. */
 export async function createPortalTask(raw: { title?: unknown; description?: unknown; category?: unknown; complexity?: unknown; links?: unknown; tags?: unknown; assigneeId?: unknown; deadlineAt?: unknown; shared?: { windowHours?: unknown; maxClaimers?: unknown } | null }): Promise<Result<{ id: string }>> {
   const auth = await requirePortalStaff()
@@ -77,6 +85,18 @@ export async function createPortalTask(raw: { title?: unknown; description?: unk
   if (error || !data) {
     console.error('[portal] task create failed:', error?.code)
     return { ok: false, error: 'Could not create the task.' }
+  }
+
+  // checkAssignee ran before this insert, so a simultaneous assignment can pass
+  // it too. Whichever write finishes last sees the extra task and leaves its
+  // own task open instead, before anyone is emailed.
+  if (assignee?.ok && await assigneeOverLimit(assignee.c.id)) {
+    const { error: reopenError } = await community().from('tasks')
+      .update({ status: 'open', assigned_to: null, claimed_at: null, deadline_at: null } as never)
+      .eq('id', data.id)
+    if (reopenError) console.error('[portal] task reopen failed:', reopenError.code)
+    refresh(data.id)
+    return { ok: false, error: `The task was created but left open, because ${contributorName(assignee.c)} just reached their task limit.` }
   }
 
   let emailed = false
