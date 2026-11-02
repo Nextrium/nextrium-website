@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { fetchAgentsEngine } from '@nextrium/agents-engine'
 import { logActivity } from '@/lib/activityLog'
 import { getVerifiedDashboardRole, getVerifiedIdentity } from '@/lib/dashboard/getRole'
+import { isEngineId } from '@/lib/dashboard/engineId'
 import { roleDenial, STAFF_ROLES } from '@/lib/dashboard/requireRole'
 import { inviteAccount, supabaseCreateAccount } from '@/lib/dashboard/teamAccounts'
 import { makeInviteDelivery } from '@/lib/dashboard/inviteDelivery'
@@ -36,19 +37,19 @@ export async function markApplicationReviewed(applicationId: string): Promise<{ 
     if (!user) return { error: 'Not signed in.' }
 
     const serviceClient = createServiceClient()
-    const { data: existing } = await (serviceClient.from('applications') as any)
-      .select('first_reviewed_by, first_reviewed_by_email, first_reviewed_at')
-      .eq('id', applicationId)
-      .maybeSingle()
-
     const now = new Date().toISOString()
-    const isFirstReview = !existing?.first_reviewed_by
+
+    // Only matches while no first reviewer is set, so of two reviews at the
+    // same moment exactly one becomes the first.
+    const { error: firstError } = await (serviceClient.from('applications') as any)
+      .update({ first_reviewed_by: user.id, first_reviewed_by_email: user.email, first_reviewed_at: now })
+      .eq('id', applicationId)
+      .is('first_reviewed_by', null)
+
+    if (firstError) throw new Error(firstError.message)
 
     const { data: updated, error } = await (serviceClient.from('applications') as any)
       .update({
-        ...(isFirstReview
-          ? { first_reviewed_by: user.id, first_reviewed_by_email: user.email, first_reviewed_at: now }
-          : {}),
         last_reviewed_by: user.id,
         last_reviewed_by_email: user.email,
         last_reviewed_at: now,
@@ -387,6 +388,7 @@ export async function getBulkScreenJobStatus(
 ): Promise<{ job?: BulkScreenJob; error?: string }> {
   const denied = await roleDenial(STAFF_ROLES)
   if (denied) return { error: denied }
+  if (!isEngineId(jobId)) return { error: 'Invalid request.' }
 
   const res = await fetchAgentsEngine(`/api/v1/agents/hr/bulk-screen/${jobId}`, {
     method: 'GET',
@@ -466,6 +468,7 @@ export async function triggerRebuttalRescreen(
 ): Promise<{ error?: string; status?: string; httpStatus?: number }> {
   const denied = await roleDenial(STAFF_ROLES)
   if (denied) return { error: denied }
+  if (!isEngineId(rebuttalId)) return { error: 'Invalid request.' }
 
   const res = await fetchAgentsEngine(`/api/v1/agents/copilot/rebuttals/${rebuttalId}/rescreen`, {
     method: 'POST',
@@ -497,6 +500,7 @@ export async function resolveRebuttalAction(
 ): Promise<ResolveRebuttalOutcome> {
   const denied = await roleDenial(STAFF_ROLES)
   if (denied) return { error: denied }
+  if (!isEngineId(rebuttalId)) return { error: 'Invalid request.' }
 
   const res = await fetchAgentsEngine(`/api/v1/agents/copilot/rebuttals/${rebuttalId}/resolve`, {
     method: 'POST',
@@ -538,6 +542,7 @@ export async function getFreshFeedbackLetter(
 ): Promise<{ letter?: FreshFeedbackLetter; error?: string }> {
   const denied = await roleDenial(STAFF_ROLES)
   if (denied) return { error: denied }
+  if (!isEngineId(applicationId)) return { error: 'Invalid request.' }
 
   const res = await fetchAgentsEngine(`/api/v1/agents/hr/feedback-letter/${applicationId}`, {
     method: 'GET',
@@ -603,12 +608,38 @@ export async function inviteApplicantToTeam(
     if (application.status !== 'accepted') throw new Error('Only accepted applicants can be invited to the team.')
     if (application.invited_to_team_at) throw new Error('This applicant has already been invited.')
 
-    const me = await getVerifiedIdentity()
-    const outcome = await inviteAccount({ email: application.email, role: 'member', applicationId, asTeamMember: true }, {
-      db: supabase,
-      createAccount: supabaseCreateAccount(supabase),
-      deliver: makeInviteDelivery(supabase, me?.userId ?? null),
-    })
+    // Claim the row before sending. Only one of two simultaneous requests gets
+    // a row back, so only one sends. A failure below releases the claim, so
+    // staff can retry as they could before.
+    const now = new Date().toISOString()
+    const { data: claimed, error: claimError } = await (supabase.from('applications') as any)
+      .update({ invited_to_team_at: now })
+      .eq('id', applicationId)
+      .is('invited_to_team_at', null)
+      .select('id')
+    if (claimError) throw new Error(claimError.message)
+    if (!claimed?.length) throw new Error('This applicant has already been invited.')
+
+    const releaseClaim = () => (supabase.from('applications') as any)
+      .update({ invited_to_team_at: null })
+      .eq('id', applicationId)
+      .eq('invited_to_team_at', now)
+
+    let outcome: Awaited<ReturnType<typeof inviteAccount>>
+    try {
+      const me = await getVerifiedIdentity()
+      outcome = await inviteAccount({ email: application.email, role: 'member', applicationId, asTeamMember: true }, {
+        db: supabase,
+        createAccount: supabaseCreateAccount(supabase),
+        deliver: makeInviteDelivery(supabase, me?.userId ?? null),
+      })
+    } catch (err) {
+      await releaseClaim()
+      throw err
+    }
+    if (outcome.kind === 'error' || outcome.kind === 'archived' || (outcome.kind === 'invited' && !outcome.emailed)) {
+      await releaseClaim()
+    }
     if (outcome.kind === 'error') throw new Error(outcome.message)
     if (outcome.kind === 'invited' && !outcome.emailed) {
       throw new Error('Their account was created, but the invitation email could not be sent. Use "Send invite link" in Team Access to send it.')
@@ -618,13 +649,6 @@ export async function inviteApplicantToTeam(
     const existingAccount = outcome.kind === 'added_existing' || outcome.kind === 'already'
     const existingRole = outcome.kind === 'already' ? outcome.role : undefined
     if (outcome.tracks.trackSet) await emitAutomationEvent(ACCESS_SYNC, outcome.userId)
-
-    const now = new Date().toISOString()
-
-    const { error: updateError } = await (supabase.from('applications') as any)
-      .update({ invited_to_team_at: now })
-      .eq('id', applicationId)
-    if (updateError) throw new Error(updateError.message)
 
     revalidatePath('/applications')
     logActivity({
