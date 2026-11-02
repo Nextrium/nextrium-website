@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers'
 import { createClient, createServiceClient } from '@nextrium/supabase/server'
+import { ROLE_COOKIE, verifyRoleCookie } from './roleCookie'
 
 // 'none' = signed in (or not signed in at all) with no dashboard_users row.
 // It is a deny role, never a fallback to real access.
@@ -9,8 +10,6 @@ interface DashboardUserRole {
   role: 'admin' | 'content' | 'community' | 'moderator' | 'member'
   archived: boolean
 }
-
-const ROLE_COOKIE = 'nextrium-role'
 
 // Reads dashboard_users with the service client so RLS on that table can
 // never make a real staff account look role-less. Any error or missing row
@@ -30,8 +29,8 @@ async function lookupRole(userId: string): Promise<DashboardRole> {
 
 /**
  * Resolves the current user's dashboard role for PAGES, which always sit
- * behind proxy.ts. Reuses the "<userId>:<role>:<onboarded>" cookie the
- * middleware caches to avoid a duplicate lookup per navigation.
+ * behind proxy.ts. Reuses the signed cookie the middleware caches to avoid a
+ * duplicate lookup per navigation.
  *
  * The identity here comes from getSession() (the local cookie, not
  * re-checked with the auth server), which is only acceptable because
@@ -47,11 +46,8 @@ export async function getDashboardRole(): Promise<DashboardRole> {
   if (!user) return 'none'
 
   const cookieStore = await cookies()
-  const cached = cookieStore.get(ROLE_COOKIE)?.value
-  if (cached) {
-    const [cachedUserId, cachedRole] = cached.split(':')
-    if (cachedUserId === user.id && cachedRole) return cachedRole as DashboardRole
-  }
+  const cached = await verifyRoleCookie(cookieStore.get(ROLE_COOKIE)?.value, user.id, process.env.ROLE_COOKIE_SECRET)
+  if (cached) return cached.role as DashboardRole
 
   return lookupRole(user.id)
 }

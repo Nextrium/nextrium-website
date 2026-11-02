@@ -2,13 +2,8 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { updateSession } from '@nextrium/supabase/proxy'
 import { createClient } from '@supabase/supabase-js'
 import { isRestricted } from '@/lib/dashboard/accessControl'
+import { ROLE_COOKIE, ROLE_COOKIE_MAX_AGE, signRoleCookie, verifyRoleCookie } from '@/lib/dashboard/roleCookie'
 
-const ROLE_COOKIE = 'nextrium-role'
-// 30s: short enough that a role change (e.g. promoting/demoting someone in
-// Team Access) takes effect on their next couple of page loads instead of
-// up to 5 minutes, while still absorbing the request-per-poll load this
-// cache exists for in the first place.
-const ROLE_COOKIE_MAX_AGE = 30
 const ROLE_QUERY_TIMEOUT_MS = 4000 // never let one slow Supabase response hang the whole middleware
 
 interface RoleQueryResult {
@@ -62,16 +57,10 @@ async function getUserRole(
   response: NextResponse,
   userId: string
 ): Promise<RoleQueryResult> {
-  // Cookie value is "<userId>:<role>:<onboarded 0|1>" — binding it to the
-  // signed-in user id means a different account signing in on the same
-  // browser can never inherit a stale cached role left over from whoever
-  // used it before.
-  const cached = request.cookies.get(ROLE_COOKIE)?.value
+  const secret = process.env.ROLE_COOKIE_SECRET
+  const cached = await verifyRoleCookie(request.cookies.get(ROLE_COOKIE)?.value, userId, secret)
   if (cached) {
-    const [cachedUserId, cachedRole, cachedOnboarded] = cached.split(':')
-    if (cachedUserId === userId && cachedRole) {
-      return { role: cachedRole, archived: cachedRole === 'archived', onboarded: cachedOnboarded === '1', verified: true }
-    }
+    return { role: cached.role, archived: cached.role === 'archived', onboarded: cached.onboarded, verified: true }
   }
 
   const result = await fetchUserRole(userId)
@@ -79,12 +68,16 @@ async function getUserRole(
   // freshly invited account locked out for up to the cookie's lifetime, and
   // an unverified lookup must be retried on the next request.
   if (result.verified && result.role !== 'none') {
-    response.cookies.set(ROLE_COOKIE, `${userId}:${result.role}:${result.onboarded ? '1' : '0'}`, {
-      maxAge: ROLE_COOKIE_MAX_AGE,
-      httpOnly: true,
-      sameSite: 'lax',
-      path: '/',
-    })
+    const signed = await signRoleCookie({ userId, role: result.role, onboarded: result.onboarded }, secret)
+    if (signed) {
+      response.cookies.set(ROLE_COOKIE, signed, {
+        maxAge: ROLE_COOKIE_MAX_AGE,
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+      })
+    }
   }
   return result
 }
