@@ -9,6 +9,8 @@ import { normalizeUrl } from '@nextrium/utils/normalizeUrl'
 import RichTextEditor from '@/components/editor/RichTextEditor'
 import type { Post } from '@nextrium/supabase/database'
 import { logActivityAction } from '@/app/actions/activityLog'
+import { publishFields, unpublishesLivePost } from '@/lib/dashboard/postPublish'
+import { isReservedSlug } from '@/lib/dashboard/reservedSlug'
 
 interface PostEditorProps {
   post: Post | null
@@ -62,9 +64,12 @@ export default function PostEditor({ post }: PostEditorProps) {
     setError(null); setSuccess(null)
     if (!title.trim())   { setError('Title is required.');   return }
     if (!slug.trim())    { setError('Slug is required.');    return }
+    if (isReservedSlug(slug)) { setError('"new" is reserved. Choose another slug.'); return }
     if (!excerpt.trim()) { setError('Excerpt is required.'); return }
     if (!content.trim() || content === '<p></p>') { setError('Content is required.'); return }
     if (!author.trim())  { setError('Author is required.');  return }
+    if (unpublishesLivePost(publish, isPublished) &&
+        !confirm('This post is live. Saving it as a draft will unpublish it. Continue?')) return
 
     setSaving(true)
     const supabase  = createClient()
@@ -79,8 +84,7 @@ export default function PostEditor({ post }: PostEditorProps) {
       post_type:       postType,
       author:          author.trim(),
       tags:            tagsArray,
-      is_published:    publish,
-      published_at:    publish ? (post?.published_at ?? now) : null,
+      ...publishFields(publish, post?.published_at, now),
       cover_image_url: normalizeUrl(coverImage) || null,
       brand:           brand,
       updated_at:      now,
@@ -90,6 +94,7 @@ export default function PostEditor({ post }: PostEditorProps) {
       if (isNew) {
         const { error: err } = await (supabase.from('posts') as any).insert({ ...payload, created_at: now })
         if (err) throw err
+        setIsPublished(publish)
         setSuccess('Post created.')
         logActivityAction({
           action: publish ? 'post_published' : 'post_created',
@@ -102,6 +107,7 @@ export default function PostEditor({ post }: PostEditorProps) {
       } else {
         const { error: err } = await (supabase.from('posts') as any).update(payload).eq('slug', post!.slug)
         if (err) throw err
+        setIsPublished(publish)
         setSuccess(publish ? 'Post published.' : 'Draft saved.')
         logActivityAction({
           action: publish && !post!.is_published ? 'post_published' : 'post_updated',
@@ -267,13 +273,12 @@ export default function PostEditor({ post }: PostEditorProps) {
                   value={tags} onChange={(e) => setTags(e.target.value)} />
               </div>
 
+              {/* Status only: the Save draft and Publish buttons decide it. */}
               <div className="editor-toggle">
-                <span className="editor-toggle-label">Published</span>
-                <label className="editor-toggle-switch">
-                  <input type="checkbox" checked={isPublished}
-                    onChange={(e) => setIsPublished(e.target.checked)} />
-                  <span className="editor-toggle-track" />
-                </label>
+                <span className="editor-toggle-label">Status</span>
+                <span className="editor-toggle-label" style={{ color: isPublished ? 'var(--success)' : 'var(--grey-mid)' }}>
+                  {isPublished ? 'Published' : 'Draft'}
+                </span>
               </div>
             </div>
 

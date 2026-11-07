@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef } from 'react'
 import { createClient } from '@nextrium/supabase/client'
 import { normalizeUrl } from '@nextrium/utils/normalizeUrl'
+import { checkMediaImage, IMAGE_ACCEPT } from '@/lib/dashboard/mediaImage'
 
 interface ImageUploadProps {
   onInsert: (url: string) => void
@@ -23,15 +24,14 @@ export default function ImageUpload({ onInsert, onClose, folder = 'posts' }: Ima
 
   async function uploadFile(file: File) {
     setError(null)
-    if (!file.type.startsWith('image/')) { setError('File must be an image.'); return }
-    if (file.size > 10 * 1024 * 1024)   { setError('Image must be under 10 MB.'); return }
+    const checked = checkMediaImage(file)
+    if (!checked.ok) { setError(checked.error); return }
     setUploading(true)
     try {
       const supabase = createClient()
-      const ext      = file.name.split('.').pop()
-      const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+      const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${checked.ext}`
       const path     = `${folder}/${filename}`
-      const { error: uploadError } = await supabase.storage.from('media').upload(path, file, { upsert: false, contentType: file.type })
+      const { error: uploadError } = await supabase.storage.from('media').upload(path, file, { upsert: false, contentType: checked.contentType })
       if (uploadError) throw uploadError
       const { data } = supabase.storage.from('media').getPublicUrl(path)
       onInsert(data.publicUrl)
@@ -111,7 +111,7 @@ export default function ImageUpload({ onInsert, onClose, folder = 'posts' }: Ima
               <div className="img-drop-label">Drop an image here, or click to browse</div>
               <div className="img-drop-hint">PNG, JPG, GIF, WEBP — max 10 MB</div>
               <button type="button" className="img-drop-btn" onClick={(e) => { e.stopPropagation(); fileRef.current?.click() }}>Browse files</button>
-              <input ref={fileRef} type="file" accept="image/*" onChange={handleFileChange} style={{ display: 'none' }} />
+              <input ref={fileRef} type="file" accept={IMAGE_ACCEPT} onChange={handleFileChange} style={{ display: 'none' }} />
             </div>
             {preview && (
               <div className="img-preview">

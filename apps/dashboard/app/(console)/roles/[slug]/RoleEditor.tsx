@@ -6,6 +6,7 @@ import { createClient } from '@nextrium/supabase/client'
 import Header from '@/components/dashboard/Header'
 import type { Role } from '@nextrium/supabase/database'
 import { logActivityAction } from '@/app/actions/activityLog'
+import { isReservedSlug } from '@/lib/dashboard/reservedSlug'
 
 interface RoleEditorProps {
   role: Role | null
@@ -47,6 +48,7 @@ export default function RoleEditor({ role }: RoleEditorProps) {
     setError(null); setSuccess(null)
     if (!title.trim())       { setError('Title is required.');       return }
     if (!slug.trim())        { setError('Slug is required.');        return }
+    if (isReservedSlug(slug)) { setError('"new" is reserved. Choose another slug.'); return }
     if (!team.trim())        { setError('Team is required.');        return }
     if (!location.trim())    { setError('Location is required.');    return }
     if (!description.trim()) { setError('Description is required.'); return }

@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { safeHref } from '@/lib/dashboard/safeHref'
 import { createServiceClient } from '@nextrium/supabase/server'
 import Header from '@/components/dashboard/Header'
 import ReviewHistory from '@/components/contributions/ReviewHistory'
@@ -42,6 +43,8 @@ export default async function ReviewDetailPage({ params }: Props) {
       .order('submission_number', { ascending: false }).order('created_at', { ascending: false }),
     getMemberDirectory(),
   ])
+  // The app can't remove a task that has submissions, but fail cleanly if one is missing.
+  if (!task) notFound()
   const reviews: ContributionReview[] = reviewRows ?? []
   // Did the latest automated review flag the work as not matching the task's complexity?
   const latestReview = reviews.find((r) => r.id === c.latest_review_id) ?? reviews[0]
@@ -107,7 +110,9 @@ export default async function ReviewDetailPage({ params }: Props) {
             <div className="mt-panel">
               <div className="mt-panel-title">Submission</div>
               <div className="mt-text">{c.description}</div>
-              {c.evidence_url && <a className="mt-link" href={c.evidence_url} target="_blank" rel="noopener noreferrer">{c.evidence_url}</a>}
+              {c.evidence_url && (safeHref(c.evidence_url)
+                ? <a className="mt-link" href={safeHref(c.evidence_url)!} target="_blank" rel="noopener noreferrer">{c.evidence_url}</a>
+                : <span className="mt-text">{c.evidence_url}</span>)}
             </div>
             <div className="mt-panel">
               <div className="mt-panel-title">Task brief · {task.title}</div>
