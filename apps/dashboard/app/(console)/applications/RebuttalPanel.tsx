@@ -11,6 +11,7 @@ import {
   type RebuttalDetail,
   type ReviewedInfo,
 } from './actions'
+import { safeHref } from '@/lib/dashboard/safeHref'
 
 /**
  * Self-contained rebuttal dispute card, isolated from ApplicationsClient.tsx
@@ -206,8 +207,10 @@ export default function RebuttalPanel({
 
       {rebuttal.evidenceUrls.length > 0 && (
         <div>
-          {rebuttal.evidenceUrls.map((url) => (
-            <a key={url} className="rebuttal-url" href={url} target="_blank" rel="noopener noreferrer">{url}</a>
+          {rebuttal.evidenceUrls.map((url) => safeHref(url) ? (
+            <a key={url} className="rebuttal-url" href={safeHref(url)!} target="_blank" rel="noopener noreferrer">{url}</a>
+          ) : (
+            <span key={url} className="rebuttal-url">{url}</span>
           ))}
         </div>
       )}
