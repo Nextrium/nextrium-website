@@ -10,6 +10,7 @@ import RichTextEditor from '@/components/editor/RichTextEditor'
 import type { Post } from '@nextrium/supabase/database'
 import { logActivityAction } from '@/app/actions/activityLog'
 import { publishFields, unpublishesLivePost } from '@/lib/dashboard/postPublish'
+import { isReservedSlug } from '@/lib/dashboard/reservedSlug'
 
 interface PostEditorProps {
   post: Post | null
@@ -63,6 +64,7 @@ export default function PostEditor({ post }: PostEditorProps) {
     setError(null); setSuccess(null)
     if (!title.trim())   { setError('Title is required.');   return }
     if (!slug.trim())    { setError('Slug is required.');    return }
+    if (isReservedSlug(slug)) { setError('"new" is reserved. Choose another slug.'); return }
     if (!excerpt.trim()) { setError('Excerpt is required.'); return }
     if (!content.trim() || content === '<p></p>') { setError('Content is required.'); return }
     if (!author.trim())  { setError('Author is required.');  return }

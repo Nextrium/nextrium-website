@@ -7,6 +7,7 @@ import { normalizeUrl } from '@nextrium/utils/normalizeUrl'
 import Header from '@/components/dashboard/Header'
 import { logActivityAction } from '@/app/actions/activityLog'
 import { color } from '@nextrium/brand'
+import { isReservedSlug } from '@/lib/dashboard/reservedSlug'
 
 const STATUS_OPTIONS = ['active', 'prototype', 'completed', 'abandoned']
 
@@ -41,6 +42,7 @@ export default function CommunityProjectEditor({ project }: { project: any }) {
     setError(null); setSuccess(null)
     if (!name.trim())        { setError('Name is required.');        return }
     if (!slug.trim())        { setError('Slug is required.');        return }
+    if (isReservedSlug(slug)) { setError('"new" is reserved. Choose another slug.'); return }
     if (!team.trim())        { setError('Team is required.');        return }
     if (!event.trim())       { setError('Event is required.');       return }
     if (!description.trim()) { setError('Description is required.'); return }
