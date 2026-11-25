@@ -24,5 +24,5 @@ Private operational notes, plans, and phase security reviews live in the private
 Security is a hard requirement on every feature and change—never an afterthought. Before marking any task complete:
 1. **Security & edge-case review (defensive and offensive):** Verify all server actions and API routes check identity and specific roles fresh on the server (`getVerifiedIdentity()` / `getVerifiedDashboardRole()` / `roleDenial()`), fail closed, prevent redirect loops, sanitize HTML/links, validate inputs at every boundary, and guard against injection, XSS, SSRF, and unauthorized access.
 2. **Automated tests:** Add and pass unit, regression, edge-case, and negative/unauthorized tests (`npm test`).
-3. **End-to-end & browser checks:** Run E2E checks and test UI changes in a real browser. Report honestly if any check could not be run and why.
+3. **End-to-end, desktop & mobile responsiveness checks:** Run E2E checks and test UI changes in a real browser across both desktop and mobile viewports (no horizontal overflow, readable contrast, usable controls). Report honestly if any check could not be run and why.
 4. **Typecheck, production build & brand check:** Confirm `npm run type-check`, `npm run brand:check`, and affected `npm run build:*` commands all pass.
