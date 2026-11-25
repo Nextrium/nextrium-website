@@ -1,6 +1,7 @@
 import { createServiceClient } from '@nextrium/supabase/server'
 import { getVerifiedIdentity, type DashboardRole } from '@/lib/dashboard/getRole'
 import { STAFF_ROLES } from '@/lib/dashboard/requireRole'
+import { memberDisplayName } from './members'
 
 export interface Caller {
   userId: string
@@ -41,4 +42,21 @@ export async function requireMember(): Promise<{ caller: Caller } | { error: str
     .maybeSingle()
   if (!data || data.archived || !data.onboarding_completed_at) return { error: 'Finish setting up your profile first.' }
   return { caller: me }
+}
+
+/** Resolves a clean human display name for the verified caller (for thread messages). */
+export async function resolveCallerName(service: any, caller: Caller): Promise<string> {
+  try {
+    const [{ data: cp }, { data: prof }] = await Promise.all([
+      service.from('contributor_profiles').select('display_name').eq('user_id', caller.userId).maybeSingle(),
+      service.from('profiles').select('full_name').eq('id', caller.userId).maybeSingle(),
+    ])
+    return memberDisplayName({
+      profileName: cp?.display_name,
+      accountName: prof?.full_name,
+      email: caller.email,
+    })
+  } catch {
+    return memberDisplayName({ email: caller.email })
+  }
 }

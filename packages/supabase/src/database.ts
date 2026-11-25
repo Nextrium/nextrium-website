@@ -678,6 +678,8 @@ export type Database = {
           created_by: string | null
           /** Shared by the copies of a task given to several people; null for a one-person task. */
           group_id: string | null
+          /** Original contribution this follow-up task was created from, if any. */
+          source_contribution_id?: string | null
           created_at: string
           updated_at: string
         }
@@ -694,6 +696,7 @@ export type Database = {
           links?: { label: string; url: string }[]
           created_by?: string | null
           group_id?: string | null
+          source_contribution_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -707,6 +710,7 @@ export type Database = {
           deadline_days?: number
           status?: 'draft' | 'assigned' | 'submitted' | 'changes_requested' | 'completed' | 'cancelled'
           links?: { label: string; url: string }[]
+          source_contribution_id?: string | null
           updated_at?: string
         }
       }
@@ -729,6 +733,8 @@ export type Database = {
           staff_notes: string | null
           verified_by: string | null
           verified_at: string | null
+          thread_closed_at?: string | null
+          thread_closed_by?: string | null
           submitted_at: string
           created_at: string
           updated_at: string
@@ -742,6 +748,8 @@ export type Database = {
           evidence_url?: string | null
           submission_count?: number
           status?: 'pending_review' | 'review_failed' | 'changes_requested' | 'needs_human' | 'ai_approved' | 'verified' | 'rejected'
+          thread_closed_at?: string | null
+          thread_closed_by?: string | null
           submitted_at?: string
           created_at?: string
           updated_at?: string
@@ -756,8 +764,62 @@ export type Database = {
           review_decision?: 'approved' | 'rejected' | 'human_required' | null
           review_score?: number | null
           staff_notes?: string | null
+          thread_closed_at?: string | null
+          thread_closed_by?: string | null
           submitted_at?: string
           updated_at?: string
+        }
+      }
+      contribution_messages: {
+        Row: {
+          id: string
+          contribution_id: string
+          submission_number: number
+          author_role: 'staff' | 'contributor'
+          author_user_id: string | null
+          author_name: string
+          kind: 'feedback' | 'reply' | 'decision_verified' | 'decision_changes' | 'decision_rejected'
+          body: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          contribution_id: string
+          submission_number?: number
+          author_role: 'staff' | 'contributor'
+          author_user_id?: string | null
+          author_name: string
+          kind: 'feedback' | 'reply' | 'decision_verified' | 'decision_changes' | 'decision_rejected'
+          body: string
+          created_at?: string
+        }
+        Update: {
+          [_ in never]: never
+        }
+      }
+      contribution_attempts: {
+        Row: {
+          id: string
+          contribution_id: string
+          submission_number: number
+          title: string
+          description: string
+          evidence_url: string | null
+          submitted_at: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          contribution_id: string
+          submission_number: number
+          title: string
+          description: string
+          evidence_url?: string | null
+          submitted_at?: string
+          created_at?: string
+        }
+        Update: {
+          [_ in never]: never
         }
       }
       contribution_reviews: {
@@ -963,6 +1025,8 @@ export type ScreeningReport      = Database['public']['Tables']['screening_repor
 export type ContributorProfile   = Database['public']['Tables']['contributor_profiles']['Row']
 export type Task                 = Database['public']['Tables']['tasks']['Row']
 export type Contribution         = Database['public']['Tables']['contributions']['Row']
+export type ContributionMessage  = Database['public']['Tables']['contribution_messages']['Row']
+export type ContributionAttempt  = Database['public']['Tables']['contribution_attempts']['Row']
 export type ContributionReview   = Database['public']['Tables']['contribution_reviews']['Row']
 export type PointsLedgerEntry    = Database['public']['Tables']['points_ledger']['Row']
 

@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createFakeSupabase } from '../testing/fakeSupabase'
 import { OPERATIONS_INBOX } from './rules'
-import { alertOverdue, alertPortalExtension, alertPortalSubmission, alertTeamExtension, alertTeamSubmission, creatorFor, deliverAlert, fallbackRecipients, type AlertDeps } from './server'
+import { alertOverdue, alertPortalExtension, alertPortalReply, alertPortalSubmission, alertTeamExtension, alertTeamReply, alertTeamSubmission, creatorFor, deliverAlert, fallbackRecipients, type AlertDeps } from './server'
 
 const ADMIN = '00000000-0000-4000-8000-000000000001'
 const ADMIN2 = '00000000-0000-4000-8000-000000000002'
@@ -252,4 +252,53 @@ test('overdue: works without the community client (team only)', async () => {
   const { deps } = setup({ tasks: [teamTask({ status: 'assigned' })] })
   deps.community = undefined
   assert.equal((await alertOverdue(deps, new Date('2026-10-31T00:00:00Z'))).sent, 1)
+})
+
+// ── Thread replies ──────────────────────────────────────────────────────────
+
+test('team reply: notifies the last active staff member who engaged, else task creator, deduplicated per message', async () => {
+  const { deps, sent } = setup({
+    tasks: [teamTask({ created_by: MOD })],
+    contributions: [teamSub()],
+    contribution_messages: [
+      { id: 'm-staff', contribution_id: 'c1', author_role: 'staff', author_user_id: ADMIN, body: 'Great review!', created_at: '2026-10-29T10:00:00Z' },
+      { id: 'm-reply', contribution_id: 'c1', author_role: 'contributor', author_user_id: MEMBER, body: 'Thanks! <script>x</script>', created_at: '2026-10-29T11:00:00Z' },
+    ],
+  })
+  assert.equal(await alertTeamReply(deps, 'c1', 'm-reply', 'member@nextrium.org'), 'sent')
+  assert.equal(await alertTeamReply(deps, 'c1', 'm-reply', 'member@nextrium.org'), 'already_sent')
+  assert.deepEqual(to(sent[0]), ['admin@nextrium.org'])
+  assert.match(sent[0].subject, /^New reply: Write the guide/)
+  assert.match(sent[0].message, /Thanks! &lt;script&gt;x&lt;\/script&gt;/)
+  assert.match(sent[0].message, /dash\.test\/reviews\/c1/)
+})
+
+test('team reply: falls back to task creator if last staff reviewer left, and ignores non-contributor messages', async () => {
+  const { deps, sent } = setup({
+    tasks: [teamTask({ created_by: MOD })],
+    contributions: [teamSub()],
+    contribution_messages: [
+      { id: 'm-gone', contribution_id: 'c1', author_role: 'staff', author_user_id: GONE, body: 'Old review', created_at: '2026-10-29T10:00:00Z' },
+      { id: 'm-reply', contribution_id: 'c1', author_role: 'contributor', author_user_id: MEMBER, body: 'Follow-up question', created_at: '2026-10-29T11:00:00Z' },
+    ],
+  })
+  assert.equal(await alertTeamReply(deps, 'c1', 'm-reply', 'member@nextrium.org'), 'sent')
+  assert.deepEqual(to(sent[0]), ['mod@nextrium.org'])
+  assert.equal(await alertTeamReply(deps, 'c1', 'm-gone'), 'not_needed')
+})
+
+test('portal reply: notifies active reviewer or task creator with portal review link', async () => {
+  const { deps, sent } = setup({}, {
+    tasks: [portalTask()],
+    contributors,
+    contributions: [{ id: 'pc1', task_id: 'p1', contributor_id: 'k1', status: 'verified', submission_count: 1 }],
+    contribution_messages: [
+      { id: 'pm-1', contribution_id: 'pc1', author_role: 'contributor', author_user_id: null, body: 'Happy to take the next step!', created_at: '2026-10-29T12:00:00Z' },
+    ],
+  })
+  assert.equal(await alertPortalReply(deps, 'pc1', 'pm-1'), 'sent')
+  assert.deepEqual(to(sent[0]), ['mod@nextrium.org'])
+  assert.match(sent[0].message, /Ada Obi/)
+  assert.match(sent[0].message, /on the contributor portal/)
+  assert.match(sent[0].message, /dash\.test\/portal\/reviews\/pc1/)
 })

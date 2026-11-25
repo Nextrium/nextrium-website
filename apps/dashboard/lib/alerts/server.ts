@@ -1,4 +1,5 @@
 import { ALERT_SENDER, OPERATIONS_INBOX, alertEmail, alertKey, alertRecipients, reviewAlertKind, type AlertContent, type AlertKind, type Creator, type TaskSystem } from './rules'
+import { pickReplyRecipientUserId } from '@nextrium/contributions-core/thread'
 
 // Sends task alerts to the person who created the task (or the fallback). Every
 // dependency is passed in, so the whole flow is tested against fakes. Nothing
@@ -120,6 +121,32 @@ export function alertTeamExtension(deps: AlertDeps, taskId: string, actorEmail?:
   })
 }
 
+/** When a team member replies in a submission thread. Routes to the reviewer who last engaged, else task creator, else fallback. */
+export function alertTeamReply(deps: AlertDeps, contributionId: string, messageId: string, actorEmail?: string | null): Promise<AlertOutcome> {
+  return safely('team reply', async () => {
+    const [{ data: c }, { data: msg }] = await Promise.all([
+      deps.db.from('contributions').select('id, task_id, contributor_id').eq('id', contributionId).maybeSingle(),
+      deps.db.from('contribution_messages').select('id, contribution_id, author_role, body').eq('id', messageId).maybeSingle(),
+    ])
+    if (!c || !msg || msg.contribution_id !== c.id || msg.author_role !== 'contributor') return 'not_needed'
+    const [{ data: t }, { data: staffMsgs }] = await Promise.all([
+      deps.db.from('tasks').select('title, created_by').eq('id', c.task_id).maybeSingle(),
+      deps.db.from('contribution_messages').select('author_role, author_user_id, created_at').eq('contribution_id', c.id).eq('author_role', 'staff'),
+    ])
+    if (!t) return 'not_needed'
+    const primaryUserId = pickReplyRecipientUserId({ messages: staffMsgs ?? [], taskCreatorId: t.created_by })
+    let creator = await creatorFor(deps.db, primaryUserId)
+    if (!creator?.activeStaff && t.created_by && t.created_by !== primaryUserId) {
+      creator = await creatorFor(deps.db, t.created_by)
+    }
+    const recipients = alertRecipients({ creator, fallback: await fallbackRecipients(deps.db), actorEmail })
+    return deliverAlert(deps, alertKey('contributor_replied', 'team', c.id, msg.id), 'contributor_replied', recipients, {
+      system: 'team', taskTitle: t.title, person: await teamPerson(deps.db, c.contributor_id), message: msg.body,
+      url: deps.link(`/reviews/${c.id}`),
+    })
+  })
+}
+
 // ── Portal tasks (community database) ───────────────────────────────────────
 
 /** After a contributor's submission is reviewed: alert if it now waits on staff. */
@@ -157,6 +184,46 @@ export function alertPortalExtension(deps: AlertDeps, taskId: string): Promise<A
       system: 'portal', taskTitle: t.title, person: portalPerson(who), deadline: t.deadline_at,
       url: deps.link(`/portal/tasks/${t.id}`),
     })
+  })
+}
+
+/** When a community contributor replies in a submission thread. Routes to the reviewer who last engaged, else task creator, else fallback. */
+export function alertPortalReply(deps: AlertDeps, contributionId: string, messageId: string): Promise<AlertOutcome> {
+  return safely('portal reply', async () => {
+    const cdb = deps.community
+    if (!cdb) return 'not_needed'
+    const [{ data: c }, { data: msg }] = await Promise.all([
+      cdb.from('contributions').select('id, task_id, contributor_id').eq('id', contributionId).maybeSingle(),
+      cdb.from('contribution_messages').select('id, contribution_id, author_role, body').eq('id', messageId).maybeSingle(),
+    ])
+    if (!c || !c.task_id || !msg || msg.contribution_id !== c.id || msg.author_role !== 'contributor') return 'not_needed'
+    const [{ data: t }, { data: who }, { data: staffMsgs }] = await Promise.all([
+      cdb.from('tasks').select('title, created_by_user, created_by_email').eq('id', c.task_id).maybeSingle(),
+      c.contributor_id ? cdb.from('contributors').select('name, contributor_type, team_name').eq('id', c.contributor_id).maybeSingle() : Promise.resolve({ data: null }),
+      cdb.from('contribution_messages').select('author_role, author_user_id, created_at').eq('contribution_id', c.id).eq('author_role', 'staff'),
+    ])
+    if (!t) return 'not_needed'
+    const primaryUserId = pickReplyRecipientUserId({ messages: staffMsgs ?? [], taskCreatorId: t.created_by_user })
+    let creator = await creatorFor(deps.db, primaryUserId, primaryUserId === t.created_by_user ? t.created_by_email : null)
+    if (!creator?.activeStaff && t.created_by_user && t.created_by_user !== primaryUserId) {
+      creator = await creatorFor(deps.db, t.created_by_user, t.created_by_email)
+    }
+    const recipients = alertRecipients({ creator, fallback: await fallbackRecipients(deps.db) })
+    return deliverAlert(deps, alertKey('contributor_replied', 'portal', c.id, msg.id), 'contributor_replied', recipients, {
+      system: 'portal', taskTitle: t.title, person: portalPerson(who), message: msg.body,
+      url: deps.link(`/portal/reviews/${c.id}`),
+    })
+  })
+}
+
+/** Looks up a portal reply by message id and notifies the active reviewer / creator / fallback. */
+export function alertPortalReplyByMessage(deps: AlertDeps, messageId: string): Promise<AlertOutcome> {
+  return safely('portal reply lookup', async () => {
+    const cdb = deps.community
+    if (!cdb) return 'not_needed'
+    const { data: msg } = await cdb.from('contribution_messages').select('id, contribution_id, author_role').eq('id', messageId).maybeSingle()
+    if (!msg || !msg.contribution_id || msg.author_role !== 'contributor') return 'not_needed'
+    return alertPortalReply(deps, msg.contribution_id, msg.id)
   })
 }
 

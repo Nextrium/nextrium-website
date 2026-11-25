@@ -17,6 +17,7 @@
     "./submissionNumber": "./src/submissionNumber.ts",
     "./taskInput": "./src/taskInput.ts",
     "./taskView": "./src/taskView.ts",
+    "./thread": "./src/thread.ts",
     "./alertSignature": "./src/alertSignature.ts"
   },
   "scripts": {

@@ -4,15 +4,17 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { submitContribution } from '../actions'
 import { SUBMISSION_MIN_WORDS, initialSubmissionTitle, wordCount } from '@nextrium/contributions-core/submission'
+import { MAX_ATTEMPTS } from '@nextrium/contributions-core/thread'
 
 interface Props {
   taskId: string
   taskTitle: string
   initial: { title: string; description: string; evidenceUrl: string } | null
   isResubmission: boolean
+  attemptNumber?: number
 }
 
-export default function SubmissionForm({ taskId, taskTitle, initial, isResubmission }: Props) {
+export default function SubmissionForm({ taskId, taskTitle, initial, isResubmission, attemptNumber = 1 }: Props) {
   const router = useRouter()
   const [title, setTitle] = useState(() => initialSubmissionTitle(taskTitle, initial?.title))
   const [description, setDescription] = useState(initial?.description ?? '')
@@ -32,7 +34,9 @@ export default function SubmissionForm({ taskId, taskTitle, initial, isResubmiss
 
   return (
     <form className="mt-panel" onSubmit={submit}>
-      <div className="mt-panel-title">{isResubmission ? 'Resubmit your work' : 'Submit your work'}</div>
+      <div className="mt-panel-title">
+        {isResubmission ? `Resubmit your work · Attempt ${attemptNumber} of ${MAX_ATTEMPTS}` : `Submit your work · Attempt 1 of ${MAX_ATTEMPTS}`}
+      </div>
       {error && <div className="mt-alert error">{error}</div>}
       <label className="mt-hint" htmlFor="sub-title">Title</label>
       <input id="sub-title" className="mt-input" maxLength={200} value={title} onChange={(e) => setTitle(e.target.value)}

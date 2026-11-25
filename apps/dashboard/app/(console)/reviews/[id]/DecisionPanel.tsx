@@ -3,14 +3,16 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { rejectContribution, requestChanges, verifyContribution } from '../actions'
+import { MAX_ATTEMPTS, canRequestMoreChanges } from '@nextrium/contributions-core/thread'
 
 interface Props {
   contributionId: string
   min: number
   max: number
+  submissionCount: number
 }
 
-export default function DecisionPanel({ contributionId, min, max }: Props) {
+export default function DecisionPanel({ contributionId, min, max, submissionCount }: Props) {
   const router = useRouter()
   const [points, setPoints] = useState(Math.round((min + max) / 2))
   const [notes, setNotes] = useState('')
@@ -18,6 +20,7 @@ export default function DecisionPanel({ contributionId, min, max }: Props) {
   const [confirmReject, setConfirmReject] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState<string | null>(null)
+  const changesAllowed = canRequestMoreChanges(submissionCount)
 
   // Every click ends in a message: the result, the server's reason, or a connection failure.
   async function run(label: string, success: string, fn: () => Promise<{ ok: boolean; error?: string }>) {
@@ -25,6 +28,7 @@ export default function DecisionPanel({ contributionId, min, max }: Props) {
     try {
       const res = await fn()
       if (!res.ok) { setError(res.error ?? 'Something went wrong.'); return }
+      setNotes('')
       setDone(success)
       router.refresh()
     } catch {
@@ -48,15 +52,32 @@ export default function DecisionPanel({ contributionId, min, max }: Props) {
       <label className="mt-hint" htmlFor="dec-points">Points to award: <strong style={{ color: 'var(--white)' }}>{points}</strong> ({min}–{max})</label>
       <input id="dec-points" type="range" min={min} max={max} step={1} value={points} onChange={(e) => setPoints(Number(e.target.value))} />
 
-      <label className="mt-hint" htmlFor="dec-notes">Note for the member (required to request changes or reject)</label>
-      <textarea id="dec-notes" className="mt-input mt-textarea" maxLength={4000} value={notes} onChange={(e) => setNotes(e.target.value)} />
+      <label className="mt-hint" htmlFor="dec-notes">Feedback for the member (shown in the thread and emailed; required for changes or rejection)</label>
+      <textarea
+        id="dec-notes"
+        className="mt-input mt-textarea"
+        maxLength={4000}
+        value={notes}
+        onChange={(e) => setNotes(e.target.value)}
+        placeholder="Share what stood out, what you are adopting, why this score was awarded, or what needs changing…"
+      />
 
       <button type="button" className="mt-btn" disabled={!!busy} onClick={() => run('verify', 'Verified. Points awarded and the member has been emailed.', () => verifyContribution(contributionId, points, notes))}>
         {busy === 'verify' ? 'Verifying…' : 'Verify & award points'}
       </button>
-      <button type="button" className="mt-btn ghost" disabled={!!busy} onClick={needsNote(() => run('changes', 'Changes requested. The member has been emailed your note.', () => requestChanges(contributionId, notes)))}>
+      <button
+        type="button"
+        className="mt-btn ghost"
+        disabled={!!busy || !changesAllowed}
+        onClick={needsNote(() => run('changes', 'Changes requested. The member has been emailed your note.', () => requestChanges(contributionId, notes)))}
+      >
         {busy === 'changes' ? 'Sending…' : 'Request changes'}
       </button>
+      {!changesAllowed && (
+        <span className="mt-hint">
+          All {MAX_ATTEMPTS} submission attempts have been used. Verify or reject this submission instead.
+        </span>
+      )}
       {!confirmReject ? (
         <button type="button" className="mt-btn danger" disabled={!!busy} onClick={needsNote(() => { setError(null); setConfirmReject(true) })}>Reject</button>
       ) : (

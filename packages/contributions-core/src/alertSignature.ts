@@ -9,7 +9,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto'
 // dashboard, so a replay inside the window still sends nothing new.
 
 export const ALERT_MAX_AGE_SECONDS = 300
-export const ALERT_EVENTS = ['submission', 'extension'] as const
+export const ALERT_EVENTS = ['submission', 'extension', 'reply'] as const
 export type AlertEvent = (typeof ALERT_EVENTS)[number]
 
 export function signAlert(rawBody: string, timestamp: number, secret: string): string {

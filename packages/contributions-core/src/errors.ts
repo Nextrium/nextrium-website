@@ -18,6 +18,8 @@ const MESSAGES: Record<string, string> = {
   contribution_final: 'This submission has already been decided.',
   notes_required: 'Add a note for the member explaining the decision.',
   own_submission: 'You cannot review your own submission. An admin will review it.',
+  submission_limit_reached: 'You have used all 3 submission attempts for this task.',
+  thread_closed: 'This conversation has been closed by the team.',
 }
 
 export function describeDbError(error: { message?: string } | null | undefined, fallback = 'Something went wrong. Please try again.'): string {
