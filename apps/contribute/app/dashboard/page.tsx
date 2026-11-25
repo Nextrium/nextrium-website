@@ -33,7 +33,17 @@ function taskTarget(task: MyTask, latest: MySubmission | undefined): { kind: 'su
   if (!latest) return { kind: 'submit', target: { taskId: task.id, taskTitle: task.title } }
   const state = submissionState(latest)
   if (state.canResubmit) {
-    return { kind: 'resubmit', target: { taskId: task.id, taskTitle: task.title, title: latest.title, description: latest.description ?? '', evidenceUrl: latest.evidence_url ?? '' } }
+    return {
+      kind: 'resubmit',
+      target: {
+        taskId: task.id,
+        taskTitle: task.title,
+        title: latest.title,
+        description: latest.description ?? '',
+        evidenceUrl: latest.evidence_url ?? '',
+        feedbackNote: latest.notes,
+      },
+    }
   }
   return { kind: 'waiting', retryId: state.canRetryReview ? latest.id : undefined }
 }

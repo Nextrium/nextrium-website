@@ -40,14 +40,14 @@ test('keys: one per occurrence', () => {
 })
 
 test('emails: a button to the right page, escaped content, a subject per kind', () => {
-  const kinds: AlertKind[] = ['review_ready', 'resubmitted', 'review_failed', 'extension_requested', 'overdue']
+  const kinds: AlertKind[] = ['review_ready', 'resubmitted', 'review_failed', 'extension_requested', 'overdue', 'contributor_replied']
   const subjects = new Set<string>()
   for (const k of kinds) {
-    const e = alertEmail(k, { taskTitle: 'Fix <b>it</b> {{x}}', person: 'Ada <i>L</i>', url: 'https://dash.test/x?a=1&b="2"', verdict: 'approved <script>', reason: 'need <time>', deadline: '2026-10-30T10:00:00Z', system: 'portal' })
+    const e = alertEmail(k, { taskTitle: 'Fix <b>it</b> {{x}}', person: 'Ada <i>L</i>', url: 'https://dash.test/x?a=1&b="2"', verdict: 'approved <script>', reason: 'need <time>', message: 'Reply <img onerror=1> {{role}}', deadline: '2026-10-30T10:00:00Z', system: 'portal' })
     subjects.add(e.subject.split(':')[0])
     assert.ok(e.html.includes('href="https://dash.test/x?a=1&amp;b=&quot;2&quot;"'), `${k}: button link`)
     const lower = e.html.toLowerCase()
-    for (const raw of ['<b>it', '<i>l', '<script', '<time', '{{x}}']) assert.ok(!lower.includes(raw), `${k}: ${raw} escaped`)
+    for (const raw of ['<b>it', '<i>l', '<script', '<time', '<img', '{{x}}', '{{role}}']) assert.ok(!lower.includes(raw), `${k}: ${raw} escaped`)
     assert.match(e.html, /<a href=/, `${k}: has a call to action`)
     assert.ok(!/[\r\n{}]/.test(e.subject), `${k}: clean subject`)
   }

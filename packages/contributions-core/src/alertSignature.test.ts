@@ -12,6 +12,8 @@ test('a correctly signed, fresh request is accepted', () => {
   assert.deepEqual(verifyAlert(body, String(NOW), sign(), SECRET, NOW), { ok: true, event: 'submission', id: ID })
   const ext = JSON.stringify({ event: 'extension', id: ID.toUpperCase() })
   assert.deepEqual(verifyAlert(ext, String(NOW), sign(ext), SECRET, NOW), { ok: true, event: 'extension', id: ID })
+  const rep = JSON.stringify({ event: 'reply', id: ID })
+  assert.deepEqual(verifyAlert(rep, String(NOW), sign(rep), SECRET, NOW), { ok: true, event: 'reply', id: ID })
 })
 
 test('unsigned, missing timestamp or missing/short secret → refused', () => {

@@ -3,14 +3,15 @@
 import { revalidatePath } from 'next/cache'
 import { createServiceClient } from '@nextrium/supabase/server'
 import { logActivity } from '@/lib/activityLog'
-import { requireStaff } from '@/lib/contributions/auth'
+import { requireStaff, resolveCallerName, type Caller } from '@/lib/contributions/auth'
 import { describeDbError } from '@nextrium/contributions-core/errors'
 import { reviewContribution } from '@/lib/contributions/reviewService'
-import { changesRequestedEmail, rejectedEmail, verifiedEmail } from '@nextrium/contributions-core/emails'
+import { changesRequestedEmail, rejectedEmail, staffFeedbackEmail, verifiedEmail } from '@nextrium/contributions-core/emails'
 import { notifyMember, notifyReviewResult, dashboardUrl } from '@/lib/contributions/notify'
 import { isReviewStale } from '@nextrium/contributions-core/taskView'
 import { POINT_RANGES, isComplexity } from '@nextrium/contributions-core/constants'
 import { OWN_SUBMISSION_MESSAGE, canDecideOnSubmission } from '@nextrium/contributions-core/decisionRules'
+import { canPostThreadMessage, canRequestMoreChanges, parseMessageBody, type ThreadMessageKind } from '@nextrium/contributions-core/thread'
 import { staffAlreadyRequestedChanges } from '@/lib/contributions/decisionState'
 
 /** Null when the caller may decide on this submission, otherwise the reason they can't. */
@@ -37,11 +38,35 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const NOTES_MAX = 4000
 const db = () => createServiceClient() as any
 
-function revalidate(contributionId: string) {
+function revalidate(contributionId: string, taskId?: string | null) {
   revalidatePath('/reviews')
   revalidatePath(`/reviews/${contributionId}`)
   revalidatePath('/my-tasks')
+  if (taskId) revalidatePath(`/my-tasks/${taskId}`)
   revalidatePath('/tasks')
+}
+
+async function recordDecisionMessage(p: {
+  contributionId: string
+  submissionNumber: number
+  caller: Caller
+  kind: Extract<ThreadMessageKind, 'decision_verified' | 'decision_changes' | 'decision_rejected'>
+  body: string | null | undefined
+}) {
+  const clean = typeof p.body === 'string' ? p.body.trim().slice(0, NOTES_MAX) : ''
+  if (!clean) return
+  const supabase = db()
+  const authorName = await resolveCallerName(supabase, p.caller)
+  const { error } = await supabase.from('contribution_messages').insert({
+    contribution_id: p.contributionId,
+    submission_number: p.submissionNumber || 1,
+    author_role: 'staff',
+    author_user_id: p.caller.userId,
+    author_name: authorName,
+    kind: p.kind,
+    body: clean,
+  })
+  if (error) console.error('[reviews] could not store decision message:', error.message)
 }
 
 async function log(action: string, contributionId: string, details: Record<string, unknown>, caller: { userId: string; email: string | null }) {
@@ -65,40 +90,67 @@ export async function verifyContribution(contributionId: string, basePoints: num
   if (denied) return { ok: false, error: denied }
   if (await alreadyIn(contributionId, 'verified')) return { ok: true }
 
+  const cleanNotes = typeof notes === 'string' && notes.trim() ? notes.replace(/\r\n/g, '\n').trim().slice(0, NOTES_MAX) : null
   const { data, error } = await db().rpc('verify_contribution', {
     p_contribution_id: contributionId, p_actor: auth.caller.userId, p_base_points: basePoints,
-    p_notes: notes?.trim() ? notes.trim().slice(0, NOTES_MAX) : null,
+    p_notes: cleanNotes,
   })
   if (error || !data) return { ok: false, error: describeDbError(error, 'Could not verify the submission.') }
 
+  if (cleanNotes) {
+    await recordDecisionMessage({
+      contributionId,
+      submissionNumber: data.submission_count ?? 1,
+      caller: auth.caller,
+      kind: 'decision_verified',
+      body: cleanNotes,
+    })
+  }
   await log('contribution_verified', contributionId, { title: data.title, points: data.final_points }, auth.caller)
   await notifyMember(data.contributor_id, verifiedEmail({
-    taskTitle: await taskTitle(data.task_id), points: data.final_points ?? 0, url: dashboardUrl('/leaderboard'),
+    taskTitle: await taskTitle(data.task_id),
+    points: data.final_points ?? 0,
+    notes: cleanNotes,
+    url: dashboardUrl(`/my-tasks/${data.task_id}`),
   }))
-  revalidate(contributionId)
+  revalidate(contributionId, data.task_id)
   return { ok: true }
 }
 
-/** Sends the submission back to the member with a note; they can resubmit. */
+/** Sends the submission back to the member with a note; they can resubmit (up to 3 attempts total). */
 export async function requestChanges(contributionId: string, notes: string): Promise<Result> {
   const auth = await requireStaff()
   if ('error' in auth) return { ok: false, error: auth.error }
   if (!UUID.test(contributionId)) return { ok: false, error: 'That submission could not be found.' }
   const denied = await decisionDenial(auth.caller, contributionId)
   if (denied) return { ok: false, error: denied }
-  if (!(notes ?? '').trim()) return { ok: false, error: 'Write a note for the member first.' }
+  const parsed = parseMessageBody(notes)
+  if ('error' in parsed) return { ok: false, error: 'Write a note for the member first.' }
+
+  const { data: current } = await db().from('contributions').select('submission_count').eq('id', contributionId).maybeSingle()
+  if (!current) return { ok: false, error: 'That submission could not be found.' }
+  if (!canRequestMoreChanges(current.submission_count ?? 1)) {
+    return { ok: false, error: 'This member has already used all 3 submission attempts. Verify or reject the submission instead.' }
+  }
   if (await staffAlreadyRequestedChanges(db(), contributionId)) return { ok: true }
 
   const { data, error } = await db().rpc('request_contribution_changes', {
-    p_contribution_id: contributionId, p_actor: auth.caller.userId, p_notes: (notes ?? '').slice(0, NOTES_MAX),
+    p_contribution_id: contributionId, p_actor: auth.caller.userId, p_notes: parsed.body,
   })
   if (error || !data) return { ok: false, error: describeDbError(error, 'Could not request changes.') }
 
+  await recordDecisionMessage({
+    contributionId,
+    submissionNumber: data.submission_count ?? 1,
+    caller: auth.caller,
+    kind: 'decision_changes',
+    body: data.staff_notes ?? parsed.body,
+  })
   await log('contribution_changes_requested', contributionId, { title: data.title }, auth.caller)
   await notifyMember(data.contributor_id, changesRequestedEmail({
-    taskTitle: await taskTitle(data.task_id), notes: data.staff_notes ?? notes, url: dashboardUrl(`/my-tasks/${data.task_id}`),
+    taskTitle: await taskTitle(data.task_id), notes: data.staff_notes ?? parsed.body, url: dashboardUrl(`/my-tasks/${data.task_id}`),
   }))
-  revalidate(contributionId)
+  revalidate(contributionId, data.task_id)
   return { ok: true }
 }
 
@@ -109,18 +161,107 @@ export async function rejectContribution(contributionId: string, notes: string):
   if (!UUID.test(contributionId)) return { ok: false, error: 'That submission could not be found.' }
   const denied = await decisionDenial(auth.caller, contributionId)
   if (denied) return { ok: false, error: denied }
+  const parsed = parseMessageBody(notes)
+  if ('error' in parsed) return { ok: false, error: 'Write a note for the member first.' }
   if (await alreadyIn(contributionId, 'rejected')) return { ok: true }
 
   const { data, error } = await db().rpc('reject_contribution', {
-    p_contribution_id: contributionId, p_actor: auth.caller.userId, p_notes: (notes ?? '').slice(0, NOTES_MAX),
+    p_contribution_id: contributionId, p_actor: auth.caller.userId, p_notes: parsed.body,
   })
   if (error || !data) return { ok: false, error: describeDbError(error, 'Could not reject the submission.') }
 
+  await recordDecisionMessage({
+    contributionId,
+    submissionNumber: data.submission_count ?? 1,
+    caller: auth.caller,
+    kind: 'decision_rejected',
+    body: data.staff_notes ?? parsed.body,
+  })
   await log('contribution_rejected', contributionId, { title: data.title }, auth.caller)
   await notifyMember(data.contributor_id, rejectedEmail({
-    taskTitle: await taskTitle(data.task_id), notes: data.staff_notes ?? notes, url: dashboardUrl(`/my-tasks/${data.task_id}`),
+    taskTitle: await taskTitle(data.task_id), notes: data.staff_notes ?? parsed.body, url: dashboardUrl(`/my-tasks/${data.task_id}`),
   }))
-  revalidate(contributionId)
+  revalidate(contributionId, data.task_id)
+  return { ok: true }
+}
+
+/** Posts a standalone staff feedback message or reply on a submission thread and notifies the member. */
+export async function postStaffFeedback(contributionId: string, body: string): Promise<Result> {
+  const auth = await requireStaff()
+  if ('error' in auth) return { ok: false, error: auth.error }
+  if (!UUID.test(contributionId)) return { ok: false, error: 'That submission could not be found.' }
+  const denied = await decisionDenial(auth.caller, contributionId)
+  if (denied) return { ok: false, error: denied }
+  const parsed = parseMessageBody(body)
+  if ('error' in parsed) return { ok: false, error: parsed.error }
+
+  const supabase = db()
+  const { data: c } = await supabase.from('contributions')
+    .select('id, task_id, contributor_id, title, submission_count, thread_closed_at')
+    .eq('id', contributionId).maybeSingle()
+  if (!c) return { ok: false, error: 'That submission could not be found.' }
+
+  const { count } = await supabase.from('contribution_messages')
+    .select('id', { count: 'exact', head: true }).eq('contribution_id', contributionId)
+  const gate = canPostThreadMessage({
+    authorRole: 'staff',
+    isOwner: false,
+    threadClosed: !!c.thread_closed_at,
+    messageCount: count ?? 0,
+  })
+  if (!gate.ok) return { ok: false, error: gate.error }
+
+  const authorName = await resolveCallerName(supabase, auth.caller)
+  const { error } = await supabase.from('contribution_messages').insert({
+    contribution_id: c.id,
+    submission_number: c.submission_count ?? 1,
+    author_role: 'staff',
+    author_user_id: auth.caller.userId,
+    author_name: authorName,
+    kind: 'feedback',
+    body: parsed.body,
+  })
+  if (error) {
+    console.error('[reviews] postStaffFeedback failed:', error.message)
+    return { ok: false, error: 'Could not send your feedback right now. Please try again.' }
+  }
+
+  await log('contribution_feedback_posted', c.id, { title: c.title }, auth.caller)
+  await notifyMember(c.contributor_id, staffFeedbackEmail({
+    taskTitle: await taskTitle(c.task_id),
+    authorName,
+    body: parsed.body,
+    url: dashboardUrl(`/my-tasks/${c.task_id}`),
+  }))
+  revalidate(c.id, c.task_id)
+  return { ok: true }
+}
+
+/** Closes or reopens a submission's conversation thread (staff only, never on one's own submission). */
+export async function toggleThreadClosed(contributionId: string, closed: boolean): Promise<Result> {
+  const auth = await requireStaff()
+  if ('error' in auth) return { ok: false, error: auth.error }
+  if (!UUID.test(contributionId)) return { ok: false, error: 'That submission could not be found.' }
+  const denied = await decisionDenial(auth.caller, contributionId)
+  if (denied) return { ok: false, error: denied }
+
+  const supabase = db()
+  const { data: c } = await supabase.from('contributions').select('id, task_id, title').eq('id', contributionId).maybeSingle()
+  if (!c) return { ok: false, error: 'That submission could not be found.' }
+
+  const { error } = await supabase.from('contributions')
+    .update({
+      thread_closed_at: closed ? new Date().toISOString() : null,
+      thread_closed_by: closed ? auth.caller.userId : null,
+    })
+    .eq('id', c.id)
+  if (error) {
+    console.error('[reviews] toggleThreadClosed failed:', error.message)
+    return { ok: false, error: 'Could not update the conversation status.' }
+  }
+
+  await log(closed ? 'contribution_thread_closed' : 'contribution_thread_reopened', c.id, { title: c.title }, auth.caller)
+  revalidate(c.id, c.task_id)
   return { ok: true }
 }
 

@@ -15,6 +15,8 @@ export interface SubmitTarget {
   title?: string
   description?: string
   evidenceUrl?: string
+  /** Latest team feedback note to display above the resubmission form. */
+  feedbackNote?: string | null
 }
 
 const IDLE: WorkState = { status: 'idle' }
@@ -94,6 +96,17 @@ export default function SubmitWorkDialog({ targets, initial, runningCount = 0, o
           </div>
         )}
         {(targets.length <= 1 || initial) && <input type="hidden" name="taskId" value={current.taskId} />}
+
+        {current.feedbackNote && (
+          <div className="p-3.5 rounded-xl" style={{ background: tint('--orange', 8), border: `1px solid ${tint('--orange', 30)}` }}>
+            <div style={{ fontFamily: F.body, fontSize: 11, color: C.accent, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>
+              Feedback from the core team
+            </div>
+            <p style={{ fontFamily: F.body, fontSize: 13, color: C.light, lineHeight: 1.6, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+              {current.feedbackNote}
+            </p>
+          </div>
+        )}
 
         <div>
           <label className="field-label" htmlFor="sub-title">Title</label>

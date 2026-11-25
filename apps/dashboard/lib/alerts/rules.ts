@@ -7,7 +7,7 @@ import { escapeHtml, type EmailContent } from '@nextrium/contributions-core/emai
 // alert goes to the fallback: every active admin and the operations inbox.
 // The person who caused the event is never alerted about their own action.
 
-export type AlertKind = 'review_ready' | 'resubmitted' | 'review_failed' | 'extension_requested' | 'overdue'
+export type AlertKind = 'review_ready' | 'resubmitted' | 'review_failed' | 'extension_requested' | 'overdue' | 'contributor_replied'
 export type TaskSystem = 'team' | 'portal'
 
 export interface Creator { email: string | null; activeStaff: boolean }
@@ -52,6 +52,8 @@ export interface AlertContent {
   verdict?: string | null
   deadline?: string | null
   reason?: string | null
+  /** Short excerpt of a contributor's reply on a submission thread. */
+  message?: string | null
   system: TaskSystem
 }
 
@@ -103,6 +105,17 @@ export function alertEmail(kind: AlertKind, c: AlertContent): EmailContent {
           '<p>You may want to check in with them, or take the task back.</p>' +
           button(c.url, 'Open the task'),
       }
+    case 'contributor_replied': {
+      const rawMsg = typeof c.message === 'string' ? c.message.trim() : ''
+      const excerpt = rawMsg.length > 400 ? `${rawMsg.slice(0, 400).trimEnd()}…` : rawMsg
+      return {
+        subject: subject(`New reply: ${c.taskTitle}`),
+        html: intro +
+          `<p>${who} replied on ${t}${where}:</p>` +
+          (excerpt ? `<p>${escapeHtml(excerpt).replace(/\n/g, '<br>')}</p>` : '') +
+          button(c.url, 'Open the thread'),
+      }
+    }
   }
 }
 

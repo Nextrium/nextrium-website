@@ -3,10 +3,14 @@ import { notFound } from 'next/navigation'
 import { POINT_RANGES, isCategory, isComplexity } from '@nextrium/contributions-core/constants'
 import { isStaffOnlyIssue } from '@nextrium/contributions-core/reviewMapping'
 import { sanitizeBrief } from '@nextrium/contributions-core/sanitize'
+import type { AttemptSnapshot, ThreadMessage } from '@nextrium/contributions-core/thread'
 import Header from '@/components/dashboard/Header'
+import SubmissionTimeline from '@/components/contributions/SubmissionTimeline'
 import { PORTAL_CSS } from '@/components/portal/portalStyles'
 import { UUID, community, contributorName, requirePortalStaff } from '@/lib/portal/server'
 import { QUEUE_TABS, canDecideOnPortalSubmission, isDecidable, queueTab } from '@/lib/portal/reviewRules'
+import { PORTAL_TASK_STATUS_LABELS, type PortalTaskStatus } from '@/lib/portal/taskRules'
+import { postPortalStaffFeedback, togglePortalThreadClosed } from '../actions'
 import PortalDecisionPanel from './PortalDecisionPanel'
 import { findSimilar } from '@/lib/contributions/groupRules'
 
@@ -27,13 +31,20 @@ export default async function PortalSubmissionPage({ params }: { params: Promise
   if (!UUID.test(id)) notFound()
 
   const db = community()
+  const rawDb = db as any
   const { data: s, error } = await db.from('contributions').select('*').eq('id', id).maybeSingle()
   if (error) throw new Error('Could not load the submission')
   if (!s) notFound()
-  const [{ data: c }, { data: task }] = await Promise.all([
+  const [{ data: c }, { data: task }, { data: messageRows }, { data: attemptRows }, { data: followUpRows }] = await Promise.all([
     s.contributor_id ? db.from('contributors').select('id, name, email, contributor_type, team_name, total_points, verified_contributions').eq('id', s.contributor_id).maybeSingle() : Promise.resolve({ data: null }),
-    s.task_id ? db.from('tasks').select('id, title, description, point_range_min, point_range_max, status, shared_from').eq('id', s.task_id).maybeSingle() : Promise.resolve({ data: null }),
+    s.task_id ? db.from('tasks').select('*').eq('id', s.task_id).maybeSingle() : Promise.resolve({ data: null }),
+    rawDb.from('contribution_messages').select('*').eq('contribution_id', s.id).order('created_at', { ascending: true }),
+    rawDb.from('contribution_attempts').select('*').eq('contribution_id', s.id).order('submission_number', { ascending: true }),
+    rawDb.from('tasks').select('id, title, status').eq('source_contribution_id', s.id).order('created_at', { ascending: false }),
   ])
+  const messages: ThreadMessage[] = messageRows ?? []
+  const attempts: AttemptSnapshot[] = attemptRows ?? []
+  const followUps: { id: string; title: string; status: string | null }[] = followUpRows ?? []
 
   const tab = queueTab(s)
   const tabLabel = QUEUE_TABS.find((t) => t.key === tab)?.label ?? s.status
@@ -67,16 +78,46 @@ export default async function PortalSubmissionPage({ params }: { params: Promise
   return (
     <>
       <style>{PORTAL_CSS}</style>
-      <Header title={s.title} description={`${tabLabel} · attempt ${s.submission_count ?? 1} of 3`} action={<Link href={`/portal/reviews?tab=${tab}`} className="pt-btn ghost">Back to queue</Link>} />
+      <Header
+        title={s.title}
+        description={`${tabLabel} · attempt ${s.submission_count ?? 1} of 3`}
+        action={
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <Link href={`/portal/tasks/new?fromContribution=${s.id}`} className="pt-btn">Create follow-up task</Link>
+            <Link href={`/portal/reviews?tab=${tab}`} className="pt-btn ghost">Back to queue</Link>
+          </div>
+        }
+      />
       <div className="dash-content">
         <div className="pt-layout">
           <div className="pt-main">
             <section className="pt-panel">
-              <div className="pt-panel-title">Submission</div>
+              <div className="pt-panel-title">Submission · Attempt {s.submission_count ?? 1} of 3</div>
               <p style={{ color: 'var(--off-white)', fontSize: 14, lineHeight: 1.7, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{s.description || '—'}</p>
               {evidence ? <a className="pt-link" href={evidence} target="_blank" rel="noopener noreferrer">{evidence}</a> : <span className="pt-hint">No evidence link.</span>}
               {s.notes && <div className="pt-alert info">Note to the contributor: {s.notes}</div>}
             </section>
+
+            <SubmissionTimeline
+              contributionId={s.id}
+              attempts={attempts}
+              reviews={[]}
+              messages={messages}
+              submissionCount={s.submission_count ?? 1}
+              legacyStaffNote={{
+                body: s.notes,
+                status: s.status === 'rejected' && s.revision_requested === true ? 'changes_requested' : s.status,
+                submissionNumber: s.submission_count ?? 1,
+                timestamp: s.verified_at ?? s.updated_at ?? s.created_at,
+              }}
+              threadClosed={!!s.thread_closed_at}
+              viewerRole="staff"
+              canModerate={canDecide}
+              showSecurity
+              postAction={postPortalStaffFeedback}
+              toggleClosedAction={togglePortalThreadClosed}
+              heading="Conversation & attempt history"
+            />
 
             <section className="pt-panel">
               <div className="pt-panel-title">Automated review{s.review_decision ? ` · ${label(s.review_decision)}` : ' · not completed'}{s.review_score != null ? ` · ${s.review_score}/100` : ''}</div>
@@ -143,10 +184,32 @@ export default async function PortalSubmissionPage({ params }: { params: Promise
                 {s.status === 'verified' && <><dt>Awarded</dt><dd>{s.final_points ?? s.base_points}</dd><dt>Verified</dt><dd>{fmt(s.verified_at)}</dd></>}
                 <dt>Submitted</dt><dd>{fmt(s.created_at)}</dd>
                 <dt>Deadline</dt><dd>{fmt(s.deadline_at)}</dd>
+                {task?.source_contribution_id && (
+                  <>
+                    <dt>Originated from</dt>
+                    <dd><Link href={`/portal/reviews/${task.source_contribution_id}`} className="pt-link">View source submission</Link></dd>
+                  </>
+                )}
               </dl>
             </div>
+            <div className="pt-panel">
+              <div className="pt-panel-title">Follow-up tasks</div>
+              {followUps.length === 0 ? (
+                <span className="pt-hint">Spin a strong recommendation or finding from this work into the next portal task.</span>
+              ) : (
+                followUps.map((f) => (
+                  <div key={f.id} className="pt-kv" style={{ gridTemplateColumns: '1fr auto' }}>
+                    <Link href={`/portal/tasks/${f.id}`} className="pt-link">{f.title}</Link>
+                    <span>{PORTAL_TASK_STATUS_LABELS[(f.status ?? 'open') as PortalTaskStatus] ?? f.status ?? 'Open'}</span>
+                  </div>
+                ))
+              )}
+              <Link href={`/portal/tasks/new?fromContribution=${s.id}`} className="pt-btn ghost" style={{ width: 'fit-content' }}>
+                + Create follow-up task
+              </Link>
+            </div>
             {isDecidable(s) && range && (canDecide
-              ? <PortalDecisionPanel contributionId={s.id} min={range.point_range_min} max={range.point_range_max} />
+              ? <PortalDecisionPanel contributionId={s.id} min={range.point_range_min} max={range.point_range_max} submissionCount={s.submission_count ?? 1} />
               : <div className="pt-alert info">This is your own submission. An admin will decide on it.</div>)}
           </div>
         </div>

@@ -5,6 +5,7 @@ import { createServiceClient } from '@nextrium/supabase/server'
 import { briefToText } from '@nextrium/contributions-core/sanitize'
 import { mapReviewResponse } from '@nextrium/contributions-core/reviewMapping'
 import { signReviewBody } from '@nextrium/contributions-core/reviewSignature'
+import { buildPreviousFeedback, latestStaffFeedbackNote, resolveReviewedStatus } from '@nextrium/contributions-core/thread'
 import type { Contribution } from '@nextrium/supabase/database'
 
 // The contract suggests 90 s, but callers run under a 60 s server limit
@@ -60,16 +61,29 @@ export async function reviewContribution(contributionId: string): Promise<Review
   if (!c) return { kind: 'failed', reason: 'bad_response' }
   const { data: task } = await supabase.from('tasks').select('description, category, complexity').eq('id', c.task_id).maybeSingle()
 
-  // Previous feedback, for the resubmission assessment.
+  // Previous feedback, for the resubmission assessment (automated + staff revision notes; never raw contributor replies).
   let previousFeedback: unknown = undefined
   if (c.submission_count > 1) {
-    const { data: prev } = await supabase.from('contribution_reviews')
-      .select('feedback').eq('contribution_id', c.id).eq('source', 'service')
-      .lt('submission_number', c.submission_count).order('submission_number', { ascending: false }).limit(1).maybeSingle()
-    const f = prev?.feedback
-    if (f && typeof f.summary === 'string') {
-      previousFeedback = { summary: f.summary, issues: Array.isArray(f.issues) ? f.issues : [], what_to_do: f.what_to_do ?? '' }
-    }
+    const [{ data: prevService }, { data: prevStaffReviews }, { data: staffMessages }] = await Promise.all([
+      supabase.from('contribution_reviews')
+        .select('feedback').eq('contribution_id', c.id).eq('source', 'service')
+        .lt('submission_number', c.submission_count).order('submission_number', { ascending: false }).limit(1).maybeSingle(),
+      supabase.from('contribution_reviews')
+        .select('source, feedback, created_at').eq('contribution_id', c.id).eq('source', 'staff')
+        .lt('submission_number', c.submission_count).order('created_at', { ascending: false }).limit(5),
+      supabase.from('contribution_messages')
+        .select('author_role, body, created_at, kind').eq('contribution_id', c.id).eq('author_role', 'staff')
+        .lt('submission_number', c.submission_count).order('created_at', { ascending: false }).limit(5),
+    ])
+    const staffNote = latestStaffFeedbackNote({
+      messages: staffMessages ?? [],
+      reviews: prevStaffReviews ?? [],
+      fallbackStaffNotes: c.staff_notes,
+    })
+    previousFeedback = buildPreviousFeedback({
+      lastServiceFeedback: prevService?.feedback ?? null,
+      latestStaffNote: staffNote,
+    })
   }
 
   const payload: Record<string, unknown> = {
@@ -101,6 +115,7 @@ export async function reviewContribution(contributionId: string): Promise<Review
 
   const mapped = mapReviewResponse(result.body)
   if (!mapped) return markFailed('bad_response')
+  const finalStatus = resolveReviewedStatus(mapped.status, c.submission_count)
 
   const { data: updated, error } = await supabase.rpc('apply_contribution_review', {
     p_contribution_id: c.id,
@@ -111,7 +126,7 @@ export async function reviewContribution(contributionId: string): Promise<Review
     p_feedback: mapped.feedback,
     p_code_audit: mapped.codeAudit,
     p_model: mapped.modelUsed,
-    p_status: mapped.status,
+    p_status: finalStatus,
   })
   if (error || !updated) return markFailed('service_error')
   return { kind: 'reviewed', status: updated.status }

@@ -24,16 +24,31 @@ type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string }
 // change while the task is still a draft.
 const LOCKED_AFTER_ASSIGNMENT = ['category', 'complexity'] as const
 
-export async function createTask(raw: unknown): Promise<Result<{ id: string }>> {
+async function resolveSourceContributionId(rawId: unknown): Promise<{ id: string | null } | { error: string }> {
+  if (rawId === null || rawId === undefined || rawId === '') return { id: null }
+  if (typeof rawId !== 'string' || !UUID.test(rawId)) return { error: 'The linked original submission could not be found.' }
+  const { data } = await db().from('contributions').select('id').eq('id', rawId).maybeSingle()
+  if (!data) return { error: 'The linked original submission could not be found.' }
+  return { id: data.id }
+}
+
+export async function createTask(raw: unknown, sourceContributionId?: string | null): Promise<Result<{ id: string }>> {
   const auth = await requireStaff()
   if ('error' in auth) return { ok: false, error: auth.error }
 
   const parsed = parseTaskInput(raw)
   if ('error' in parsed) return { ok: false, error: parsed.error }
+  const source = await resolveSourceContributionId(sourceContributionId)
+  if ('error' in source) return { ok: false, error: source.error }
 
   const { data, error }: { data: Pick<Task, 'id'> | null; error: any } = await db()
     .from('tasks')
-    .insert({ ...parsed.fields, status: 'draft', created_by: auth.caller.userId })
+    .insert({
+      ...parsed.fields,
+      status: 'draft',
+      created_by: auth.caller.userId,
+      ...(source.id ? { source_contribution_id: source.id } : {}),
+    })
     .select('id')
     .single()
   if (error || !data) {
@@ -43,10 +58,11 @@ export async function createTask(raw: unknown): Promise<Result<{ id: string }>> 
 
   await logActivity({
     action: 'task_created', targetType: 'task', targetId: data.id,
-    details: { title: parsed.fields.title, category: parsed.fields.category },
+    details: { title: parsed.fields.title, category: parsed.fields.category, ...(source.id ? { sourceContributionId: source.id } : {}) },
     actorId: auth.caller.userId, actorEmail: auth.caller.email ?? undefined,
   })
   revalidatePath('/tasks')
+  if (source.id) revalidatePath(`/reviews/${source.id}`)
   return { ok: true, id: data.id }
 }
 
@@ -181,7 +197,7 @@ export async function assignTask(taskId: string, assigneeId: string, deadlineAt?
  * example the person was archived a moment ago), the task stays a draft and
  * the error says so, with its id so the editor can open it.
  */
-export async function createAndAssignTask(raw: unknown, assigneeId: string, deadlineAt?: string | null): Promise<Result<{ id: string }> | { ok: false; error: string; draftId: string }> {
+export async function createAndAssignTask(raw: unknown, assigneeId: string, deadlineAt?: string | null, sourceContributionId?: string | null): Promise<Result<{ id: string }> | { ok: false; error: string; draftId: string }> {
   const auth = await requireStaff()
   if ('error' in auth) return { ok: false, error: auth.error }
 
@@ -189,6 +205,8 @@ export async function createAndAssignTask(raw: unknown, assigneeId: string, dead
   if ('error' in parsed) return { ok: false, error: parsed.error }
   const assignment = parseAssignment(assigneeId, deadlineAt)
   if ('error' in assignment) return { ok: false, error: assignment.error }
+  const source = await resolveSourceContributionId(sourceContributionId)
+  if ('error' in source) return { ok: false, error: source.error }
 
   const { data: person } = await db().from('dashboard_users')
     .select('archived, onboarding_completed_at').eq('user_id', assignment.assigneeId).maybeSingle()
@@ -198,7 +216,12 @@ export async function createAndAssignTask(raw: unknown, assigneeId: string, dead
 
   const { data, error }: { data: Pick<Task, 'id'> | null; error: any } = await db()
     .from('tasks')
-    .insert({ ...parsed.fields, status: 'draft', created_by: auth.caller.userId })
+    .insert({
+      ...parsed.fields,
+      status: 'draft',
+      created_by: auth.caller.userId,
+      ...(source.id ? { source_contribution_id: source.id } : {}),
+    })
     .select('id')
     .single()
   if (error || !data) {
@@ -207,10 +230,11 @@ export async function createAndAssignTask(raw: unknown, assigneeId: string, dead
   }
   await logActivity({
     action: 'task_created', targetType: 'task', targetId: data.id,
-    details: { title: parsed.fields.title, category: parsed.fields.category },
+    details: { title: parsed.fields.title, category: parsed.fields.category, ...(source.id ? { sourceContributionId: source.id } : {}) },
     actorId: auth.caller.userId, actorEmail: auth.caller.email ?? undefined,
   })
   revalidatePath('/tasks')
+  if (source.id) revalidatePath(`/reviews/${source.id}`)
 
   const assigned = await assignAndNotify(data.id, assignment.assigneeId, assignment.deadline, auth.caller)
   if (!assigned.ok) {
@@ -262,18 +286,26 @@ async function checkGroup(assigneeIds: unknown, deadlineAt: unknown): Promise<{ 
 }
 
 /** Creates a task and gives a copy of it to each chosen person, all with the same deadline. */
-export async function createTaskForGroup(raw: unknown, assigneeIds: unknown, deadlineAt?: string | null): Promise<GroupResult> {
+export async function createTaskForGroup(raw: unknown, assigneeIds: unknown, deadlineAt?: string | null, sourceContributionId?: string | null): Promise<GroupResult> {
   const auth = await requireStaff()
   if ('error' in auth) return { ok: false, error: auth.error }
   const parsed = parseTaskInput(raw)
   if ('error' in parsed) return { ok: false, error: parsed.error }
   const group = await checkGroup(assigneeIds, deadlineAt)
   if ('error' in group) return { ok: false, error: group.error }
+  const source = await resolveSourceContributionId(sourceContributionId)
+  if ('error' in source) return { ok: false, error: source.error }
 
   const groupId = randomUUID()
   const { data, error }: { data: Pick<Task, 'id'>[] | null; error: any } = await db()
     .from('tasks')
-    .insert(group.ids.map(() => ({ ...parsed.fields, status: 'draft', created_by: auth.caller.userId, group_id: groupId })))
+    .insert(group.ids.map(() => ({
+      ...parsed.fields,
+      status: 'draft',
+      created_by: auth.caller.userId,
+      group_id: groupId,
+      ...(source.id ? { source_contribution_id: source.id } : {}),
+    })))
     .select('id')
   if (error || !data || data.length !== group.ids.length) {
     console.error('[tasks] group create failed:', error?.message)
@@ -281,13 +313,14 @@ export async function createTaskForGroup(raw: unknown, assigneeIds: unknown, dea
   }
   await logActivity({
     action: 'task_group_created', targetType: 'task', targetId: data[0].id,
-    details: { title: parsed.fields.title, category: parsed.fields.category, group: groupId, people: group.ids.length },
+    details: { title: parsed.fields.title, category: parsed.fields.category, group: groupId, people: group.ids.length, ...(source.id ? { sourceContributionId: source.id } : {}) },
     actorId: auth.caller.userId, actorEmail: auth.caller.email ?? undefined,
   })
 
   const deadline = groupDeadline(group.chosen, parsed.fields.deadline_days)
   const outcome = await assignCopies(data.map((r) => r.id), group.ids, deadline, auth.caller)
   revalidatePath('/tasks')
+  if (source.id) revalidatePath(`/reviews/${source.id}`)
   if (outcome.assigned === 0) return { ok: false, error: `The task was saved but no one could be assigned. ${groupOutcome(0, outcome.failed)}` }
   return { ok: true, firstId: data[0].id, assigned: outcome.assigned, total: group.ids.length, message: groupOutcome(outcome.assigned, outcome.failed) }
 }
@@ -317,6 +350,7 @@ export async function assignDraftToGroup(taskId: string, assigneeIds: unknown, d
     title: task.title, description: task.description, category: task.category, complexity: task.complexity,
     point_range_min: task.point_range_min, point_range_max: task.point_range_max, deadline_days: task.deadline_days,
     links: task.links, created_by: task.created_by, status: 'draft', group_id: groupId,
+    ...(task.source_contribution_id ? { source_contribution_id: task.source_contribution_id } : {}),
   }
   const { data: extra, error } = await supabase.from('tasks').insert(group.ids.slice(1).map(() => copy)).select('id')
   if (error || !extra || extra.length !== group.ids.length - 1) {

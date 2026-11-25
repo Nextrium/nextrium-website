@@ -38,7 +38,7 @@ async function assigneeOverLimit(assigneeId: string): Promise<boolean> {
 }
 
 /** Creates a portal task, open for claiming or assigned straight to a contributor. */
-export async function createPortalTask(raw: { title?: unknown; description?: unknown; category?: unknown; complexity?: unknown; links?: unknown; tags?: unknown; assigneeId?: unknown; deadlineAt?: unknown; shared?: { windowHours?: unknown; maxClaimers?: unknown } | null }): Promise<Result<{ id: string }>> {
+export async function createPortalTask(raw: { title?: unknown; description?: unknown; category?: unknown; complexity?: unknown; links?: unknown; tags?: unknown; assigneeId?: unknown; deadlineAt?: unknown; sourceContributionId?: unknown; shared?: { windowHours?: unknown; maxClaimers?: unknown } | null }): Promise<Result<{ id: string }>> {
   const auth = await requirePortalStaff()
   if ('error' in auth) return { ok: false, error: auth.error }
   const parsed = parseTaskInput(raw)
@@ -46,6 +46,16 @@ export async function createPortalTask(raw: { title?: unknown; description?: unk
   const tags = parseTags(raw.tags)
   if ('error' in tags) return { ok: false, error: tags.error }
   const f = parsed.fields
+
+  let validSourceId: string | null = null
+  if (raw.sourceContributionId !== null && raw.sourceContributionId !== undefined && raw.sourceContributionId !== '') {
+    if (typeof raw.sourceContributionId !== 'string' || !UUID.test(raw.sourceContributionId)) {
+      return { ok: false, error: 'The linked original submission could not be found.' }
+    }
+    const { data: src } = await community().from('contributions').select('id').eq('id', raw.sourceContributionId).maybeSingle()
+    if (!src) return { ok: false, error: 'The linked original submission could not be found.' }
+    validSourceId = src.id
+  }
 
   const row: Record<string, unknown> = {
     title: f.title,
@@ -58,6 +68,7 @@ export async function createPortalTask(raw: { title?: unknown; description?: unk
     links: f.links.length > 0 ? f.links : null,
     primitives: tags.tags,
     status: 'open',
+    ...(validSourceId ? { source_contribution_id: validSourceId } : {}),
   }
 
   // Open to several contributors: each claim (during the window) makes that person's own copy.
@@ -96,6 +107,7 @@ export async function createPortalTask(raw: { title?: unknown; description?: unk
       .eq('id', data.id)
     if (reopenError) console.error('[portal] task reopen failed:', reopenError.code)
     refresh(data.id)
+  if (validSourceId) revalidatePath(`/portal/reviews/${validSourceId}`)
     return { ok: false, error: `The task was created but left open, because ${contributorName(assignee.c)} just reached their task limit.` }
   }
 
@@ -115,6 +127,7 @@ export async function createPortalTask(raw: { title?: unknown; description?: unk
     },
   })
   refresh(data.id)
+  if (validSourceId) revalidatePath(`/portal/reviews/${validSourceId}`)
   if (shared && !('error' in shared)) {
     return { ok: true, id: data.id, message: `Task created and open to several contributors for ${shared.windowHours} hours${shared.maxClaimers ? `, up to ${shared.maxClaimers} people` : ''}.` }
   }

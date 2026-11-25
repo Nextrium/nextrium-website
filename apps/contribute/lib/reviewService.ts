@@ -1,6 +1,7 @@
 import { briefToText } from '@nextrium/contributions-core/sanitize'
 import { mapReviewResponse } from '@nextrium/contributions-core/reviewMapping'
 import { signReviewBody } from '@nextrium/contributions-core/reviewSignature'
+import { buildPreviousFeedback, latestStaffFeedbackNote, resolveReviewedStatus } from '@nextrium/contributions-core/thread'
 import { createCommunityServiceClient } from '@nextrium/supabase/community/server'
 import { communityStatus, type CommunityReviewStatus } from './submissionRules'
 
@@ -49,10 +50,10 @@ async function callService(payload: Record<string, unknown>) {
  * counting against the contributor's running tasks.
  */
 export async function reviewSubmission(contributionId: string): Promise<ReviewOutcome> {
-  const db = createCommunityServiceClient()
+  const db = createCommunityServiceClient() as any
   const { data: c } = await db
     .from('contributions')
-    .select('id, contributor_id, task_id, title, description, evidence_url, submission_count, status, review_decision, review_feedback, created_at, updated_at')
+    .select('id, contributor_id, task_id, title, description, evidence_url, submission_count, status, notes, review_decision, review_feedback, created_at, updated_at')
     .eq('id', contributionId)
     .maybeSingle()
   if (!c || !AWAITING.includes(c.status ?? '') || c.review_decision) return { kind: 'failed', reason: 'stale' }
@@ -63,11 +64,26 @@ export async function reviewSubmission(contributionId: string): Promise<ReviewOu
   if (!task) return { kind: 'failed', reason: 'bad_response' }
 
   const attempt = c.submission_count ?? 1
-  // On a resubmission the stored feedback is the previous attempt's: the service compares against it.
-  const prev = attempt > 1 && c.review_feedback && typeof c.review_feedback === 'object' ? (c.review_feedback as Record<string, unknown>) : null
-  const previousFeedback = prev && typeof prev.summary === 'string'
-    ? { summary: prev.summary, issues: Array.isArray(prev.issues) ? prev.issues : [], what_to_do: typeof prev.what_to_do === 'string' ? prev.what_to_do : '' }
-    : null
+  // On a resubmission, combine prior automated feedback with the latest staff revision note (never raw contributor replies).
+  let previousFeedback: unknown = undefined
+  if (attempt > 1) {
+    const prev = c.review_feedback && typeof c.review_feedback === 'object' ? (c.review_feedback as Record<string, unknown>) : null
+    const { data: staffMsgs } = await db.from('contribution_messages')
+      .select('author_role, body, created_at, kind')
+      .eq('contribution_id', c.id)
+      .eq('author_role', 'staff')
+      .lt('submission_number', attempt)
+      .order('created_at', { ascending: false })
+      .limit(5)
+    const staffNote = latestStaffFeedbackNote({
+      messages: staffMsgs ?? [],
+      fallbackStaffNotes: c.notes,
+    })
+    previousFeedback = buildPreviousFeedback({
+      lastServiceFeedback: prev,
+      latestStaffNote: staffNote,
+    })
+  }
 
   const payload: Record<string, unknown> = {
     contribution_id: c.id,
@@ -97,7 +113,7 @@ export async function reviewSubmission(contributionId: string): Promise<ReviewOu
 
   const mapped = mapReviewResponse(result.body)
   if (!mapped) return failed('bad_response')
-  const status = communityStatus(mapped.status)
+  const status = communityStatus(resolveReviewedStatus(mapped.status, attempt))
 
   const { data: updated, error } = await db
     .from('contributions')

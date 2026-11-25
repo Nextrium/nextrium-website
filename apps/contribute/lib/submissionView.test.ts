@@ -2,8 +2,8 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { checkLabel, memberFeedback, submissionState } from './submissionView'
 
-const s = (status: string, extra: Partial<{ review_decision: string | null; notes: string | null; submission_count: number }> = {}) =>
-  submissionState({ status, review_decision: null, notes: null, submission_count: 1, ...extra })
+const s = (status: string, extra: Partial<{ review_decision: string | null; notes: string | null; submission_count: number; revision_requested: boolean | null }> = {}) =>
+  submissionState({ status, review_decision: null, notes: null, submission_count: 1, revision_requested: false, ...extra })
 
 test('automated rejections can be resubmitted until attempts run out', () => {
   assert.equal(s('rejected', { review_decision: 'rejected' }).canResubmit, true)
@@ -13,8 +13,19 @@ test('automated rejections can be resubmitted until attempts run out', () => {
   assert.equal(last.label, 'Not accepted')
 })
 
-test('a reviewer note makes a rejection final', () => {
-  const final = s('rejected', { review_decision: 'rejected', notes: 'Plagiarised.' })
+test('staff change requests allow resubmission with written notes until attempt 3, while final rejection blocks resubmit', () => {
+  const rev1 = s('rejected', { notes: 'Please add benchmarks', revision_requested: true, submission_count: 1 })
+  assert.equal(rev1.canResubmit, true)
+  assert.equal(rev1.label, 'Changes requested')
+  assert.equal(rev1.tone, 'action')
+
+  const rev2 = s('rejected', { notes: 'Almost there', revision_requested: true, submission_count: 2 })
+  assert.equal(rev2.canResubmit, true)
+
+  const rev3 = s('rejected', { notes: 'Out of attempts', revision_requested: true, submission_count: 3 })
+  assert.equal(rev3.canResubmit, false)
+
+  const final = s('rejected', { review_decision: 'rejected', notes: 'Plagiarised.', revision_requested: false })
   assert.equal(final.canResubmit, false)
   assert.equal(final.tone, 'bad')
 })

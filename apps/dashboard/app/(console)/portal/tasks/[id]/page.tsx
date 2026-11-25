@@ -64,6 +64,10 @@ export default async function PortalTaskPage({ params }: { params: Promise<{ id:
   }
   // A copy: the shared task it came from.
   const { data: parent } = t.shared_from ? await db.from('tasks').select('id, title').eq('id', t.shared_from).maybeSingle() : { data: null }
+  const sourceContributionId = (t as any).source_contribution_id as string | null | undefined
+  const { data: sourceSub } = sourceContributionId
+    ? await db.from('contributions').select('id, title').eq('id', sourceContributionId).maybeSingle()
+    : { data: null }
   const hasCopies = !!shared && shared.copies.length > 0
 
   return (
@@ -77,6 +81,12 @@ export default async function PortalTaskPage({ params }: { params: Promise<{ id:
             {parent && (
               <div className="pt-alert info">
                 {holder ? `${contributorName(holder)}'s copy` : 'A copy'} of the shared task <Link href={`/portal/tasks/${parent.id}`}>{parent.title}</Link>. Changes here apply to this copy only.
+              </div>
+            )}
+            {sourceSub && (
+              <div className="pt-alert info">
+                Originated from submission <strong>{sourceSub.title}</strong>.{' '}
+                <Link href={`/portal/reviews/${sourceSub.id}`} className="pt-link">View original submission</Link>
               </div>
             )}
             <PortalTaskEditor
@@ -105,6 +115,15 @@ export default async function PortalTaskPage({ params }: { params: Promise<{ id:
                 {status === 'assigned' && <><dt>Claimed</dt><dd>{fmt(t.claimed_at)}</dd><dt>Deadline</dt><dd>{fmt(deadline)}</dd><dt>Extension</dt><dd>{EXTENSION_LABELS[ext]}</dd></>}
                 <dt>Submissions</dt><dd>{(subs ?? []).length}</dd>
               </dl>
+              {(subs ?? []).length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 6, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                  {(subs ?? []).map((sub) => (
+                    <Link key={sub.id} href={`/portal/reviews/${sub.id}`} className="pt-btn" style={{ width: 'fit-content' }}>
+                      Open review &amp; thread (attempt {sub.submission_count ?? 1}/3) →
+                    </Link>
+                  ))}
+                </div>
+              )}
             </div>
             {t.shared && shared && t.claim_closes_at && (
               <SharedPanel

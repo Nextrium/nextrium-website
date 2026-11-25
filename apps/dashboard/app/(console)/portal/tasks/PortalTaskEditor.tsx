@@ -6,6 +6,7 @@ import RichTextEditor from '@/components/editor/RichTextEditor'
 import { CATEGORIES, CATEGORY_LABELS, COMPLEXITIES, COMPLEXITY_LABELS, taskDefaults, type Category, type Complexity } from '@nextrium/contributions-core/constants'
 import { createPortalTask, updatePortalTask } from './actions'
 import { SHARED_WINDOW_DEFAULT_HOURS, SHARED_WINDOW_MAX_HOURS } from '@/lib/portal/sharedRules'
+import type { FollowUpPrefill } from '@nextrium/contributions-core/thread'
 
 export interface PortalTaskValues {
   id?: string
@@ -27,15 +28,26 @@ export interface AssignableContributor {
 }
 
 /** Create or edit a portal task. New tasks can be left open or assigned straight to a contributor. */
-export default function PortalTaskEditor({ initial, contributors }: { initial: PortalTaskValues; contributors: AssignableContributor[] }) {
+export default function PortalTaskEditor({
+  initial,
+  contributors,
+  followUpPrefill = null,
+}: {
+  initial: PortalTaskValues
+  contributors: AssignableContributor[]
+  followUpPrefill?: FollowUpPrefill | null
+}) {
   const router = useRouter()
   const isNew = !initial.id
   const sizingLocked = !isNew && initial.status !== 'open'
   const [v, setV] = useState(initial)
-  const [mode, setMode] = useState<'open' | 'shared' | 'assign'>('open')
+  const suggestedAvailable = isNew && followUpPrefill?.suggestedAssigneeId
+    ? contributors.find((c) => c.id === followUpPrefill.suggestedAssigneeId && c.running < c.maxClaims)?.id ?? ''
+    : ''
+  const [mode, setMode] = useState<'open' | 'shared' | 'assign'>(suggestedAvailable ? 'assign' : 'open')
   const [windowHours, setWindowHours] = useState(String(SHARED_WINDOW_DEFAULT_HOURS))
   const [maxClaimers, setMaxClaimers] = useState('')
-  const [assignee, setAssignee] = useState('')
+  const [assignee, setAssignee] = useState(suggestedAvailable)
   const [deadline, setDeadline] = useState('')
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null)
@@ -54,6 +66,7 @@ export default function PortalTaskEditor({ initial, contributors }: { initial: P
     const res = isNew
       ? await createPortalTask({
           ...input,
+          ...(followUpPrefill?.sourceContributionId ? { sourceContributionId: followUpPrefill.sourceContributionId } : {}),
           ...(mode === 'assign' ? { assigneeId: assignee, deadlineAt: deadline ? new Date(deadline).toISOString() : null } : {}),
           ...(mode === 'shared' ? { shared: { windowHours, maxClaimers } } : {}),
         })

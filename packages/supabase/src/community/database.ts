@@ -72,6 +72,9 @@ export type CommunityDatabase = {
           review_decision: string | null
           review_score: number | null
           review_feedback: Json | null
+          revision_requested?: boolean | null
+          thread_closed_at?: string | null
+          thread_closed_by?: string | null
           updated_at: string | null
         }
         Insert: {
@@ -97,6 +100,9 @@ export type CommunityDatabase = {
           review_decision?: string | null
           review_score?: number | null
           review_feedback?: Json | null
+          revision_requested?: boolean | null
+          thread_closed_at?: string | null
+          thread_closed_by?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -122,7 +128,64 @@ export type CommunityDatabase = {
           review_decision?: string | null
           review_score?: number | null
           review_feedback?: Json | null
+          revision_requested?: boolean | null
+          thread_closed_at?: string | null
+          thread_closed_by?: string | null
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      contribution_messages: {
+        Row: {
+          id: string
+          contribution_id: string
+          submission_number: number
+          author_role: 'staff' | 'contributor'
+          author_user_id: string | null
+          author_name: string
+          kind: 'feedback' | 'reply' | 'decision_verified' | 'decision_changes' | 'decision_rejected'
+          body: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          contribution_id: string
+          submission_number?: number
+          author_role: 'staff' | 'contributor'
+          author_user_id?: string | null
+          author_name: string
+          kind: 'feedback' | 'reply' | 'decision_verified' | 'decision_changes' | 'decision_rejected'
+          body: string
+          created_at?: string
+        }
+        Update: {
+          [_ in never]: never
+        }
+        Relationships: []
+      }
+      contribution_attempts: {
+        Row: {
+          id: string
+          contribution_id: string
+          submission_number: number
+          title: string
+          description: string
+          evidence_url: string | null
+          submitted_at: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          contribution_id: string
+          submission_number: number
+          title: string
+          description: string
+          evidence_url?: string | null
+          submitted_at?: string
+          created_at?: string
+        }
+        Update: {
+          [_ in never]: never
         }
         Relationships: []
       }
@@ -331,6 +394,8 @@ export type CommunityDatabase = {
           /** The dashboard account that created the task; it receives the task's alerts. */
           created_by_user: string | null
           created_by_email: string | null
+          /** Original contribution this follow-up task was created from, if any. */
+          source_contribution_id?: string | null
         }
         Insert: {
           id?: string
@@ -359,6 +424,7 @@ export type CommunityDatabase = {
           shared_from?: string | null
           created_by_user?: string | null
           created_by_email?: string | null
+          source_contribution_id?: string | null
         }
         Update: {
           id?: string
@@ -387,6 +453,7 @@ export type CommunityDatabase = {
           shared_from?: string | null
           created_by_user?: string | null
           created_by_email?: string | null
+          source_contribution_id?: string | null
         }
         Relationships: []
       }
@@ -445,5 +512,7 @@ type Tables = CommunityDatabase['public']['Tables']
 export type Contributor       = Tables['contributors']['Row']
 export type CommunityTask     = Tables['tasks']['Row']
 export type CommunityContribution = Tables['contributions']['Row']
+export type CommunityContributionMessage = Tables['contribution_messages']['Row']
+export type CommunityContributionAttempt = Tables['contribution_attempts']['Row']
 export type CoreTeamMember    = Tables['core_team']['Row']
 export type CommunityAuditEntry = Tables['admin_audit_log']['Row']

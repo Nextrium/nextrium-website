@@ -17,7 +17,9 @@ import {
   type Category,
   type Complexity,
 } from '@nextrium/contributions-core/constants'
-import { TASK_STATUS_LABELS } from '@nextrium/contributions-core/taskView'
+import { QUEUE_TABS, TASK_STATUS_LABELS } from '@nextrium/contributions-core/taskView'
+import { isCategory } from '@nextrium/contributions-core/constants'
+import { MAX_ATTEMPTS, type FollowUpPrefill } from '@nextrium/contributions-core/thread'
 import type { MemberSummary } from '@/lib/contributions/members'
 import type { Task } from '@nextrium/supabase/database'
 
@@ -25,24 +27,32 @@ interface Props {
   task: Task | null
   members: MemberSummary[]
   hasSubmission: boolean
+  submission?: { id: string; status: string; submissionCount: number } | null
   /** People holding a copy of this task when it is shared; 0 when it is not. */
   groupSize: number
   /** Set just after this task was created for several people. */
   sharedWith?: number | null
   /** For a shared task: progress across the copies and how many are still open. */
   group?: { label: string; open: number } | null
+  /** Prefill values when spinning a follow-up task from a reviewed submission. */
+  followUpPrefill?: FollowUpPrefill | null
+  /** Linked source submission when editing a follow-up task. */
+  sourceSubmission?: { contributionId: string; taskTitle: string; submissionTitle: string } | null
   isAdmin?: boolean
 }
 
-export default function TaskEditor({ task, members, hasSubmission, groupSize, sharedWith = null, group = null, isAdmin = false }: Props) {
+export default function TaskEditor({ task, members, hasSubmission, submission = null, groupSize, sharedWith = null, group = null, followUpPrefill = null, sourceSubmission = null, isAdmin = false }: Props) {
   const router = useRouter()
   const isNew = !task
   const isDraft = isNew || task.status === 'draft'
   const isClosed = task?.status === 'completed' || task?.status === 'cancelled'
+  const sourceContributionId = isNew ? (followUpPrefill?.sourceContributionId ?? null) : (task.source_contribution_id ?? null)
 
-  const [title, setTitle] = useState(task?.title ?? '')
-  const [description, setDescription] = useState(task?.description ?? '')
-  const [category, setCategory] = useState<Category>(task?.category ?? 'technical')
+  const initialCategory: Category = task?.category
+    ?? (followUpPrefill && isCategory(followUpPrefill.category) ? followUpPrefill.category : 'technical')
+  const [title, setTitle] = useState(task?.title ?? followUpPrefill?.title ?? '')
+  const [description, setDescription] = useState(task?.description ?? followUpPrefill?.description ?? '')
+  const [category, setCategory] = useState<Category>(initialCategory)
   const [complexity, setComplexity] = useState<Complexity>(task?.complexity ?? 'small')
   const [links, setLinks] = useState<{ label: string; url: string }[]>(task?.links ?? [])
 
@@ -53,7 +63,11 @@ export default function TaskEditor({ task, members, hasSubmission, groupSize, sh
   const [success, setSuccess] = useState<string | null>(sharedWith ? `Shared with ${sharedWith} people. Each has their own copy.` : null)
 
   // New tasks are assigned in the same pass as they are created.
-  const [assignee, setAssignee] = useState('')
+  const suggestedActive = followUpPrefill?.suggestedAssigneeId
+    && members.some((m) => m.active && m.userId === followUpPrefill.suggestedAssigneeId)
+    ? followUpPrefill.suggestedAssigneeId
+    : ''
+  const [assignee, setAssignee] = useState(suggestedActive)
   const [deadline, setDeadline] = useState('')
   const [strandedDraftId, setStrandedDraftId] = useState<string | null>(null)
   // …or to several people, each getting their own copy.
@@ -80,7 +94,7 @@ export default function TaskEditor({ task, members, hasSubmission, groupSize, sh
   async function handleSave() {
     setError(null); setSuccess(null); setSaving(true)
     const input = { title, description, category, complexity, links }
-    const res = isNew ? await createTask(input) : await updateTask(task.id, input)
+    const res = isNew ? await createTask(input, sourceContributionId) : await updateTask(task.id, input)
     setSaving(false)
     if (!res.ok) { setError(res.error); return }
     setSuccess(isNew ? 'Task created as a draft.' : 'Task saved.')
@@ -91,7 +105,7 @@ export default function TaskEditor({ task, members, hasSubmission, groupSize, sh
 
   async function handleCreateAndAssign() {
     setError(null); setSuccess(null); setSaving(true)
-    const res = await createAndAssignTask(current, assignee, deadline ? new Date(deadline).toISOString() : null)
+    const res = await createAndAssignTask(current, assignee, deadline ? new Date(deadline).toISOString() : null, sourceContributionId)
     setSaving(false)
     if (res.ok) {
       router.push(`/tasks/${res.id}`)
@@ -105,7 +119,7 @@ export default function TaskEditor({ task, members, hasSubmission, groupSize, sh
 
   async function handleCreateForGroup() {
     setError(null); setSuccess(null); setSaving(true)
-    const res = await createTaskForGroup(current, groupIds, deadline ? new Date(deadline).toISOString() : null)
+    const res = await createTaskForGroup(current, groupIds, deadline ? new Date(deadline).toISOString() : null, sourceContributionId)
     setSaving(false); setConfirmGroup(false)
     if (!res.ok) {
       setError(res.error)
@@ -280,6 +294,18 @@ export default function TaskEditor({ task, members, hasSubmission, groupSize, sh
             <a href={`/tasks?group=${task.group_id}`} style={{ color: 'var(--orange-w)' }}>See all copies</a>
           </div>
         )}
+        {isNew && followUpPrefill && (
+          <div className="task-alert info">
+            Follow-up task linked to <strong>{followUpPrefill.sourceTaskTitle}</strong> ({followUpPrefill.sourceSubmissionTitle}). You can edit any field before saving.{' '}
+            <a href={`/reviews/${followUpPrefill.sourceContributionId}`} style={{ color: 'var(--orange-w)' }}>View original submission</a>
+          </div>
+        )}
+        {!isNew && sourceSubmission && (
+          <div className="task-alert info">
+            Originated from <strong>{sourceSubmission.taskTitle}</strong> ({sourceSubmission.submissionTitle}).{' '}
+            <a href={`/reviews/${sourceSubmission.contributionId}`} style={{ color: 'var(--orange-w)' }}>View original submission</a>
+          </div>
+        )}
 
         <div className="task-layout">
           <div className="task-main">
@@ -404,6 +430,22 @@ export default function TaskEditor({ task, members, hasSubmission, groupSize, sh
                 ) : (
                   <button type="button" className="task-btn danger" style={{ width: 'fit-content' }} onClick={() => setConfirmAction('cancel-group')}>Cancel whole group</button>
                 ))}
+              </div>
+            )}
+            {!isNew && submission && (
+              <div className="task-panel">
+                <div className="task-panel-title">Submission &amp; conversation</div>
+                <div className="task-kv">
+                  <span>Status</span>
+                  <span>{QUEUE_TABS.find((t) => t.key === submission.status)?.label ?? submission.status}</span>
+                </div>
+                <div className="task-kv">
+                  <span>Attempt</span>
+                  <span>{submission.submissionCount} of {MAX_ATTEMPTS}</span>
+                </div>
+                <a href={`/reviews/${submission.id}`} className="task-btn" style={{ textDecoration: 'none', width: 'fit-content' }}>
+                  Open review &amp; thread →
+                </a>
               </div>
             )}
             {!isNew && !isClosed && <AssignmentPanel task={task} members={members} hasSubmission={hasSubmission} groupSize={groupSize} />}

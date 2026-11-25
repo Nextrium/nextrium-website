@@ -3,10 +3,11 @@ import { notFound } from 'next/navigation'
 import { safeHref } from '@/lib/dashboard/safeHref'
 import { createServiceClient } from '@nextrium/supabase/server'
 import Header from '@/components/dashboard/Header'
-import ReviewHistory from '@/components/contributions/ReviewHistory'
+import SubmissionTimeline from '@/components/contributions/SubmissionTimeline'
 import DecisionPanel from './DecisionPanel'
 import RetryReview from './RetryReview'
 import AdjustComplexity from './AdjustComplexity'
+import { postStaffFeedback, toggleThreadClosed } from '../actions'
 import { SCOPE_CHECK, hasMemberFixableFailure } from '@nextrium/contributions-core/reviewMapping'
 import { requireStaff } from '@/lib/contributions/auth'
 import { OWN_SUBMISSION_MESSAGE, canDecideOnSubmission } from '@nextrium/contributions-core/decisionRules'
@@ -14,7 +15,8 @@ import { getMemberDirectory } from '@/lib/contributions/members'
 import { findSimilar } from '@/lib/contributions/groupRules'
 import { sanitizeBrief } from '@nextrium/contributions-core/sanitize'
 import { CATEGORY_LABELS, COMPLEXITY_LABELS } from '@nextrium/contributions-core/constants'
-import { QUEUE_TABS, effectiveDeadline, isReviewStale } from '@nextrium/contributions-core/taskView'
+import { QUEUE_TABS, TASK_STATUS_LABELS, effectiveDeadline, isReviewStale } from '@nextrium/contributions-core/taskView'
+import { MAX_ATTEMPTS, type AttemptSnapshot, type ThreadMessage, type TimelineReview } from '@nextrium/contributions-core/thread'
 import ReviewPoller from '@/components/contributions/ReviewPoller'
 import { loadSubmissionNumbers } from '@nextrium/contributions-core/submissionNumber'
 import type { Contribution, ContributionReview, Task } from '@nextrium/supabase/database'
@@ -37,15 +39,22 @@ export default async function ReviewDetailPage({ params }: Props) {
   const supabase = createServiceClient() as any
   const { data: c }: { data: Contribution | null } = await supabase.from('contributions').select('*').eq('id', id).maybeSingle()
   if (!c) notFound()
-  const [{ data: task }, { data: reviewRows }, members] = await Promise.all([
+  const [{ data: task }, { data: reviewRows }, { data: messageRows }, { data: attemptRows }, { data: followUpRows }, members] = await Promise.all([
     supabase.from('tasks').select('*').eq('id', c.task_id).maybeSingle() as Promise<{ data: Task }>,
     supabase.from('contribution_reviews').select('*').eq('contribution_id', c.id)
       .order('submission_number', { ascending: false }).order('created_at', { ascending: false }),
+    supabase.from('contribution_messages').select('*').eq('contribution_id', c.id).order('created_at', { ascending: true }),
+    supabase.from('contribution_attempts').select('*').eq('contribution_id', c.id).order('submission_number', { ascending: true }),
+    supabase.from('tasks').select('id, title, status').eq('source_contribution_id', c.id).order('created_at', { ascending: false }),
     getMemberDirectory(),
   ])
   // The app can't remove a task that has submissions, but fail cleanly if one is missing.
   if (!task) notFound()
   const reviews: ContributionReview[] = reviewRows ?? []
+  const messages: ThreadMessage[] = messageRows ?? []
+  const attempts: AttemptSnapshot[] = attemptRows ?? []
+  const followUps: { id: string; title: string; status: Task['status'] }[] = followUpRows ?? []
+  const canDecide = canDecideOnSubmission(auth.caller, c.contributor_id)
   // Did the latest automated review flag the work as not matching the task's complexity?
   const latestReview = reviews.find((r) => r.id === c.latest_review_id) ?? reviews[0]
   const scopeFlagged = (latestReview?.checks as Record<string, unknown> | null)?.[SCOPE_CHECK] === false
@@ -79,46 +88,68 @@ export default async function ReviewDetailPage({ params }: Props) {
   return (
     <>
       <style>{`
-        .mt-layout { display: grid; grid-template-columns: 1fr 320px; gap: 24px; align-items: start; }
-        .mt-main { display: flex; flex-direction: column; gap: 20px; }
-        .mt-side { display: flex; flex-direction: column; gap: 16px; position: sticky; top: 24px; }
-        .mt-panel { background: var(--navy); border: 1px solid rgba(255,255,255,0.06); padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+        .mt-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 24px; align-items: start; }
+        .mt-main { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+        .mt-side { display: flex; flex-direction: column; gap: 16px; position: sticky; top: 24px; min-width: 0; }
+        .mt-panel { background: var(--navy); border: 1px solid rgba(255,255,255,0.06); padding: 20px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
         .mt-panel-title { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--grey-mid); padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.06); }
-        .mt-kv { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--off-white); }
+        .mt-kv { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 13px; color: var(--off-white); }
         .mt-kv span:first-child { color: var(--grey-mid); }
-        .mt-brief { color: var(--off-white); font-size: 14px; line-height: 1.7; }
+        .mt-brief { color: var(--off-white); font-size: 14px; line-height: 1.7; overflow-wrap: anywhere; }
         .mt-brief a, .mt-link { color: var(--orange); word-break: break-all; }
-        .mt-text { color: var(--off-white); font-size: 14px; line-height: 1.7; white-space: pre-wrap; }
+        .mt-text { color: var(--off-white); font-size: 14px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
         .mt-hint { font-size: 12px; color: var(--grey-mid); line-height: 1.5; }
         .mt-input { background: var(--navy-mid, #0b1a2e); border: 1px solid rgba(255,255,255,0.08); color: var(--white); font-family: var(--font-dm); font-size: 13px; padding: 10px 12px; outline: none; width: 100%; }
         .mt-textarea { min-height: 90px; resize: vertical; }
-        .mt-btn { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.12em; text-transform: uppercase; padding: 9px 18px; background: var(--orange); border: 1px solid var(--orange); color: var(--white); cursor: pointer; }
+        .mt-btn { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.12em; text-transform: uppercase; padding: 9px 18px; background: var(--orange); border: 1px solid var(--orange); color: var(--white); cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; min-height: 38px; }
         .mt-btn:disabled { opacity: 0.6; cursor: default; }
         .mt-btn.ghost { background: none; border-color: rgba(255,255,255,0.12); color: var(--grey-mid); }
         .mt-btn.danger { background: none; border-color: color-mix(in srgb, var(--error) 35%, transparent); color: var(--error); }
         .mt-alert { padding: 10px 14px; font-size: 12px; border: 1px solid; }
         .mt-alert.error { background: color-mix(in srgb, var(--error) 8%, transparent); border-color: color-mix(in srgb, var(--error) 30%, transparent); color: var(--error); }
         .mt-alert.warn { background: color-mix(in srgb, var(--gold) 8%, transparent); border-color: color-mix(in srgb, var(--gold) 30%, transparent); color: var(--warning); line-height: 1.5; }
-        .mt-alert.success { background: color-mix(in srgb, var(--success) 8%, transparent); border-color: color-mix(in srgb, var(--success) 30%, transparent); color: var(--success); }
+        .mt-alert.success, .mt-alert.ok { background: color-mix(in srgb, var(--success) 8%, transparent); border-color: color-mix(in srgb, var(--success) 30%, transparent); color: var(--success); }
+        .mt-header-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
         @media (max-width: 1100px) { .mt-layout { grid-template-columns: 1fr; } .mt-side { position: static; } }
       `}</style>
-      <Header title={c.title} description={`${statusLabel} · Submission #${submissionNo ?? '—'} · attempt ${c.submission_count}`}
-        action={<Link href={`/reviews?tab=${c.status}`} className="mt-btn ghost" style={{ textDecoration: 'none' }}>Back to queue</Link>} />
+      <Header
+        title={c.title}
+        description={`${statusLabel} · Submission #${submissionNo ?? '—'} · attempt ${c.submission_count} of ${MAX_ATTEMPTS}`}
+        action={
+          <div className="mt-header-actions">
+            <Link href={`/tasks/new?fromContribution=${c.id}`} className="mt-btn">Create follow-up task</Link>
+            <Link href={`/reviews?tab=${c.status}`} className="mt-btn ghost">Back to queue</Link>
+          </div>
+        }
+      />
       <div className="dash-content">
         <div className="mt-layout">
           <div className="mt-main">
             <div className="mt-panel">
-              <div className="mt-panel-title">Submission</div>
+              <div className="mt-panel-title">Submission · Attempt {c.submission_count} of {MAX_ATTEMPTS}</div>
               <div className="mt-text">{c.description}</div>
               {c.evidence_url && (safeHref(c.evidence_url)
                 ? <a className="mt-link" href={safeHref(c.evidence_url)!} target="_blank" rel="noopener noreferrer">{c.evidence_url}</a>
                 : <span className="mt-text">{c.evidence_url}</span>)}
             </div>
+            <SubmissionTimeline
+              contributionId={c.id}
+              attempts={attempts}
+              reviews={reviews as unknown as TimelineReview[]}
+              messages={messages}
+              submissionCount={c.submission_count}
+              legacyStaffNote={{ body: c.staff_notes, status: c.status, submissionNumber: c.submission_count, timestamp: c.verified_at ?? c.updated_at ?? c.submitted_at }}
+              threadClosed={!!c.thread_closed_at}
+              viewerRole="staff"
+              canModerate={canDecide}
+              showSecurity
+              postAction={postStaffFeedback}
+              toggleClosedAction={toggleThreadClosed}
+            />
             <div className="mt-panel">
               <div className="mt-panel-title">Task brief · {task.title}</div>
               <div className="mt-brief" dangerouslySetInnerHTML={{ __html: sanitizeBrief(task.description) }} />
             </div>
-            <ReviewHistory reviews={reviews} showSecurity />
           </div>
 
           <div className="mt-side">
@@ -126,11 +157,34 @@ export default async function ReviewDetailPage({ params }: Props) {
               <div className="mt-panel-title">Details</div>
               <div className="mt-kv"><span>Member</span><span>{member?.name ?? 'Unknown'}</span></div>
               <div className="mt-kv"><span>Task</span><span>{CATEGORY_LABELS[task.category]} · {COMPLEXITY_LABELS[task.complexity]}</span></div>
+              <div className="mt-kv"><span>Attempt</span><span>{c.submission_count} of {MAX_ATTEMPTS}</span></div>
               <div className="mt-kv"><span>Points range</span><span>{task.point_range_min}–{task.point_range_max}</span></div>
               <div className="mt-kv"><span>Deadline</span><span>{fmt(deadline?.toISOString() ?? null)}</span></div>
               <div className="mt-kv"><span>Submitted</span><span>{fmt(c.submitted_at)}</span></div>
               {c.review_score !== null && <div className="mt-kv"><span>Automated score</span><span>{Math.round(Number(c.review_score))}/100</span></div>}
               {c.final_points !== null && <div className="mt-kv"><span>Points awarded</span><span>{c.final_points}</span></div>}
+              {task.source_contribution_id && (
+                <div className="mt-kv">
+                  <span>Originated from</span>
+                  <Link href={`/reviews/${task.source_contribution_id}`} className="mt-link">View source submission</Link>
+                </div>
+              )}
+            </div>
+            <div className="mt-panel">
+              <div className="mt-panel-title">Follow-up tasks</div>
+              {followUps.length === 0 ? (
+                <span className="mt-hint">Turn a strong recommendation or finding from this work into the next task.</span>
+              ) : (
+                followUps.map((f) => (
+                  <div key={f.id} className="mt-kv">
+                    <Link href={`/tasks/${f.id}`} className="mt-link">{f.title}</Link>
+                    <span>{TASK_STATUS_LABELS[f.status]}</span>
+                  </div>
+                ))
+              )}
+              <Link href={`/tasks/new?fromContribution=${c.id}`} className="mt-btn ghost" style={{ width: 'fit-content' }}>
+                + Create follow-up task
+              </Link>
             </div>
             {similar.length > 0 && (
               <div className="mt-panel">
@@ -157,10 +211,16 @@ export default async function ReviewDetailPage({ params }: Props) {
             )}
             {(c.status === 'review_failed' || stale) && <RetryReview contributionId={c.id} />}
             {['needs_human', 'ai_approved', 'review_failed', 'changes_requested'].includes(c.status) && (
-              canDecideOnSubmission(auth.caller, c.contributor_id)
+              canDecide
                 ? <>
                     <AdjustComplexity contributionId={c.id} category={task.category} complexity={task.complexity} scopeFlagged={scopeFlagged} />
-                    <DecisionPanel key={`${task.point_range_min}-${task.point_range_max}`} contributionId={c.id} min={task.point_range_min} max={task.point_range_max} />
+                    <DecisionPanel
+                      key={`${task.point_range_min}-${task.point_range_max}-${c.submission_count}`}
+                      contributionId={c.id}
+                      min={task.point_range_min}
+                      max={task.point_range_max}
+                      submissionCount={c.submission_count}
+                    />
                   </>
                 : <div className="mt-panel"><span className="mt-hint">{OWN_SUBMISSION_MESSAGE}</span></div>
             )}

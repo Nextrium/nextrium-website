@@ -4,13 +4,14 @@ import { revalidatePath } from 'next/cache'
 import { after } from 'next/server'
 import { createServiceClient } from '@nextrium/supabase/server'
 import { logActivity } from '@/lib/activityLog'
-import { requireMember } from '@/lib/contributions/auth'
+import { requireMember, resolveCallerName } from '@/lib/contributions/auth'
 import { describeDbError } from '@nextrium/contributions-core/errors'
 import { parseSubmission } from '@nextrium/contributions-core/submission'
+import { canPostThreadMessage, canRequestMoreChanges, parseMessageBody } from '@nextrium/contributions-core/thread'
 import { reviewContribution } from '@/lib/contributions/reviewService'
 import { notifyReviewResult } from '@/lib/contributions/notify'
 import { liveAlertDeps } from '@/lib/alerts/live'
-import { alertTeamExtension, alertTeamSubmission } from '@/lib/alerts/server'
+import { alertTeamExtension, alertTeamReply, alertTeamSubmission } from '@/lib/alerts/server'
 
 type Result = { ok: true } | { ok: false; error: string }
 
@@ -69,6 +70,13 @@ export async function submitContribution(taskId: string, raw: unknown): Promise<
   if ('error' in parsed) return { ok: false, error: parsed.error }
   const s = parsed.submission
 
+  // Belt-and-suspenders 3-attempt check ahead of the database trigger.
+  const { data: existing } = await db().from('contributions')
+    .select('submission_count').eq('task_id', taskId).eq('contributor_id', auth.caller.userId).maybeSingle()
+  if (existing && !canRequestMoreChanges(existing.submission_count ?? 1)) {
+    return { ok: false, error: 'You have used all 3 submission attempts for this task.' }
+  }
+
   const { data, error } = await db().rpc('submit_contribution', {
     p_task_id: taskId, p_member: auth.caller.userId,
     p_title: s.title, p_description: s.description, p_evidence_url: s.evidenceUrl,
@@ -100,4 +108,60 @@ export async function submitContribution(taskId: string, raw: unknown): Promise<
   revalidatePath('/my-tasks')
   revalidatePath(`/my-tasks/${taskId}`)
   return { ok: true, contributionId, status: data.status, submissionCount: data.submission_count }
+}
+
+/**
+ * Posts a contributor's reply on their own submission thread and notifies the
+ * staff reviewer who last engaged (or the task creator / admin fallback).
+ */
+export async function postContributorReply(contributionId: string, body: string): Promise<Result> {
+  const auth = await requireMember()
+  if ('error' in auth) return { ok: false, error: auth.error }
+  if (!UUID.test(contributionId)) return { ok: false, error: 'That submission could not be found.' }
+  const parsed = parseMessageBody(body)
+  if ('error' in parsed) return { ok: false, error: parsed.error }
+
+  const supabase = db()
+  const { data: c } = await supabase.from('contributions')
+    .select('id, task_id, contributor_id, title, submission_count, thread_closed_at')
+    .eq('id', contributionId).maybeSingle()
+  const isOwner = !!c && c.contributor_id === auth.caller.userId
+  if (!isOwner) return { ok: false, error: 'That submission could not be found.' }
+
+  const { count } = await supabase.from('contribution_messages')
+    .select('id', { count: 'exact', head: true }).eq('contribution_id', c.id)
+  const gate = canPostThreadMessage({
+    authorRole: 'contributor',
+    isOwner: true,
+    threadClosed: !!c.thread_closed_at,
+    messageCount: count ?? 0,
+  })
+  if (!gate.ok) return { ok: false, error: gate.error }
+
+  const authorName = await resolveCallerName(supabase, auth.caller)
+  const { data: inserted, error } = await supabase.from('contribution_messages').insert({
+    contribution_id: c.id,
+    submission_number: c.submission_count ?? 1,
+    author_role: 'contributor',
+    author_user_id: auth.caller.userId,
+    author_name: authorName,
+    kind: 'reply',
+    body: parsed.body,
+  }).select('id').single()
+  if (error || !inserted) {
+    console.error('[my-tasks] postContributorReply failed:', error?.message)
+    return { ok: false, error: 'Could not send your reply right now. Please try again.' }
+  }
+
+  await logActivity({
+    action: 'contribution_reply_posted', targetType: 'contribution', targetId: c.id,
+    details: { title: c.title, taskId: c.task_id },
+    actorId: auth.caller.userId, actorEmail: auth.caller.email ?? undefined,
+  })
+  const actor = auth.caller.email
+  after(() => alertTeamReply(liveAlertDeps(), c.id, inserted.id, actor))
+
+  revalidatePath(`/my-tasks/${c.task_id}`)
+  revalidatePath(`/reviews/${c.id}`)
+  return { ok: true }
 }

@@ -81,19 +81,22 @@ export function changesRequestedEmail(p: { taskTitle: string; notes: string; url
     html:
       `<p>Hi {{name}},</p>` +
       `<p>The team reviewed <strong>${escapeHtml(p.taskTitle)}</strong> and asked for changes:</p>` +
-      `<p>${escapeHtml(p.notes)}</p>` +
-      `<p>You can update and resubmit it from the task page.</p>` +
-      button(p.url, 'Resubmit'),
+      `<p>${escapeHtml(p.notes).replace(/\n/g, '<br>')}</p>` +
+      `<p>You can reply to the team or resubmit your updated work from the task page.</p>` +
+      button(p.url, 'View feedback & resubmit'),
   }
 }
 
-export function verifiedEmail(p: { taskTitle: string; points: number; url: string }): EmailContent {
+export function verifiedEmail(p: { taskTitle: string; points: number; url: string; notes?: string | null }): EmailContent {
+  const note = p.notes?.trim()
   return {
     subject: subjectText(`Verified: ${p.taskTitle} (+${p.points} points)`),
     html:
       `<p>Hi {{name}},</p>` +
       `<p>Great work — <strong>${escapeHtml(p.taskTitle)}</strong> was verified and you earned <strong>${escapeHtml(p.points)} points</strong>.</p>` +
-      button(p.url, 'See the leaderboard'),
+      (note ? `<p><strong>Team feedback:</strong><br>${escapeHtml(note).replace(/\n/g, '<br>')}</p>` : '') +
+      `<p>You can read the feedback or reply directly on your task page.</p>` +
+      button(p.url, note ? 'Read feedback & reply' : 'Open the task'),
   }
 }
 
@@ -103,7 +106,19 @@ export function rejectedEmail(p: { taskTitle: string; notes: string; url: string
     html:
       `<p>Hi {{name}},</p>` +
       `<p>The team decided not to accept <strong>${escapeHtml(p.taskTitle)}</strong>.</p>` +
-      `<p>${escapeHtml(p.notes)}</p>` +
-      button(p.url, 'Open the task'),
+      `<p>${escapeHtml(p.notes).replace(/\n/g, '<br>')}</p>` +
+      `<p>You can reply in the task thread if you have any questions about this feedback.</p>` +
+      button(p.url, 'View feedback & reply'),
+  }
+}
+
+export function staffFeedbackEmail(p: { taskTitle: string; authorName: string; body: string; url: string }): EmailContent {
+  return {
+    subject: subjectText(`New feedback on ${p.taskTitle}`),
+    html:
+      `<p>Hi {{name}},</p>` +
+      `<p><strong>${escapeHtml(p.authorName)}</strong> left feedback on your submission for <strong>${escapeHtml(p.taskTitle)}</strong>:</p>` +
+      `<p>${escapeHtml(p.body).replace(/\n/g, '<br>')}</p>` +
+      button(p.url, 'Read & reply'),
   }
 }

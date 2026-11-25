@@ -21,6 +21,7 @@ interface Sub {
   status: string | null
   notes: string | null
   submission_count: number | null
+  revision_requested?: boolean | null
 }
 
 /** Which queue tab a submission belongs in. */
@@ -30,7 +31,7 @@ export function queueTab(s: Sub): QueueTab {
     case 'ai_approved': return 'passed'
     case 'submitted': return 'pending'
     case 'verified': return 'verified'
-    case 'rejected': return !s.notes && (s.submission_count ?? 1) < MAX_ATTEMPTS ? 'changes' : 'rejected'
+    case 'rejected': return (s.revision_requested === true || !s.notes) && (s.submission_count ?? 1) < MAX_ATTEMPTS ? 'changes' : 'rejected'
     default: return 'team'
   }
 }
