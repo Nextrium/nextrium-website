@@ -2,6 +2,8 @@
 
 import { fetchAgentsEngine } from '@nextrium/agents-engine'
 import { roleDenial, STAFF_ROLES } from '@/lib/dashboard/requireRole'
+import { COPILOT_DOMAIN, parseCopilotRequest } from '@/lib/dashboard/copilotInput'
+import { isEngineId } from '@/lib/dashboard/engineId'
 
 export interface CopilotChatParams {
   domainType?: string
@@ -33,9 +35,12 @@ export async function sendCopilotChat(params: CopilotChatParams): Promise<Copilo
   const denied = await roleDenial(STAFF_ROLES)
   if (denied) return { error: denied }
 
+  const parsed = parseCopilotRequest(params)
+  if ('error' in parsed) return { error: parsed.error }
+
   const res = await fetchAgentsEngine('/api/v1/agents/copilot/chat', {
     method: 'POST',
-    body: JSON.stringify({ domainType: 'hr_screening', ...params }),
+    body: JSON.stringify(parsed.request),
   })
 
   if (!res.ok) {
@@ -64,6 +69,7 @@ export async function getCopilotHistory(
 ): Promise<{ history: CopilotHistoryMessage[]; error?: string }> {
   const denied = await roleDenial(STAFF_ROLES)
   if (denied) return { history: [], error: denied }
+  if (domainType !== COPILOT_DOMAIN || !isEngineId(resourceId)) return { history: [], error: 'That candidate could not be found.' }
 
   const res = await fetchAgentsEngine(
     `/api/v1/agents/copilot/history/${encodeURIComponent(domainType)}/${encodeURIComponent(resourceId)}`,
