@@ -49,8 +49,8 @@ test('messages: one for every refusal, none naming the account', () => {
 })
 
 test('email: link, 5-day date, and everything escaped', () => {
-  const e = inviteEmail({ url: 'https://dash.test/invite/abc?x=1&y="2"', name: '<script>alert(1)</script>', teamName: 'Nextrium', expiresAt: later(5).toISOString() })
-  assert.match(e.subject, /Nextrium dashboard/)
+  const e = inviteEmail({ url: 'https://dash.test/invite/abc?x=1&y="2"', name: '<script>alert(1)</script>', teamName: 'Acme', expiresAt: later(5).toISOString() })
+  assert.match(e.subject, /Acme dashboard/)
   assert.ok(e.message.includes('href="https://dash.test/invite/abc?x=1&amp;y=&quot;2&quot;"'))
   assert.ok(!e.message.includes('<script>'))
   assert.match(e.message, /30 October 2026/)
