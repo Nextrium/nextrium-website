@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { createClient } from '@nextrium/supabase/client'
+import { checkMediaImage, IMAGE_ACCEPT } from '@/lib/dashboard/mediaImage'
 
 interface CoverImageUploadProps {
   value: string
@@ -22,12 +23,10 @@ export default function CoverImageUpload({
     const file = e.target.files?.[0]
     if (!file) return
 
-    if (!file.type.startsWith('image/')) {
-      setError('File must be an image.')
-      return
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      setError('Image must be under 10 MB.')
+    const checked = checkMediaImage(file)
+    if (!checked.ok) {
+      setError(checked.error)
+      if (fileRef.current) fileRef.current.value = ''
       return
     }
 
@@ -36,13 +35,12 @@ export default function CoverImageUpload({
 
     try {
       const supabase = createClient()
-      const ext      = file.name.split('.').pop()
-      const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+      const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${checked.ext}`
       const path     = `${folder}/${filename}`
 
       const { error: uploadError } = await supabase.storage
         .from('media')
-        .upload(path, file, { upsert: false, contentType: file.type })
+        .upload(path, file, { upsert: false, contentType: checked.contentType })
 
       if (uploadError) throw uploadError
 
@@ -116,7 +114,7 @@ export default function CoverImageUpload({
           <input
             ref={fileRef}
             type="file"
-            accept="image/*"
+            accept={IMAGE_ACCEPT}
             onChange={handleFile}
             style={{ display: 'none' }}
           />

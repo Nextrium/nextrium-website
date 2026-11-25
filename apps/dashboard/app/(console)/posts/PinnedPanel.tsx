@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Post } from '@nextrium/supabase/database'
-import { MAX_PINS, PIN_SITES, applyPinOp, type PinOp, type PinSite } from '@/lib/dashboard/pins'
+import { MAX_PINS, PARENT_SITE, PIN_SITES, applyPinOp, type PinOp, type PinSite } from '@/lib/dashboard/pins'
 import { setPostPins } from './pinActions'
 
 type Pins = Record<PinSite, string[]>
@@ -36,7 +36,7 @@ export default function PinnedPanel({ posts, state }: { posts: Post[]; state: Re
     <section className="pin-panel" aria-labelledby="pin-panel-title">
       <div className="pin-panel-head">
         <h2 id="pin-panel-title" className="pin-panel-title">Pinned posts</h2>
-        <span className="pin-panel-note">Up to {MAX_PINS} per site, shown first in this order. The Nextrium blog can pin any brand&apos;s post; a brand&apos;s own site only its own.</span>
+        <span className="pin-panel-note">Up to {MAX_PINS} per site, shown first in this order. The {PIN_SITES[PARENT_SITE]} can pin any brand&apos;s post; a brand&apos;s own site only its own.</span>
       </div>
       {message && <div className={`pin-msg ${message.ok ? 'ok' : 'bad'}`} role={message.ok ? 'status' : 'alert'}>{message.text}</div>}
       <div className="pin-sites">

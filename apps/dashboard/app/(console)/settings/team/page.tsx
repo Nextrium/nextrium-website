@@ -1,4 +1,6 @@
+import { redirect } from 'next/navigation'
 import { createServiceClient } from '@nextrium/supabase/server'
+import { getVerifiedDashboardRole } from '@/lib/dashboard/getRole'
 import Header from '@/components/dashboard/Header'
 import { APPLICATION_TRACKS } from '@/lib/automation/rulesAdmin'
 import TeamAccessClient from './TeamAccessClient'
@@ -66,6 +68,8 @@ async function getDashboardUsers(): Promise<DashboardUserRow[]> {
 }
 
 export default async function TeamAccessPage() {
+  // proxy.ts already keeps non-admins out; this is the page's own check.
+  if ((await getVerifiedDashboardRole()) !== 'admin') redirect('/')
   const users = await getDashboardUsers()
   return (
     <>

@@ -9,6 +9,7 @@ import CoverImageUpload from '@/components/dashboard/CoverImageUpload'
 import type { Product } from '@nextrium/supabase/database'
 import { logActivityAction } from '@/app/actions/activityLog'
 import { brand, color } from '@nextrium/brand'
+import { isReservedSlug } from '@/lib/dashboard/reservedSlug'
 
 interface ProductEditorProps {
   product: Product | null
@@ -53,6 +54,7 @@ export default function ProductEditor({ product }: ProductEditorProps) {
     setError(null); setSuccess(null)
     if (!name.trim())    { setError('Name is required.');    return }
     if (!slug.trim())    { setError('Slug is required.');    return }
+    if (isReservedSlug(slug)) { setError('"new" is reserved. Choose another slug.'); return }
     if (!tagline.trim()) { setError('Tagline is required.'); return }
 
     setSaving(true)

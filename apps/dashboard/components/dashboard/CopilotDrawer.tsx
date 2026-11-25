@@ -28,19 +28,27 @@ export default function CopilotDrawer() {
   const bodyEndRef = useRef<HTMLDivElement>(null)
 
   const open = !!copilotTarget
+  // The conversation now on screen. A reply that arrives after a switch
+  // belongs to the previous one and must not be shown here.
+  const targetKey = copilotTarget ? `${copilotTarget.domainType}:${copilotTarget.resourceId}` : null
+  const targetKeyRef = useRef(targetKey)
+  targetKeyRef.current = targetKey
 
   useEffect(() => {
     if (!copilotTarget) return
+    let cancelled = false
     setHistory([])
     setError(null)
     setPrompt(copilotTarget.initialPrompt || '')
     setLoadingHistory(true)
     getCopilotHistory(copilotTarget.domainType, copilotTarget.resourceId)
       .then(({ history, error }) => {
+        if (cancelled) return
         setHistory(history)
         if (error) setError(error)
       })
-      .finally(() => setLoadingHistory(false))
+      .finally(() => { if (!cancelled) setLoadingHistory(false) })
+    return () => { cancelled = true }
   }, [copilotTarget?.domainType, copilotTarget?.resourceId])
 
   useEffect(() => {
@@ -52,6 +60,7 @@ export default function CopilotDrawer() {
     setSending(true)
     setError(null)
 
+    const sentFor = targetKeyRef.current
     const manualUrls = urlInput.split(',').map((u) => u.trim()).filter(Boolean)
 
     const manualOverrides = overrideOpen && (overrideScore.trim() || overrideRecommendation)
@@ -72,6 +81,13 @@ export default function CopilotDrawer() {
     })
 
     setSending(false)
+
+    // Switched to another candidate while waiting: the message was saved for
+    // the first one, so leave this conversation alone.
+    if (targetKeyRef.current !== sentFor) {
+      if (typeof result.delta?.scoreDelta === 'number') copilotTarget.onDelta?.()
+      return
+    }
 
     if (result.error) {
       setError(result.error)

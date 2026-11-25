@@ -9,6 +9,7 @@ import CoverImageUpload from '@/components/dashboard/CoverImageUpload'
 import type { TeamMember } from '@nextrium/supabase/database'
 import { logActivityAction } from '@/app/actions/activityLog'
 import { brand } from '@nextrium/brand'
+import { isReservedSlug } from '@/lib/dashboard/reservedSlug'
 
 function slugify(str: string): string {
   return str.toLowerCase().trim()
@@ -41,6 +42,7 @@ export default function TeamMemberEditor({ member }: { member: TeamMember | null
     setError(null); setSuccess(null)
     if (!name.trim()) { setError('Name is required.'); return }
     if (!slug.trim()) { setError('Slug is required.'); return }
+    if (isReservedSlug(slug)) { setError('"new" is reserved. Choose another slug.'); return }
     if (!role.trim()) { setError('Role is required.'); return }
 
     setSaving(true)

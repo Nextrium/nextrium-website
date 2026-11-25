@@ -9,6 +9,7 @@ import CoverImageUpload from '@/components/dashboard/CoverImageUpload'
 import type { NTEvent } from '@nextrium/supabase/database'
 import { logActivityAction } from '@/app/actions/activityLog'
 import { color } from '@nextrium/brand'
+import { isReservedSlug } from '@/lib/dashboard/reservedSlug'
 
 interface EventEditorProps {
   event: NTEvent | null
@@ -63,6 +64,7 @@ export default function EventEditor({ event }: EventEditorProps) {
     setError(null); setSuccess(null)
     if (!title.trim())      { setError('Title is required.');      return }
     if (!slug.trim())       { setError('Slug is required.');       return }
+    if (isReservedSlug(slug)) { setError('"new" is reserved. Choose another slug.'); return }
     if (!description.trim()){ setError('Description is required.'); return }
     if (!startDate)         { setError('Start date is required.'); return }
     if (!location.trim())   { setError('Location is required.');   return }
