@@ -223,6 +223,7 @@ test('overdue: past-deadline running tasks with nothing submitted, once per dead
     teamTask({ id: 'denied', status: 'assigned', extension_status: 'denied', extended_deadline_at: '2026-11-05T00:00:00Z' }),
     teamTask({ id: 'cancelled', status: 'cancelled' }),
     teamTask({ id: 'nodeadline', status: 'assigned', deadline_at: null }),
+    teamTask({ id: 'recurring-late', status: 'assigned', recurring_task_id: 'sched-1' }),
   ]
   const portal = [
     portalTask({ id: 'plate' }),

@@ -7,6 +7,7 @@ import { getMemberDirectory } from '@/lib/contributions/members'
 import { loadSubmissionNumbers } from '@nextrium/contributions-core/submissionNumber'
 import { CATEGORY_LABELS } from '@nextrium/contributions-core/constants'
 import { QUEUE_TABS } from '@nextrium/contributions-core/taskView'
+import { draftExpiryLabel, isRecurringGraceDraft } from '@nextrium/contributions-core/recurring'
 import type { Contribution, Task } from '@nextrium/supabase/database'
 
 export const dynamic = 'force-dynamic'
@@ -25,14 +26,21 @@ export default async function ReviewQueuePage({ searchParams }: Props) {
   if ('error' in (await requireStaff())) notFound()
 
   const { tab: rawTab } = await searchParams
+  const isRecurringDraftsTab = rawTab === 'recurring_drafts'
   const tab = QUEUE_TABS.find((t) => t.key === rawTab) ?? QUEUE_TABS[0]
   const supabase = createServiceClient() as any
 
-  const [{ data: rows }, { data: all }] = await Promise.all([
-    supabase.from('contributions').select('*').eq('status', tab.key).order('submitted_at', { ascending: true }).limit(200),
+  const [{ data: rows }, { data: all }, { data: assignedTasks }] = await Promise.all([
+    isRecurringDraftsTab
+      ? Promise.resolve({ data: [] })
+      : supabase.from('contributions').select('*').eq('status', tab.key).order('submitted_at', { ascending: true }).limit(200),
     supabase.from('contributions').select('status'),
+    supabase.from('tasks').select('*').eq('status', 'assigned').order('deadline_at', { ascending: true }).limit(300),
   ])
   const contributions: Contribution[] = rows ?? []
+  const recurringDrafts: Task[] = ((assignedTasks ?? []) as Task[])
+    .filter((t) => isRecurringGraceDraft(t))
+    .sort((a, b) => String(a.expires_at ?? '').localeCompare(String(b.expires_at ?? '')))
   const counts = new Map<string, number>()
   for (const r of (all ?? []) as { status: string }[]) counts.set(r.status, (counts.get(r.status) ?? 0) + 1)
 
@@ -48,7 +56,7 @@ export default async function ReviewQueuePage({ searchParams }: Props) {
   return (
     <>
       <style>{`
-        .rq-tabs { display: flex; flex-wrap: wrap; gap: 0; border: 1px solid rgba(255,255,255,0.08); width: fit-content; margin-bottom: 8px; }
+        .rq-tabs { display: flex; flex-wrap: wrap; gap: 0; border: 1px solid rgba(255,255,255,0.08); width: fit-content; max-width: 100%; margin-bottom: 8px; }
         .rq-tab { padding: 9px 16px; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; text-decoration: none; color: var(--grey-mid); }
         .rq-tab.active { background: color-mix(in srgb, var(--orange) 10%, transparent); color: var(--orange); }
         .rq-hint { font-size: 12px; color: var(--grey-mid); margin-bottom: 18px; }
@@ -70,14 +78,46 @@ export default async function ReviewQueuePage({ searchParams }: Props) {
       <div className="dash-content">
         <div className="rq-tabs">
           {QUEUE_TABS.map((t) => (
-            <Link key={t.key} href={`/reviews?tab=${t.key}`} className={`rq-tab ${t.key === tab.key ? 'active' : ''}`}>
+            <Link key={t.key} href={`/reviews?tab=${t.key}`} className={`rq-tab ${!isRecurringDraftsTab && t.key === tab.key ? 'active' : ''}`}>
               {t.label} ({counts.get(t.key) ?? 0})
             </Link>
           ))}
+          <Link href="/reviews?tab=recurring_drafts" className={`rq-tab ${isRecurringDraftsTab ? 'active' : ''}`}>
+            Recurring drafts ({recurringDrafts.length})
+          </Link>
         </div>
-        <div className="rq-hint">{tab.hint}</div>
+        <div className="rq-hint">
+          {isRecurringDraftsTab
+            ? 'Unsubmitted recurring cycles saved as draft for 3 days after the 24-hour reminder; automatically deleted if still unsubmitted.'
+            : tab.hint}
+        </div>
 
-        {contributions.length === 0 ? (
+        {isRecurringDraftsTab ? (
+          recurringDrafts.length === 0 ? (
+            <div className="rq-empty">No recurring tasks in the 3-day draft window right now.</div>
+          ) : (
+            <div className="rq-wrap">
+              <table className="rq-table">
+                <thead>
+                  <tr><th>Recurring task</th><th>Member</th><th>Cycle date</th><th>Auto-delete</th></tr>
+                </thead>
+                <tbody>
+                  {recurringDrafts.map((t) => (
+                    <tr key={t.id}>
+                      <td>
+                        <Link href={`/tasks/${t.id}`}>{t.title}</Link>
+                        <span className="rq-muted"> · {CATEGORY_LABELS[t.category]}</span>
+                      </td>
+                      <td className="rq-muted">{t.assigned_to ? nameOf.get(t.assigned_to) ?? 'Unknown' : 'Unassigned'}</td>
+                      <td className="rq-muted">{t.occurrence_date ?? '—'}</td>
+                      <td style={{ color: 'var(--orange)', fontSize: 12 }}>{draftExpiryLabel(t.expires_at, now)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        ) : contributions.length === 0 ? (
           <div className="rq-empty">Nothing here.</div>
         ) : (
           <div className="rq-wrap">

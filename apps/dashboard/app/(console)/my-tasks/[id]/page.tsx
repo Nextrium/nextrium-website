@@ -7,6 +7,7 @@ import { safeHref } from '@/lib/dashboard/safeHref'
 import { CATEGORY_LABELS, COMPLEXITY_LABELS, EXTENSION_DAYS } from '@nextrium/contributions-core/constants'
 import { CONTRIBUTION_STATUS_MEMBER_LABELS, TASK_STATUS_LABELS, deadlineLabel, effectiveDeadline, isOverdue } from '@nextrium/contributions-core/taskView'
 import { MAX_ATTEMPTS, canResubmitTeam, latestStaffFeedbackNote, type AttemptSnapshot, type ThreadMessage, type TimelineReview } from '@nextrium/contributions-core/thread'
+import { draftExpiryLabel, isRecurringGraceDraft } from '@nextrium/contributions-core/recurring'
 import ExtensionRequest from './ExtensionRequest'
 import SubmissionForm from './SubmissionForm'
 import SubmissionTimeline from '@/components/contributions/SubmissionTimeline'
@@ -142,6 +143,16 @@ export default async function MyTaskPage({ params }: Props) {
                   so a brief that reached the database any other way can't run script. */}
               <div className="mt-brief" dangerouslySetInnerHTML={{ __html: sanitizeBrief(task.description) }} />
             </div>
+            {isRecurringGraceDraft(task) && !contribution && (
+              <div className="mt-feedback-banner" role="alert">
+                <div className="mt-panel-title" style={{ borderBottomColor: 'color-mix(in srgb, var(--orange) 25%, transparent)', color: 'var(--orange)' }}>
+                  Saved as draft (3-day window) · {draftExpiryLabel(task.expires_at, now)}
+                </div>
+                <div className="mt-hint" style={{ color: 'var(--off-white)' }}>
+                  This recurring cycle was not submitted within 24 hours of its deadline. You can still submit below before it is automatically removed.
+                </div>
+              </div>
+            )}
             {canSubmit && contribution && latestFeedback && (
               <div className="mt-feedback-banner" role="region" aria-label="Latest team feedback">
                 <div className="mt-panel-title" style={{ borderBottomColor: 'color-mix(in srgb, var(--orange) 25%, transparent)', color: 'var(--orange)' }}>
@@ -156,6 +167,7 @@ export default async function MyTaskPage({ params }: Props) {
                 taskTitle={task.title}
                 isResubmission={!!contribution}
                 attemptNumber={contribution ? contribution.submission_count + 1 : 1}
+                directReview={task.skip_automated_review === true}
                 initial={contribution ? { title: contribution.title, description: contribution.description, evidenceUrl: contribution.evidence_url ?? '' } : null}
               />
             )}

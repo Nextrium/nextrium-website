@@ -5,6 +5,7 @@ import Header from '@/components/dashboard/Header'
 import { requireMember } from '@/lib/contributions/auth'
 import { CATEGORY_LABELS, COMPLEXITY_LABELS } from '@nextrium/contributions-core/constants'
 import { TASK_STATUS_LABELS, deadlineLabel, isOverdue } from '@nextrium/contributions-core/taskView'
+import { draftExpiryLabel, isRecurringGraceDraft } from '@nextrium/contributions-core/recurring'
 import type { Task } from '@nextrium/supabase/database'
 
 export const dynamic = 'force-dynamic'
@@ -23,26 +24,44 @@ export default async function MyTasksPage() {
     supabase.from('contributor_profiles').select('total_points, verified_contributions, display_name').eq('user_id', auth.caller.userId).maybeSingle(),
   ])
   const tasks: Task[] = taskRows ?? []
-  const current = tasks.filter((t) => CURRENT.includes(t.status))
+  const graceDrafts = tasks.filter((t) => isRecurringGraceDraft(t))
+  const current = tasks.filter((t) => CURRENT.includes(t.status) && !isRecurringGraceDraft(t))
   const past = tasks.filter((t) => !CURRENT.includes(t.status))
   const now = new Date()
   // Anyone doing tasks without a display name is pointed to their profile.
   const needsProfile = tasks.length > 0 && !profile?.display_name?.trim()
 
-  const Row = ({ t }: { t: Task }) => (
-    <Link href={`/my-tasks/${t.id}`} className="mytask-row">
-      <div>
-        <div className="mytask-title">{t.title}</div>
-        <div className="mytask-meta">{CATEGORY_LABELS[t.category]} · {COMPLEXITY_LABELS[t.complexity]} · {t.point_range_min}–{t.point_range_max} points{t.group_id ? ' · Shared task' : ''}</div>
-      </div>
-      <div className="mytask-right">
-        <span className={`mytask-badge ${t.status === 'changes_requested' ? 'warn' : t.status === 'completed' ? 'good' : ''}`}>{TASK_STATUS_LABELS[t.status]}</span>
-        {CURRENT.includes(t.status) && t.status !== 'submitted' && (
-          <span className={`mytask-due ${isOverdue(t, now) ? 'bad' : ''}`}>{deadlineLabel(t, now)}</span>
-        )}
-      </div>
-    </Link>
-  )
+  const Row = ({ t }: { t: Task }) => {
+    const inDraft = isRecurringGraceDraft(t)
+    return (
+      <Link href={`/my-tasks/${t.id}`} className="mytask-row">
+        <div>
+          <div className="mytask-title">{t.title}</div>
+          <div className="mytask-meta">
+            {CATEGORY_LABELS[t.category]} · {COMPLEXITY_LABELS[t.complexity]} · {t.point_range_min}–{t.point_range_max} points
+            {t.recurring_task_id ? ' · Recurring' : ''}
+            {t.skip_automated_review ? ' · Direct team review' : ''}
+            {t.group_id ? ' · Shared task' : ''}
+          </div>
+        </div>
+        <div className="mytask-right">
+          {inDraft ? (
+            <>
+              <span className="mytask-badge warn">Draft (3-day window)</span>
+              <span className="mytask-due bad">{draftExpiryLabel(t.expires_at, now)}</span>
+            </>
+          ) : (
+            <>
+              <span className={`mytask-badge ${t.status === 'changes_requested' ? 'warn' : t.status === 'completed' ? 'good' : ''}`}>{TASK_STATUS_LABELS[t.status]}</span>
+              {CURRENT.includes(t.status) && t.status !== 'submitted' && (
+                <span className={`mytask-due ${isOverdue(t, now) ? 'bad' : ''}`}>{deadlineLabel(t, now)}</span>
+              )}
+            </>
+          )}
+        </div>
+      </Link>
+    )
+  }
 
   return (
     <>
@@ -53,7 +72,7 @@ export default async function MyTasksPage() {
         .mytask-stat span { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--grey-mid); }
         .mytask-section { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--grey-mid); margin: 24px 0 10px; }
         .mytask-list { display: flex; flex-direction: column; gap: 8px; }
-        .mytask-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; background: var(--navy); border: 1px solid rgba(255,255,255,0.06); padding: 16px 20px; text-decoration: none; }
+        .mytask-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; background: var(--navy); border: 1px solid rgba(255,255,255,0.06); padding: 16px 20px; text-decoration: none; }
         .mytask-row:hover { border-color: color-mix(in srgb, var(--orange) 35%, transparent); }
         .mytask-title { color: var(--white); font-weight: 600; font-size: 14px; }
         .mytask-meta { color: var(--grey-mid); font-size: 12px; margin-top: 4px; }
@@ -79,8 +98,15 @@ export default async function MyTasksPage() {
         <div className="mytask-stats">
           <div className="mytask-stat"><b>{profile?.total_points ?? 0}</b><span>Points</span></div>
           <div className="mytask-stat"><b>{profile?.verified_contributions ?? 0}</b><span>Verified contributions</span></div>
-          <div className="mytask-stat"><b>{current.length}</b><span>Open tasks</span></div>
+          <div className="mytask-stat"><b>{current.filter((t) => !t.recurring_task_id).length}</b><span>Open tasks</span></div>
         </div>
+
+        {graceDrafts.length > 0 && (
+          <>
+            <div className="mytask-section">Draft — submit within 3 days</div>
+            <div className="mytask-list">{graceDrafts.map((t) => <Row key={t.id} t={t} />)}</div>
+          </>
+        )}
 
         <div className="mytask-section">Current</div>
         {current.length === 0

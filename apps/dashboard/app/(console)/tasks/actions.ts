@@ -32,6 +32,10 @@ async function resolveSourceContributionId(rawId: unknown): Promise<{ id: string
   return { id: data.id }
 }
 
+function extractSkipAutomatedReview(raw: unknown): boolean {
+  return !!raw && typeof raw === 'object' && (raw as Record<string, unknown>).skipAutomatedReview === true
+}
+
 export async function createTask(raw: unknown, sourceContributionId?: string | null): Promise<Result<{ id: string }>> {
   const auth = await requireStaff()
   if ('error' in auth) return { ok: false, error: auth.error }
@@ -40,6 +44,7 @@ export async function createTask(raw: unknown, sourceContributionId?: string | n
   if ('error' in parsed) return { ok: false, error: parsed.error }
   const source = await resolveSourceContributionId(sourceContributionId)
   if ('error' in source) return { ok: false, error: source.error }
+  const skipAutomatedReview = extractSkipAutomatedReview(raw)
 
   const { data, error }: { data: Pick<Task, 'id'> | null; error: any } = await db()
     .from('tasks')
@@ -48,6 +53,7 @@ export async function createTask(raw: unknown, sourceContributionId?: string | n
       status: 'draft',
       created_by: auth.caller.userId,
       ...(source.id ? { source_contribution_id: source.id } : {}),
+      ...(skipAutomatedReview ? { skip_automated_review: true } : {}),
     })
     .select('id')
     .single()
@@ -85,9 +91,14 @@ export async function updateTask(taskId: string, raw: unknown): Promise<Result> 
     return { ok: false, error: 'Category and complexity can only change while the task is a draft.' }
   }
 
+  const skipAutomatedReview = extractSkipAutomatedReview(raw)
+  const hasExplicitSkip = !!raw && typeof raw === 'object' && typeof (raw as Record<string, unknown>).skipAutomatedReview === 'boolean'
   // Only save if the status is still what was checked above, so a task
   // assigned in the meantime can't have its category or complexity changed.
-  const { data: saved, error } = await supabase.from('tasks').update(parsed.fields)
+  const { data: saved, error } = await supabase.from('tasks').update({
+    ...parsed.fields,
+    ...(hasExplicitSkip && task.status === 'draft' ? { skip_automated_review: skipAutomatedReview } : {}),
+  })
     .eq('id', taskId).eq('status', task.status).select('id')
   if (error) {
     console.error('[tasks] update failed:', error.message)
@@ -214,6 +225,7 @@ export async function createAndAssignTask(raw: unknown, assigneeId: string, dead
     return { ok: false, error: 'Tasks can only be assigned to active members (onboarded and not archived).' }
   }
 
+  const skipAutomatedReview = extractSkipAutomatedReview(raw)
   const { data, error }: { data: Pick<Task, 'id'> | null; error: any } = await db()
     .from('tasks')
     .insert({
@@ -221,6 +233,7 @@ export async function createAndAssignTask(raw: unknown, assigneeId: string, dead
       status: 'draft',
       created_by: auth.caller.userId,
       ...(source.id ? { source_contribution_id: source.id } : {}),
+      ...(skipAutomatedReview ? { skip_automated_review: true } : {}),
     })
     .select('id')
     .single()
@@ -296,6 +309,7 @@ export async function createTaskForGroup(raw: unknown, assigneeIds: unknown, dea
   const source = await resolveSourceContributionId(sourceContributionId)
   if ('error' in source) return { ok: false, error: source.error }
 
+  const skipAutomatedReview = extractSkipAutomatedReview(raw)
   const groupId = randomUUID()
   const { data, error }: { data: Pick<Task, 'id'>[] | null; error: any } = await db()
     .from('tasks')
@@ -305,6 +319,7 @@ export async function createTaskForGroup(raw: unknown, assigneeIds: unknown, dea
       created_by: auth.caller.userId,
       group_id: groupId,
       ...(source.id ? { source_contribution_id: source.id } : {}),
+      ...(skipAutomatedReview ? { skip_automated_review: true } : {}),
     })))
     .select('id')
   if (error || !data || data.length !== group.ids.length) {
@@ -351,6 +366,7 @@ export async function assignDraftToGroup(taskId: string, assigneeIds: unknown, d
     point_range_min: task.point_range_min, point_range_max: task.point_range_max, deadline_days: task.deadline_days,
     links: task.links, created_by: task.created_by, status: 'draft', group_id: groupId,
     ...(task.source_contribution_id ? { source_contribution_id: task.source_contribution_id } : {}),
+    ...(task.skip_automated_review ? { skip_automated_review: true } : {}),
   }
   const { data: extra, error } = await supabase.from('tasks').insert(group.ids.slice(1).map(() => copy)).select('id')
   if (error || !extra || extra.length !== group.ids.length - 1) {

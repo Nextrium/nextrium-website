@@ -237,8 +237,10 @@ export async function alertOverdue(deps: AlertDeps, now: Date = new Date()): Pro
   const tally: Record<AlertOutcome, number> = { sent: 0, already_sent: 0, nobody: 0, failed: 0, not_needed: 0 }
   const fallback = await fallbackRecipients(deps.db)
 
-  const { data: team } = await deps.db.from('tasks').select('id, title, created_by, assigned_to, deadline_at, extended_deadline_at, extension_status').eq('status', 'assigned')
+  const { data: team } = await deps.db.from('tasks').select('*').eq('status', 'assigned')
   for (const t of (team ?? []) as any[]) {
+    // Recurring tasks follow their own dedicated 24h reminder -> 3-day draft -> auto-delete lifecycle.
+    if (t.recurring_task_id) continue
     const due = effective(t)
     if (!due || new Date(due).getTime() > now.getTime()) continue
     const { count } = await deps.db.from('contributions').select('id', { count: 'exact', head: true }).eq('task_id', t.id)

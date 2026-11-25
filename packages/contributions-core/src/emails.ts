@@ -122,3 +122,25 @@ export function staffFeedbackEmail(p: { taskTitle: string; authorName: string; b
       button(p.url, 'Read & reply'),
   }
 }
+
+export function recurringDeadlineReminderEmail(p: { taskTitle: string; deadlineAt: string | null; url: string }): EmailContent {
+  return {
+    subject: subjectText(`24-hour reminder to submit: ${p.taskTitle}`),
+    html:
+      `<p>Hi {{name}},</p>` +
+      `<p>The deadline for your recurring task <strong>${escapeHtml(p.taskTitle)}</strong> (${escapeHtml(formatDate(p.deadlineAt))}) has passed.</p>` +
+      `<p>Please submit your update within the next <strong>24 hours</strong>. If not submitted, it will move into a 3-day draft window and then be automatically removed.</p>` +
+      button(p.url, 'Submit now'),
+  }
+}
+
+export function recurringMovedToDraftEmail(p: { taskTitle: string; expiresAt: string | null; url: string }): EmailContent {
+  return {
+    subject: subjectText(`Saved as draft (3 days left): ${p.taskTitle}`),
+    html:
+      `<p>Hi {{name}},</p>` +
+      `<p>Your recurring task <strong>${escapeHtml(p.taskTitle)}</strong> was not submitted within 24 hours of its deadline and has been moved to a <strong>3-day draft</strong>.</p>` +
+      `<p>You can still submit it before <strong>${escapeHtml(formatDate(p.expiresAt))}</strong>. If it is still not submitted by then, it will be automatically removed.</p>` +
+      button(p.url, 'Open & submit'),
+  }
+}

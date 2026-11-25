@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Header from '@/components/dashboard/Header'
 import RichTextEditor from '@/components/editor/RichTextEditor'
 import { cancelTask, cancelTaskGroup, createAndAssignTask, createTask, createTaskForGroup, deleteTask, updateTask, updateTaskGroup } from '../actions'
+import { createRecurringTask } from '../recurring/actions'
 import { taskHasChanges, type TaskFormValues } from '@nextrium/contributions-core/taskInput'
 import AssignmentPanel from './AssignmentPanel'
 import GroupPicker from './GroupPicker'
@@ -20,6 +21,20 @@ import {
 import { QUEUE_TABS, TASK_STATUS_LABELS } from '@nextrium/contributions-core/taskView'
 import { isCategory } from '@nextrium/contributions-core/constants'
 import { MAX_ATTEMPTS, type FollowUpPrefill } from '@nextrium/contributions-core/thread'
+import {
+  CADENCES,
+  CADENCE_LABELS,
+  DAY_OF_WEEK_LABELS,
+  DURATION_DAYS_MAX,
+  DURATION_DAYS_MIN,
+  MAX_OCCURRENCES_CAP,
+  dayOfWeekYmd,
+  draftExpiryLabel,
+  isRecurringGraceDraft,
+  lagosToday,
+  type Cadence,
+  type EndMode,
+} from '@nextrium/contributions-core/recurring'
 import type { MemberSummary } from '@/lib/contributions/members'
 import type { Task } from '@nextrium/supabase/database'
 
@@ -38,10 +53,11 @@ interface Props {
   followUpPrefill?: FollowUpPrefill | null
   /** Linked source submission when editing a follow-up task. */
   sourceSubmission?: { contributionId: string; taskTitle: string; submissionTitle: string } | null
+  defaultRecurring?: boolean
   isAdmin?: boolean
 }
 
-export default function TaskEditor({ task, members, hasSubmission, submission = null, groupSize, sharedWith = null, group = null, followUpPrefill = null, sourceSubmission = null, isAdmin = false }: Props) {
+export default function TaskEditor({ task, members, hasSubmission, submission = null, groupSize, sharedWith = null, group = null, followUpPrefill = null, sourceSubmission = null, defaultRecurring = false, isAdmin = false }: Props) {
   const router = useRouter()
   const isNew = !task
   const isDraft = isNew || task.status === 'draft'
@@ -55,6 +71,19 @@ export default function TaskEditor({ task, members, hasSubmission, submission = 
   const [category, setCategory] = useState<Category>(initialCategory)
   const [complexity, setComplexity] = useState<Complexity>(task?.complexity ?? 'small')
   const [links, setLinks] = useState<{ label: string; url: string }[]>(task?.links ?? [])
+  const [skipAutomatedReview, setSkipAutomatedReview] = useState<boolean>(task?.skip_automated_review ?? defaultRecurring)
+
+  // Recurring schedule options (inside the normal New Task flow).
+  const today = useMemo(() => lagosToday(), [])
+  const [isRecurring, setIsRecurring] = useState<boolean>(isNew && defaultRecurring)
+  const [cadence, setCadence] = useState<Cadence>('weekly')
+  const [startsOn, setStartsOn] = useState<string>(today)
+  const [dayOfWeek, setDayOfWeek] = useState<number>(() => dayOfWeekYmd(today))
+  const [dayOfMonth, setDayOfMonth] = useState<number>(() => Math.min(28, Number(today.slice(8, 10))))
+  const [endMode, setEndMode] = useState<EndMode>('date')
+  const [endsOn, setEndsOn] = useState<string>('')
+  const [maxOccurrences, setMaxOccurrences] = useState<string>('8')
+  const [durationDays, setDurationDays] = useState<string>('')
 
   const [saving, setSaving] = useState(false)
   const [cancelling, setCancelling] = useState(false)
@@ -70,8 +99,8 @@ export default function TaskEditor({ task, members, hasSubmission, submission = 
   const [assignee, setAssignee] = useState(suggestedActive)
   const [deadline, setDeadline] = useState('')
   const [strandedDraftId, setStrandedDraftId] = useState<string | null>(null)
-  // …or to several people, each getting their own copy.
-  const [mode, setMode] = useState<'one' | 'group'>('one')
+  // …or to several people, each getting their own copy (or unassigned drafts for recurring).
+  const [mode, setMode] = useState<'one' | 'group' | 'draft'>('one')
   const [groupIds, setGroupIds] = useState<string[]>([])
   const [confirmGroup, setConfirmGroup] = useState(false)
   // Shared-task and clean-up actions, each behind its own confirmation.
@@ -86,14 +115,14 @@ export default function TaskEditor({ task, members, hasSubmission, submission = 
 
   const current: TaskFormValues = { title, description, category, complexity, links }
   const [saved, setSaved] = useState<TaskFormValues>(current)
-  const dirty = taskHasChanges(saved, current)
+  const dirty = taskHasChanges(saved, current) || (!isNew && isDraft && skipAutomatedReview !== (task.skip_automated_review === true))
   const canSubmitNew = !!title.trim() && !saving && !strandedDraftId
 
   const defaults = taskDefaults(category, complexity)
 
   async function handleSave() {
     setError(null); setSuccess(null); setSaving(true)
-    const input = { title, description, category, complexity, links }
+    const input = { title, description, category, complexity, links, skipAutomatedReview }
     const res = isNew ? await createTask(input, sourceContributionId) : await updateTask(task.id, input)
     setSaving(false)
     if (!res.ok) { setError(res.error); return }
@@ -105,7 +134,7 @@ export default function TaskEditor({ task, members, hasSubmission, submission = 
 
   async function handleCreateAndAssign() {
     setError(null); setSuccess(null); setSaving(true)
-    const res = await createAndAssignTask(current, assignee, deadline ? new Date(deadline).toISOString() : null, sourceContributionId)
+    const res = await createAndAssignTask({ ...current, skipAutomatedReview }, assignee, deadline ? new Date(deadline).toISOString() : null, sourceContributionId)
     setSaving(false)
     if (res.ok) {
       router.push(`/tasks/${res.id}`)
@@ -119,7 +148,7 @@ export default function TaskEditor({ task, members, hasSubmission, submission = 
 
   async function handleCreateForGroup() {
     setError(null); setSuccess(null); setSaving(true)
-    const res = await createTaskForGroup(current, groupIds, deadline ? new Date(deadline).toISOString() : null, sourceContributionId)
+    const res = await createTaskForGroup({ ...current, skipAutomatedReview }, groupIds, deadline ? new Date(deadline).toISOString() : null, sourceContributionId)
     setSaving(false); setConfirmGroup(false)
     if (!res.ok) {
       setError(res.error)
@@ -134,6 +163,28 @@ export default function TaskEditor({ task, members, hasSubmission, submission = 
       return
     }
     router.push(`/tasks/${res.firstId}?shared=${res.total}`)
+    router.refresh()
+  }
+
+  async function handleCreateRecurring() {
+    setError(null); setSuccess(null); setSaving(true)
+    const assigneeIds = mode === 'one' ? (assignee ? [assignee] : []) : mode === 'group' ? groupIds : []
+    const res = await createRecurringTask(current, {
+      cadence,
+      dayOfWeek,
+      dayOfMonth,
+      startsOn,
+      endMode,
+      endsOn: endMode === 'date' ? endsOn : null,
+      maxOccurrences: endMode === 'count' ? Number(maxOccurrences) : null,
+      durationDays: durationDays.trim() ? Number(durationDays) : defaults.deadlineDays,
+      assignmentMode: mode,
+      assigneeIds,
+      skipAutomatedReview,
+    })
+    setSaving(false)
+    if (!res.ok) { setError(res.error); return }
+    router.push(`/tasks/recurring/${res.id}${res.spawnedNow > 0 ? `?spawned=${res.spawnedNow}` : ''}`)
     router.refresh()
   }
 
@@ -194,6 +245,16 @@ export default function TaskEditor({ task, members, hasSubmission, submission = 
         </>
       )}
       {isNew ? (
+        isRecurring ? (
+          <button
+            type="button"
+            className="task-btn"
+            onClick={handleCreateRecurring}
+            disabled={!canSubmitNew || (mode === 'one' && !assignee) || (mode === 'group' && groupIds.length < 2)}
+          >
+            {saving ? 'Creating…' : 'Create recurring schedule'}
+          </button>
+        ) : (
         <>
           <button type="button" className="task-btn ghost" onClick={handleSave} disabled={!canSubmitNew}>
             {saving ? 'Saving…' : 'Save as draft'}
@@ -208,6 +269,7 @@ export default function TaskEditor({ task, members, hasSubmission, submission = 
             </button>
           )}
         </>
+        )
       ) : !isClosed && (
         <button type="button" className="task-btn" onClick={handleSave} disabled={saving || !dirty}>
           {saving ? 'Saving…' : groupSize > 0 ? 'Save this copy' : 'Save changes'}
@@ -306,6 +368,17 @@ export default function TaskEditor({ task, members, hasSubmission, submission = 
             <a href={`/reviews/${sourceSubmission.contributionId}`} style={{ color: 'var(--orange-w)' }}>View original submission</a>
           </div>
         )}
+        {!isNew && task.recurring_task_id && (
+          <div className="task-alert info">
+            Spawned from a recurring schedule{task.occurrence_date ? ` (${task.occurrence_date})` : ''}. Does not count against the member&apos;s open-task limit.{' '}
+            <a href={`/tasks/recurring/${task.recurring_task_id}`} style={{ color: 'var(--orange-w)' }}>View schedule</a>
+          </div>
+        )}
+        {!isNew && isRecurringGraceDraft(task) && !hasSubmission && (
+          <div className="task-alert error">
+            Saved as draft (3-day window) · {draftExpiryLabel(task.expires_at)}. This unsubmitted recurring cycle will be automatically deleted unless submitted before the window closes.
+          </div>
+        )}
 
         <div className="task-layout">
           <div className="task-main">
@@ -359,8 +432,130 @@ export default function TaskEditor({ task, members, hasSubmission, submission = 
               </div>
               {!isDraft && !isClosed && <span className="task-hint">Category and complexity set the points, so they are fixed once a task is assigned. Unassign it to return it to draft and change them.</span>}
               <div className="task-kv"><span>Points</span><span>{defaults.pointRangeMin}–{defaults.pointRangeMax}</span></div>
-              <div className="task-kv"><span>Deadline</span><span>{defaults.deadlineDays} days after assignment</span></div>
+              <div className="task-kv"><span>Deadline</span><span>{isRecurring && durationDays.trim() ? `${durationDays} day(s) per cycle` : `${defaults.deadlineDays} days after assignment`}</span></div>
+              <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', cursor: isDraft ? 'pointer' : 'default', marginTop: 4 }}>
+                <input
+                  type="checkbox"
+                  checked={skipAutomatedReview}
+                  disabled={!isDraft}
+                  onChange={(e) => setSkipAutomatedReview(e.target.checked)}
+                  style={{ marginTop: 3, accentColor: 'var(--orange)' }}
+                />
+                <span style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <span style={{ fontSize: 12.5, color: 'var(--off-white)', fontWeight: 500 }}>Direct team review (skip AI check)</span>
+                  <span style={{ fontSize: 11.5, color: 'var(--grey-mid)', lineHeight: 1.45 }}>
+                    Skips automated review to save tokens and sends submissions straight to human review. Link becomes optional and minimum note is 10 words.
+                  </span>
+                </span>
+              </label>
             </div>
+
+            {isNew && (
+              <div className="task-panel">
+                <div className="task-panel-title">Schedule</div>
+                <div className="group-mode" role="group" aria-label="Task schedule type">
+                  <button
+                    type="button"
+                    className={`group-chip${!isRecurring ? ' on' : ''}`}
+                    aria-pressed={!isRecurring}
+                    onClick={() => {
+                      setIsRecurring(false)
+                      if (mode === 'draft') setMode('one')
+                    }}
+                  >
+                    One-time task
+                  </button>
+                  <button
+                    type="button"
+                    className={`group-chip${isRecurring ? ' on' : ''}`}
+                    aria-pressed={isRecurring}
+                    onClick={() => {
+                      setIsRecurring(true)
+                      setSkipAutomatedReview(true)
+                    }}
+                  >
+                    Recurring task
+                  </button>
+                </div>
+
+                {isRecurring && (
+                  <>
+                    <div className="task-field">
+                      <label className="task-label" htmlFor="rec-cadence">Repeats</label>
+                      <select id="rec-cadence" className="task-select" value={cadence} onChange={(e) => setCadence(e.target.value as Cadence)}>
+                        {CADENCES.map((c) => <option key={c} value={c}>{CADENCE_LABELS[c]}</option>)}
+                      </select>
+                    </div>
+
+                    {(cadence === 'weekly' || cadence === 'biweekly') && (
+                      <div className="task-field">
+                        <label className="task-label" htmlFor="rec-dow">Day of week</label>
+                        <select id="rec-dow" className="task-select" value={dayOfWeek} onChange={(e) => setDayOfWeek(Number(e.target.value))}>
+                          {DAY_OF_WEEK_LABELS.map((label, idx) => <option key={label} value={idx}>{label}</option>)}
+                        </select>
+                      </div>
+                    )}
+
+                    {cadence === 'monthly' && (
+                      <div className="task-field">
+                        <label className="task-label" htmlFor="rec-dom">Day of month (1–28)</label>
+                        <input id="rec-dom" type="number" min={1} max={28} className="task-input" value={dayOfMonth} onChange={(e) => setDayOfMonth(Number(e.target.value))} />
+                      </div>
+                    )}
+
+                    <div className="task-field">
+                      <label className="task-label" htmlFor="rec-start">Start date</label>
+                      <input id="rec-start" type="date" className="task-input" value={startsOn} onChange={(e) => setStartsOn(e.target.value)} />
+                      <span style={{ fontSize: 11.5, color: 'var(--grey-mid)' }}>If today ({today}), Cycle 1 is created immediately on save.</span>
+                    </div>
+
+                    <div className="task-field">
+                      <label className="task-label" htmlFor="rec-end-mode">Duration / end</label>
+                      <select id="rec-end-mode" className="task-select" value={endMode} onChange={(e) => setEndMode(e.target.value as EndMode)}>
+                        <option value="date">Until end date</option>
+                        <option value="count">After a set number of cycles</option>
+                        <option value="never">Ongoing until paused</option>
+                      </select>
+                    </div>
+
+                    {endMode === 'date' && (
+                      <div className="task-field">
+                        <label className="task-label" htmlFor="rec-end-date">End date</label>
+                        <input id="rec-end-date" type="date" min={startsOn} className="task-input" value={endsOn} onChange={(e) => setEndsOn(e.target.value)} />
+                      </div>
+                    )}
+
+                    {endMode === 'count' && (
+                      <div className="task-field">
+                        <label className="task-label" htmlFor="rec-max">Total cycles (1–{MAX_OCCURRENCES_CAP})</label>
+                        <input id="rec-max" type="number" min={1} max={MAX_OCCURRENCES_CAP} className="task-input" value={maxOccurrences} onChange={(e) => setMaxOccurrences(e.target.value)} />
+                      </div>
+                    )}
+
+                    <div className="task-field">
+                      <label className="task-label" htmlFor="rec-duration">Deadline window per cycle (days)</label>
+                      <input
+                        id="rec-duration"
+                        type="number"
+                        min={DURATION_DAYS_MIN}
+                        max={DURATION_DAYS_MAX}
+                        className="task-input"
+                        placeholder={String(defaults.deadlineDays)}
+                        value={durationDays}
+                        onChange={(e) => setDurationDays(e.target.value)}
+                      />
+                      <span style={{ fontSize: 11.5, color: 'var(--grey-mid)', lineHeight: 1.45 }}>
+                        e.g. 1 day for a weekly call, 5 days for weekly coordination. Leave blank for {defaults.deadlineDays} days.
+                      </span>
+                    </div>
+
+                    <div style={{ fontSize: 11.5, color: 'var(--grey-mid)', lineHeight: 1.5, paddingTop: 6, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                      Recurring tasks do not count against a member&apos;s max task load. Unsubmitted cycles get a 24h reminder, move to a 3-day draft for both sides, and auto-delete if still unsubmitted. Points always require manual review.
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
 
             {isNew && (
               <div className="task-panel">
@@ -368,8 +563,15 @@ export default function TaskEditor({ task, members, hasSubmission, submission = 
                 <div className="group-mode" role="group" aria-label="Who is this task for">
                   <button type="button" className={`group-chip${mode === 'one' ? ' on' : ''}`} aria-pressed={mode === 'one'} onClick={() => { setMode('one'); setConfirmGroup(false) }}>One person</button>
                   <button type="button" className={`group-chip${mode === 'group' ? ' on' : ''}`} aria-pressed={mode === 'group'} onClick={() => setMode('group')}>Several people</button>
+                  {isRecurring && (
+                    <button type="button" className={`group-chip${mode === 'draft' ? ' on' : ''}`} aria-pressed={mode === 'draft'} onClick={() => { setMode('draft'); setConfirmGroup(false) }}>Unassigned draft</button>
+                  )}
                 </div>
-                {mode === 'group' ? (
+                {mode === 'draft' ? (
+                  <span style={{ fontSize: 12, color: 'var(--grey-mid)', lineHeight: 1.5 }}>
+                    Each cycle will be created as a draft so staff can assign it manually when ready.
+                  </span>
+                ) : mode === 'group' ? (
                   <>
                     <GroupPicker members={activeMembers} category={category} selected={groupIds} onChange={(ids) => { setGroupIds(ids); setConfirmGroup(false) }} />
                     <span className="group-note">Each person gets their own copy and submits on their own. Everyone has the same deadline.</span>
@@ -393,12 +595,14 @@ export default function TaskEditor({ task, members, hasSubmission, submission = 
                   )}
                 </div>
                 )}
-                <div className="task-field">
-                  <label className="task-label" htmlFor="new-task-deadline">Custom deadline (optional)</label>
-                  <input id="new-task-deadline" type="datetime-local" className="task-input" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
-                  <span className="task-hint">Leave empty for {defaults.deadlineDays} days from assignment.</span>
-                </div>
-                {mode === 'group' && confirmGroup && (
+                {!isRecurring && (
+                  <div className="task-field">
+                    <label className="task-label" htmlFor="new-task-deadline">Custom deadline (optional)</label>
+                    <input id="new-task-deadline" type="datetime-local" className="task-input" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
+                    <span className="task-hint">Leave empty for {defaults.deadlineDays} days from assignment.</span>
+                  </div>
+                )}
+                {!isRecurring && mode === 'group' && confirmGroup && (
                   <div className="group-confirm" role="alertdialog" aria-label="Confirm">
                     <span>Create {groupIds.length} copies of this task and email {groupIds.length} people?</span>
                     <span style={{ display: 'flex', gap: 8 }}>

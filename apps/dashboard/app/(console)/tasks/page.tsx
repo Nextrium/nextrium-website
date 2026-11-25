@@ -6,6 +6,7 @@ import { requireStaff } from '@/lib/contributions/auth'
 import { getMemberDirectory } from '@/lib/contributions/members'
 import { CATEGORIES, CATEGORY_LABELS, COMPLEXITY_LABELS, TASK_STATUSES, isCategory } from '@nextrium/contributions-core/constants'
 import { TASK_STATUS_LABELS, deadlineLabel, isOverdue } from '@nextrium/contributions-core/taskView'
+import { draftExpiryLabel, isRecurringGraceDraft } from '@nextrium/contributions-core/recurring'
 import { groupProgress } from '@/lib/contributions/groupRules'
 import type { Task } from '@nextrium/supabase/database'
 
@@ -89,7 +90,12 @@ export default async function TasksPage({ searchParams }: Props) {
       <Header
         title="Tasks"
         description="Create and assign contributor tasks"
-        action={<Link href="/tasks/new" className="tasks-btn">+ New task</Link>}
+        action={
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <Link href="/tasks/recurring" className="tasks-btn ghost">Recurring schedules</Link>
+            <Link href="/tasks/new" className="tasks-btn">+ New task</Link>
+          </div>
+        }
       />
 
       <div className="dash-content">
@@ -168,6 +174,12 @@ export default async function TasksPage({ searchParams }: Props) {
                         <Link className="title" href={`/tasks/${t.id}`}>{t.title}</Link>
                         {t.group_id && !group && (
                           <> <Link className="tasks-badge" href={`/tasks?group=${t.group_id}`} style={{ textDecoration: 'none' }}>Group of {groupProgress(groupStatuses.get(t.group_id) ?? []).total}</Link></>
+                        )}
+                        {t.recurring_task_id && (
+                          <> <Link className="tasks-badge" href={`/tasks/recurring/${t.recurring_task_id}`} style={{ textDecoration: 'none' }}>Recurring</Link></>
+                        )}
+                        {isRecurringGraceDraft(t) && (
+                          <> <span className="tasks-badge bad">Draft · {draftExpiryLabel(t.expires_at, now)}</span></>
                         )}
                       </td>
                       <td>{CATEGORY_LABELS[t.category]} <span className="tasks-muted">· {COMPLEXITY_LABELS[t.complexity]}</span></td>

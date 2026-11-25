@@ -55,13 +55,17 @@ export async function getMemberDirectory(service: any = createServiceClient()): 
   const ids = rows.map((r) => r.user_id)
   const [{ data: profiles }, { data: open }, accounts] = await Promise.all([
     service.from('contributor_profiles').select('user_id, categories, skills, display_name').in('user_id', ids),
-    service.from('tasks').select('assigned_to').in('assigned_to', ids).in('status', ['assigned', 'changes_requested']),
+    service.from('tasks').select('*').in('assigned_to', ids).in('status', ['assigned', 'changes_requested']),
     listAccounts(service),
   ])
   const profileMap = new Map<string, { categories: Category[]; skills: string[]; displayName: string | null }>()
   for (const p of profiles ?? []) profileMap.set(p.user_id, { categories: p.categories ?? [], skills: p.skills ?? [], displayName: p.display_name?.trim() || null })
   const openCount = new Map<string, number>()
-  for (const t of open ?? []) openCount.set(t.assigned_to, (openCount.get(t.assigned_to) ?? 0) + 1)
+  // Recurring tasks do not count against a member's open-task load / max task limit.
+  for (const t of open ?? []) {
+    if (t.recurring_task_id) continue
+    openCount.set(t.assigned_to, (openCount.get(t.assigned_to) ?? 0) + 1)
+  }
 
   // Applications: the linked one by id, and any sent from the person's email.
   const appIds = rows.map((r) => r.application_id).filter(Boolean)
