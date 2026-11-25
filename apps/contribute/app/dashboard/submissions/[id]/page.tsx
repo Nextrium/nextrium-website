@@ -100,6 +100,13 @@ export default async function SubmissionDetailPage({ params }: { params: Promise
           contributionId={sub.id}
           attempts={sub.attempts}
           messages={sub.messages}
+          submissionCount={sub.submission_count ?? 1}
+          legacyStaffNote={{
+            body: sub.notes,
+            status: sub.status === 'rejected' && sub.revision_requested ? 'changes_requested' : sub.status,
+            submissionNumber: sub.submission_count ?? 1,
+            timestamp: sub.verified_at ?? sub.updated_at ?? sub.created_at,
+          }}
           threadClosed={!!sub.thread_closed_at}
         />
 

@@ -161,6 +161,29 @@ test('buildSubmissionTimeline orders attempts, reviews, and messages chronologic
   assert.deepEqual(timeline.map((e) => e.id), ['attempt-a1', 'review-r1', 'review-r3', 'message-m1', 'message-m2', 'attempt-a2'])
 })
 
+test('buildSubmissionTimeline surfaces legacy staff_notes when not already in messages or reviews', () => {
+  const withLegacy = buildSubmissionTimeline({
+    attempts: [],
+    reviews: [],
+    messages: [],
+    legacyStaffNote: { body: 'Strong audit, awarding 250 pts.', status: 'verified', submissionNumber: 2, timestamp: '2026-10-05T12:00:00Z' },
+  })
+  assert.equal(withLegacy.length, 1)
+  assert.equal(withLegacy[0].type, 'message')
+  if (withLegacy[0].type === 'message') {
+    assert.equal(withLegacy[0].message.kind, 'decision_verified')
+    assert.equal(withLegacy[0].message.body, 'Strong audit, awarding 250 pts.')
+  }
+
+  // Deduplicated if a thread message already has the exact note
+  const deduped = buildSubmissionTimeline({
+    messages: [{ id: 'm1', submission_number: 2, author_role: 'staff', author_name: 'Ada', kind: 'decision_verified', body: 'Strong audit, awarding 250 pts.', created_at: '2026-10-05T12:00:00Z' }],
+    legacyStaffNote: { body: 'Strong audit, awarding 250 pts.', status: 'verified', submissionNumber: 2, timestamp: '2026-10-05T12:00:00Z' },
+  })
+  assert.equal(deduped.length, 1)
+  assert.equal(deduped[0].id, 'message-m1')
+})
+
 test('buildFollowUpDraft escapes HTML in brief and rejects non-http reference URLs', () => {
   const safe = buildFollowUpDraft({
     originalTaskTitle: 'Review <script>alert(1)</script> NAIG',

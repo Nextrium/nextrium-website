@@ -17,9 +17,9 @@ import {
   type Category,
   type Complexity,
 } from '@nextrium/contributions-core/constants'
-import { TASK_STATUS_LABELS } from '@nextrium/contributions-core/taskView'
+import { QUEUE_TABS, TASK_STATUS_LABELS } from '@nextrium/contributions-core/taskView'
 import { isCategory } from '@nextrium/contributions-core/constants'
-import type { FollowUpPrefill } from '@nextrium/contributions-core/thread'
+import { MAX_ATTEMPTS, type FollowUpPrefill } from '@nextrium/contributions-core/thread'
 import type { MemberSummary } from '@/lib/contributions/members'
 import type { Task } from '@nextrium/supabase/database'
 
@@ -27,6 +27,7 @@ interface Props {
   task: Task | null
   members: MemberSummary[]
   hasSubmission: boolean
+  submission?: { id: string; status: string; submissionCount: number } | null
   /** People holding a copy of this task when it is shared; 0 when it is not. */
   groupSize: number
   /** Set just after this task was created for several people. */
@@ -40,7 +41,7 @@ interface Props {
   isAdmin?: boolean
 }
 
-export default function TaskEditor({ task, members, hasSubmission, groupSize, sharedWith = null, group = null, followUpPrefill = null, sourceSubmission = null, isAdmin = false }: Props) {
+export default function TaskEditor({ task, members, hasSubmission, submission = null, groupSize, sharedWith = null, group = null, followUpPrefill = null, sourceSubmission = null, isAdmin = false }: Props) {
   const router = useRouter()
   const isNew = !task
   const isDraft = isNew || task.status === 'draft'
@@ -429,6 +430,22 @@ export default function TaskEditor({ task, members, hasSubmission, groupSize, sh
                 ) : (
                   <button type="button" className="task-btn danger" style={{ width: 'fit-content' }} onClick={() => setConfirmAction('cancel-group')}>Cancel whole group</button>
                 ))}
+              </div>
+            )}
+            {!isNew && submission && (
+              <div className="task-panel">
+                <div className="task-panel-title">Submission &amp; conversation</div>
+                <div className="task-kv">
+                  <span>Status</span>
+                  <span>{QUEUE_TABS.find((t) => t.key === submission.status)?.label ?? submission.status}</span>
+                </div>
+                <div className="task-kv">
+                  <span>Attempt</span>
+                  <span>{submission.submissionCount} of {MAX_ATTEMPTS}</span>
+                </div>
+                <a href={`/reviews/${submission.id}`} className="task-btn" style={{ textDecoration: 'none', width: 'fit-content' }}>
+                  Open review &amp; thread →
+                </a>
               </div>
             )}
             {!isNew && !isClosed && <AssignmentPanel task={task} members={members} hasSubmission={hasSubmission} groupSize={groupSize} />}

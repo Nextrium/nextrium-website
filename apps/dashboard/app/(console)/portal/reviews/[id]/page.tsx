@@ -103,6 +103,13 @@ export default async function PortalSubmissionPage({ params }: { params: Promise
               attempts={attempts}
               reviews={[]}
               messages={messages}
+              submissionCount={s.submission_count ?? 1}
+              legacyStaffNote={{
+                body: s.notes,
+                status: s.status === 'rejected' && s.revision_requested === true ? 'changes_requested' : s.status,
+                submissionNumber: s.submission_count ?? 1,
+                timestamp: s.verified_at ?? s.updated_at ?? s.created_at,
+              }}
               threadClosed={!!s.thread_closed_at}
               viewerRole="staff"
               canModerate={canDecide}

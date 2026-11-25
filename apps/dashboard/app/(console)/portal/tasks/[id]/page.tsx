@@ -115,6 +115,15 @@ export default async function PortalTaskPage({ params }: { params: Promise<{ id:
                 {status === 'assigned' && <><dt>Claimed</dt><dd>{fmt(t.claimed_at)}</dd><dt>Deadline</dt><dd>{fmt(deadline)}</dd><dt>Extension</dt><dd>{EXTENSION_LABELS[ext]}</dd></>}
                 <dt>Submissions</dt><dd>{(subs ?? []).length}</dd>
               </dl>
+              {(subs ?? []).length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 6, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                  {(subs ?? []).map((sub) => (
+                    <Link key={sub.id} href={`/portal/reviews/${sub.id}`} className="pt-btn" style={{ width: 'fit-content' }}>
+                      Open review &amp; thread (attempt {sub.submission_count ?? 1}/3) →
+                    </Link>
+                  ))}
+                </div>
+              )}
             </div>
             {t.shared && shared && t.claim_closes_at && (
               <SharedPanel

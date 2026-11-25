@@ -181,6 +181,8 @@ export default async function MyTaskPage({ params }: Props) {
                 attempts={attempts}
                 reviews={reviews as unknown as TimelineReview[]}
                 messages={messages}
+                submissionCount={contribution.submission_count}
+                legacyStaffNote={{ body: contribution.staff_notes, status: contribution.status, submissionNumber: contribution.submission_count, timestamp: contribution.verified_at ?? contribution.updated_at ?? contribution.submitted_at }}
                 threadClosed={!!contribution.thread_closed_at}
                 viewerRole="contributor"
                 showSecurity={false}

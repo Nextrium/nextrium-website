@@ -10,6 +10,7 @@ import {
   MESSAGE_MAX,
   buildSubmissionTimeline,
   type AttemptSnapshot,
+  type LegacyStaffNote,
   type ThreadMessage,
   type TimelineReview,
 } from '@nextrium/contributions-core/thread'
@@ -53,6 +54,8 @@ interface Props {
   attempts: AttemptSnapshot[]
   reviews: TimelineReview[]
   messages: ThreadMessage[]
+  submissionCount?: number
+  legacyStaffNote?: LegacyStaffNote | null
   threadClosed: boolean
   viewerRole: 'staff' | 'contributor'
   /** False when a staff member views their own submission and cannot moderate it. */
@@ -78,6 +81,8 @@ export default function SubmissionTimeline({
   attempts,
   reviews,
   messages,
+  submissionCount,
+  legacyStaffNote = null,
   threadClosed,
   viewerRole,
   canModerate = true,
@@ -93,8 +98,9 @@ export default function SubmissionTimeline({
   const [error, setError] = useState<string | null>(null)
   const [statusMsg, setStatusMsg] = useState<string | null>(null)
 
-  const entries = buildSubmissionTimeline({ attempts, reviews, messages })
+  const entries = buildSubmissionTimeline({ attempts, reviews, messages, legacyStaffNote })
   const latestAttemptNumber = attempts.reduce((max, a) => Math.max(max, a.submission_number), 0)
+  const missingOlderSnapshots = typeof submissionCount === 'number' && submissionCount > attempts.length && attempts.length > 0
   const atMessageLimit = messages.length >= MAX_MESSAGES_PER_THREAD
   const canCompose = !!postAction && !threadClosed && !atMessageLimit && (viewerRole === 'contributor' || canModerate)
 
@@ -215,6 +221,12 @@ export default function SubmissionTimeline({
           </button>
         )}
       </div>
+
+      {missingOlderSnapshots && (
+        <div className="st-hint">
+          This submission had {submissionCount} attempts before attempt snapshots were enabled. Earlier submission text was not stored, while review records for all attempts remain below.
+        </div>
+      )}
 
       {entries.length === 0 ? (
         <div className="st-empty">

@@ -30,6 +30,7 @@ export default async function TaskEditorPage({ params, searchParams }: Props) {
   const supabase = createServiceClient() as any
   let task: Task | null = null
   let hasSubmission = false
+  let submission: { id: string; status: string; submissionCount: number } | null = null
   let groupSize = 0
   // For a shared task: where the group stands and how many copies are still open.
   let group: { label: string; open: number } | null = null
@@ -41,11 +42,14 @@ export default async function TaskEditorPage({ params, searchParams }: Props) {
     const { data } = await supabase.from('tasks').select('*').eq('id', id).maybeSingle()
     if (!data) notFound()
     task = data
-    const [{ count }, { data: copies }] = await Promise.all([
-      supabase.from('contributions').select('id', { count: 'exact', head: true }).eq('task_id', id),
+    const [{ data: subRow }, { data: copies }] = await Promise.all([
+      supabase.from('contributions').select('id, status, submission_count').eq('task_id', id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
       data.group_id ? supabase.from('tasks').select('id, status').eq('group_id', data.group_id) : Promise.resolve({ data: [] }),
     ])
-    hasSubmission = !!count
+    if (subRow) {
+      hasSubmission = true
+      submission = { id: subRow.id, status: subRow.status, submissionCount: subRow.submission_count ?? 1 }
+    }
     if (data.group_id) {
       const list: { id: string; status: string }[] = copies ?? []
       const { data: subs } = await supabase.from('contributions').select('task_id').in('task_id', list.map((c) => c.id))
@@ -90,6 +94,7 @@ export default async function TaskEditorPage({ params, searchParams }: Props) {
       task={task}
       members={members}
       hasSubmission={hasSubmission}
+      submission={submission}
       groupSize={groupSize}
       group={group}
       sharedWith={sharedWith}

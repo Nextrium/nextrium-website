@@ -137,6 +137,8 @@ export default async function ReviewDetailPage({ params }: Props) {
               attempts={attempts}
               reviews={reviews as unknown as TimelineReview[]}
               messages={messages}
+              submissionCount={c.submission_count}
+              legacyStaffNote={{ body: c.staff_notes, status: c.status, submissionNumber: c.submission_count, timestamp: c.verified_at ?? c.updated_at ?? c.submitted_at }}
               threadClosed={!!c.thread_closed_at}
               viewerRole="staff"
               canModerate={canDecide}

@@ -222,22 +222,37 @@ const ENTRY_ORDER: Record<TimelineEntry['type'], number> = {
   message: 2,
 }
 
+export interface LegacyStaffNote {
+  body: string | null | undefined
+  status: string | null | undefined
+  submissionNumber?: number | null
+  timestamp?: string | null
+}
+
 /**
  * Builds a unified chronological timeline of submission attempts, automated
- * reviews, legacy staff reviews (not already represented in messages), and
- * two-way thread messages.
+ * reviews, legacy staff reviews (not already represented in messages), legacy
+ * `staff_notes`/`notes` written before threads existed, and two-way messages.
  */
 export function buildSubmissionTimeline(p: {
   attempts?: AttemptSnapshot[]
   reviews?: TimelineReview[]
   messages?: ThreadMessage[]
+  legacyStaffNote?: LegacyStaffNote | null
 }): TimelineEntry[] {
   const messages = p.messages ?? []
+  const reviews = p.reviews ?? []
   const staffMessageKeys = new Set(
     messages
       .filter((m) => m.author_role === 'staff')
       .map((m) => `${m.submission_number}:${m.body.trim()}`),
   )
+  const staffBodies = new Set<string>([
+    ...messages.filter((m) => m.author_role === 'staff').map((m) => m.body.trim()),
+    ...reviews
+      .filter((r) => r.source === 'staff' && typeof r.feedback?.summary === 'string')
+      .map((r) => r.feedback!.summary!.trim()),
+  ])
 
   const entries: TimelineEntry[] = []
 
@@ -251,7 +266,7 @@ export function buildSubmissionTimeline(p: {
     })
   }
 
-  for (const r of p.reviews ?? []) {
+  for (const r of reviews) {
     // Avoid duplicating a staff decision that already appears as a thread message.
     if (r.source === 'staff') {
       const summary = (r.feedback?.summary ?? '').trim()
@@ -273,6 +288,33 @@ export function buildSubmissionTimeline(p: {
       timestamp: m.created_at,
       submissionNumber: m.submission_number,
       message: m,
+    })
+  }
+
+  const legacyText = typeof p.legacyStaffNote?.body === 'string' ? p.legacyStaffNote.body.trim() : ''
+  if (legacyText && !staffBodies.has(legacyText)) {
+    const st = p.legacyStaffNote?.status
+    const kind: ThreadMessageKind =
+      st === 'verified' ? 'decision_verified'
+      : st === 'rejected' ? 'decision_rejected'
+      : st === 'changes_requested' ? 'decision_changes'
+      : 'feedback'
+    const submissionNumber = Math.max(1, p.legacyStaffNote?.submissionNumber ?? 1)
+    const timestamp = p.legacyStaffNote?.timestamp ?? ''
+    entries.push({
+      type: 'message',
+      id: 'message-legacy-staff-note',
+      timestamp,
+      submissionNumber,
+      message: {
+        id: 'legacy-staff-note',
+        submission_number: submissionNumber,
+        author_role: 'staff',
+        author_name: 'Team',
+        kind,
+        body: legacyText,
+        created_at: timestamp,
+      },
     })
   }
 

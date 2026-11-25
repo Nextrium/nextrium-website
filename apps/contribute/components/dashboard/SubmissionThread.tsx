@@ -7,6 +7,7 @@ import {
   MESSAGE_MAX,
   buildSubmissionTimeline,
   type AttemptSnapshot,
+  type LegacyStaffNote,
   type ThreadMessage,
 } from '@nextrium/contributions-core/thread'
 import { postPortalContributorReply } from '@/app/actions/work'
@@ -33,11 +34,15 @@ export default function SubmissionThread({
   contributionId,
   attempts,
   messages,
+  submissionCount,
+  legacyStaffNote = null,
   threadClosed,
 }: {
   contributionId: string
   attempts: AttemptSnapshot[]
   messages: ThreadMessage[]
+  submissionCount?: number
+  legacyStaffNote?: LegacyStaffNote | null
   threadClosed: boolean
 }) {
   const router = useRouter()
@@ -46,8 +51,9 @@ export default function SubmissionThread({
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState<string | null>(null)
 
-  const entries = buildSubmissionTimeline({ attempts, reviews: [], messages })
+  const entries = buildSubmissionTimeline({ attempts, reviews: [], messages, legacyStaffNote })
   const latestAttempt = attempts.reduce((max, a) => Math.max(max, a.submission_number), 0)
+  const missingOlderSnapshots = typeof submissionCount === 'number' && submissionCount > attempts.length && attempts.length > 0
   const atLimit = messages.length >= MAX_MESSAGES_PER_THREAD
 
   async function handleSubmit(e: React.FormEvent) {
@@ -102,6 +108,12 @@ export default function SubmissionThread({
           {threadClosed ? 'Closed' : 'Open'}
         </span>
       </div>
+
+      {missingOlderSnapshots && (
+        <p style={{ fontFamily: F.body, fontSize: 12, color: C.mute, lineHeight: 1.6 }}>
+          This submission had {submissionCount} attempts before attempt snapshots were enabled. Earlier submission text was not stored.
+        </p>
+      )}
 
       {entries.length === 0 ? (
         <p style={{ fontFamily: F.body, fontSize: 13, color: C.mute, lineHeight: 1.6 }}>
