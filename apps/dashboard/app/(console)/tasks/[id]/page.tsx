@@ -13,7 +13,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 interface Props {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ shared?: string; fromContribution?: string }>
+  searchParams: Promise<{ shared?: string; fromContribution?: string; recurring?: string }>
 }
 
 export async function generateMetadata({ params }: Props) {
@@ -26,7 +26,7 @@ export default async function TaskEditorPage({ params, searchParams }: Props) {
   if ('error' in auth) notFound()
 
   const { id } = await params
-  const { shared, fromContribution } = await searchParams
+  const { shared, fromContribution, recurring } = await searchParams
   const supabase = createServiceClient() as any
   let task: Task | null = null
   let hasSubmission = false
@@ -100,6 +100,7 @@ export default async function TaskEditorPage({ params, searchParams }: Props) {
       sharedWith={sharedWith}
       followUpPrefill={followUpPrefill}
       sourceSubmission={sourceSubmission}
+      defaultRecurring={id === 'new' && recurring === '1'}
       isAdmin={auth.caller.role === 'admin'}
     />
   )

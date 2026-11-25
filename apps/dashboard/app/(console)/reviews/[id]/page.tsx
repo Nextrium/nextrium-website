@@ -161,6 +161,13 @@ export default async function ReviewDetailPage({ params }: Props) {
               <div className="mt-kv"><span>Points range</span><span>{task.point_range_min}–{task.point_range_max}</span></div>
               <div className="mt-kv"><span>Deadline</span><span>{fmt(deadline?.toISOString() ?? null)}</span></div>
               <div className="mt-kv"><span>Submitted</span><span>{fmt(c.submitted_at)}</span></div>
+              {task.skip_automated_review && <div className="mt-kv"><span>Review mode</span><span>Direct team review</span></div>}
+              {task.recurring_task_id && (
+                <div className="mt-kv">
+                  <span>Schedule</span>
+                  <Link href={`/tasks/recurring/${task.recurring_task_id}`} className="mt-link">Recurring schedule</Link>
+                </div>
+              )}
               {c.review_score !== null && <div className="mt-kv"><span>Automated score</span><span>{Math.round(Number(c.review_score))}/100</span></div>}
               {c.final_points !== null && <div className="mt-kv"><span>Points awarded</span><span>{c.final_points}</span></div>}
               {task.source_contribution_id && (

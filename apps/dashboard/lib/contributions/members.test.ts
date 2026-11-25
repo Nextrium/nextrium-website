@@ -37,7 +37,12 @@ function seed(extraRows: any[] = []) {
       { id: 'a3', email: 'unlinked@x.com', name: 'Older Name', created_at: '2026-08-01' },
       { id: 'a4', email: 'UNLINKED@x.com', name: 'Unlinked Applicant', created_at: '2026-09-15' },
     ],
-    tasks: [{ assigned_to: 'p1', status: 'assigned' }, { assigned_to: 'p1', status: 'completed' }],
+    tasks: [
+      { assigned_to: 'p1', status: 'assigned' },
+      { assigned_to: 'p1', status: 'assigned', recurring_task_id: 'rec-1' },
+      { assigned_to: 'p1', status: 'changes_requested', recurring_task_id: 'rec-2' },
+      { assigned_to: 'p1', status: 'completed' },
+    ],
   }, {}, auth as any)
 }
 

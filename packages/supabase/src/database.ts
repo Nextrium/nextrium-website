@@ -680,6 +680,18 @@ export type Database = {
           group_id: string | null
           /** Original contribution this follow-up task was created from, if any. */
           source_contribution_id?: string | null
+          /** When true, skips automated AI review and goes straight to human team review. */
+          skip_automated_review?: boolean
+          /** Parent recurring schedule when spawned from a recurring task. */
+          recurring_task_id?: string | null
+          /** Calendar date (YYYY-MM-DD, Lagos) this recurring occurrence was spawned for. */
+          occurrence_date?: string | null
+          /** When the 24-hour post-deadline reminder was sent for an unsubmitted recurring cycle. */
+          grace_reminder_sent_at?: string | null
+          /** When an unsubmitted recurring cycle moved into its 3-day draft grace window. */
+          grace_draft_at?: string | null
+          /** When an unsubmitted recurring grace-draft task will be auto-deleted. */
+          expires_at?: string | null
           created_at: string
           updated_at: string
         }
@@ -697,6 +709,12 @@ export type Database = {
           created_by?: string | null
           group_id?: string | null
           source_contribution_id?: string | null
+          skip_automated_review?: boolean
+          recurring_task_id?: string | null
+          occurrence_date?: string | null
+          grace_reminder_sent_at?: string | null
+          grace_draft_at?: string | null
+          expires_at?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -711,7 +729,113 @@ export type Database = {
           status?: 'draft' | 'assigned' | 'submitted' | 'changes_requested' | 'completed' | 'cancelled'
           links?: { label: string; url: string }[]
           source_contribution_id?: string | null
+          skip_automated_review?: boolean
+          grace_reminder_sent_at?: string | null
+          grace_draft_at?: string | null
+          expires_at?: string | null
           updated_at?: string
+        }
+      }
+      recurring_tasks: {
+        Row: {
+          id: string
+          title: string
+          description: string
+          category: 'technical' | 'design' | 'research' | 'operations' | 'community'
+          complexity: 'small' | 'medium' | 'large'
+          point_range_min: number
+          point_range_max: number
+          duration_days: number
+          links: { label: string; url: string }[]
+          cadence: 'daily' | 'weekdays' | 'weekly' | 'biweekly' | 'monthly'
+          day_of_week: number | null
+          day_of_month: number | null
+          starts_on: string
+          ends_on: string | null
+          max_occurrences: number | null
+          occurrences_created: number
+          next_run_on: string | null
+          last_run_on: string | null
+          assignment_mode: 'draft' | 'one' | 'group'
+          assignee_ids: string[]
+          skip_automated_review: boolean
+          status: 'active' | 'paused' | 'completed'
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          description?: string
+          category: 'technical' | 'design' | 'research' | 'operations' | 'community'
+          complexity: 'small' | 'medium' | 'large'
+          point_range_min: number
+          point_range_max: number
+          duration_days: number
+          links?: { label: string; url: string }[]
+          cadence: 'daily' | 'weekdays' | 'weekly' | 'biweekly' | 'monthly'
+          day_of_week?: number | null
+          day_of_month?: number | null
+          starts_on: string
+          ends_on?: string | null
+          max_occurrences?: number | null
+          occurrences_created?: number
+          next_run_on?: string | null
+          last_run_on?: string | null
+          assignment_mode?: 'draft' | 'one' | 'group'
+          assignee_ids?: string[]
+          skip_automated_review?: boolean
+          status?: 'active' | 'paused' | 'completed'
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          title?: string
+          description?: string
+          category?: 'technical' | 'design' | 'research' | 'operations' | 'community'
+          complexity?: 'small' | 'medium' | 'large'
+          point_range_min?: number
+          point_range_max?: number
+          duration_days?: number
+          links?: { label: string; url: string }[]
+          cadence?: 'daily' | 'weekdays' | 'weekly' | 'biweekly' | 'monthly'
+          day_of_week?: number | null
+          day_of_month?: number | null
+          starts_on?: string
+          ends_on?: string | null
+          max_occurrences?: number | null
+          occurrences_created?: number
+          next_run_on?: string | null
+          last_run_on?: string | null
+          assignment_mode?: 'draft' | 'one' | 'group'
+          assignee_ids?: string[]
+          skip_automated_review?: boolean
+          status?: 'active' | 'paused' | 'completed'
+          updated_at?: string
+        }
+      }
+      recurring_task_runs: {
+        Row: {
+          id: string
+          recurring_task_id: string
+          occurrence_date: string
+          outcome: 'spawned' | 'expired_deleted' | 'skipped'
+          task_count: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          recurring_task_id: string
+          occurrence_date: string
+          outcome?: 'spawned' | 'expired_deleted' | 'skipped'
+          task_count?: number
+          created_at?: string
+        }
+        Update: {
+          outcome?: 'spawned' | 'expired_deleted' | 'skipped'
+          task_count?: number
         }
       }
       contributions: {
@@ -975,6 +1099,10 @@ export type Database = {
         Args: { p_task_id: string; p_member: string; p_title: string; p_description: string; p_evidence_url: string }
         Returns: Database['public']['Tables']['contributions']['Row']
       }
+      submit_direct_contribution: {
+        Args: { p_task_id: string; p_member: string; p_title: string; p_description: string; p_evidence_url?: string | null }
+        Returns: Database['public']['Tables']['contributions']['Row']
+      }
       apply_contribution_review: {
         Args: {
           p_contribution_id: string; p_submission_number: number; p_decision: string; p_score: number | null
@@ -1024,6 +1152,8 @@ export type AgentScreeningResult = Database['public']['Tables']['agent_screening
 export type ScreeningReport      = Database['public']['Tables']['screening_reports']['Row']
 export type ContributorProfile   = Database['public']['Tables']['contributor_profiles']['Row']
 export type Task                 = Database['public']['Tables']['tasks']['Row']
+export type RecurringTask        = Database['public']['Tables']['recurring_tasks']['Row']
+export type RecurringTaskRun     = Database['public']['Tables']['recurring_task_runs']['Row']
 export type Contribution         = Database['public']['Tables']['contributions']['Row']
 export type ContributionMessage  = Database['public']['Tables']['contribution_messages']['Row']
 export type ContributionAttempt  = Database['public']['Tables']['contribution_attempts']['Row']

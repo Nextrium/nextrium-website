@@ -77,6 +77,7 @@ export function createFakeSupabase(seed: Record<string, Row[]> = {}, opts: FakeO
       neq(c: string, v: unknown) { filters.push((r) => r[c] !== v); return api },
       is(c: string, v: unknown) { filters.push((r) => (v === null ? r[c] === null || r[c] === undefined : r[c] === v)); return api },
       in(c: string, vs: unknown[]) { filters.push((r) => vs.includes(r[c])); return api },
+      lte(c: string, v: unknown) { filters.push((r) => r[c] != null && r[c] <= (v as any)); return api },
       ilike(c: string, p: string) { const re = likeToRegex(p); filters.push((r) => typeof r[c] === 'string' && re.test(r[c])); return api },
       not(c: string, o: string, v: unknown) { if (o === 'is') filters.push((r) => !(v === null ? r[c] == null : r[c] === v)); return api },
       order(c: string, o?: { ascending?: boolean }) { orderBy.push({ col: c, asc: o?.ascending !== false }); return api },

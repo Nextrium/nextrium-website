@@ -6,7 +6,7 @@ import { createServiceClient } from '@nextrium/supabase/server'
 import { logActivity } from '@/lib/activityLog'
 import { requireMember, resolveCallerName } from '@/lib/contributions/auth'
 import { describeDbError } from '@nextrium/contributions-core/errors'
-import { parseSubmission } from '@nextrium/contributions-core/submission'
+import { parseDirectSubmission, parseSubmission } from '@nextrium/contributions-core/submission'
 import { canPostThreadMessage, canRequestMoreChanges, parseMessageBody } from '@nextrium/contributions-core/thread'
 import { reviewContribution } from '@/lib/contributions/reviewService'
 import { notifyReviewResult } from '@/lib/contributions/notify'
@@ -66,47 +66,85 @@ export async function submitContribution(taskId: string, raw: unknown): Promise<
   if ('error' in auth) return { ok: false, error: auth.error }
   if (!UUID.test(taskId)) return { ok: false, error: 'That task could not be found.' }
 
-  const parsed = parseSubmission(raw)
-  if ('error' in parsed) return { ok: false, error: parsed.error }
-  const s = parsed.submission
+  const supabase = db()
+  const { data: task } = await supabase.from('tasks').select('*').eq('id', taskId).eq('assigned_to', auth.caller.userId).maybeSingle()
+  if (!task) return { ok: false, error: 'That task could not be found.' }
+  const directReview = task.skip_automated_review === true
 
   // Belt-and-suspenders 3-attempt check ahead of the database trigger.
-  const { data: existing } = await db().from('contributions')
+  const { data: existing } = await supabase.from('contributions')
     .select('submission_count').eq('task_id', taskId).eq('contributor_id', auth.caller.userId).maybeSingle()
   if (existing && !canRequestMoreChanges(existing.submission_count ?? 1)) {
     return { ok: false, error: 'You have used all 3 submission attempts for this task.' }
   }
 
-  const { data, error } = await db().rpc('submit_contribution', {
-    p_task_id: taskId, p_member: auth.caller.userId,
-    p_title: s.title, p_description: s.description, p_evidence_url: s.evidenceUrl,
-  })
+  let data: any = null
+  let error: any = null
+  let submittedTitle = ''
+
+  if (directReview) {
+    const parsed = parseDirectSubmission(raw)
+    if ('error' in parsed) return { ok: false, error: parsed.error }
+    const s = parsed.submission
+    submittedTitle = s.title
+    const res = await supabase.rpc('submit_direct_contribution', {
+      p_task_id: taskId,
+      p_member: auth.caller.userId,
+      p_title: s.title,
+      p_description: s.description,
+      p_evidence_url: s.evidenceUrl,
+    })
+    data = res.data
+    error = res.error
+  } else {
+    const parsed = parseSubmission(raw)
+    if ('error' in parsed) return { ok: false, error: parsed.error }
+    const s = parsed.submission
+    submittedTitle = s.title
+    const res = await supabase.rpc('submit_contribution', {
+      p_task_id: taskId, p_member: auth.caller.userId,
+      p_title: s.title, p_description: s.description, p_evidence_url: s.evidenceUrl,
+    })
+    data = res.data
+    error = res.error
+    // Clear recurring grace-draft markers if this recurring task used automated review.
+    if (!error && data && task.grace_draft_at) {
+      await supabase.from('tasks').update({ grace_draft_at: null, expires_at: null }).eq('id', taskId)
+    }
+  }
   if (error || !data) return { ok: false, error: describeDbError(error, 'Could not submit your work.') }
 
   await logActivity({
     action: data.submission_count > 1 ? 'contribution_resubmitted' : 'contribution_submitted',
     targetType: 'contribution', targetId: data.id,
-    details: { title: s.title, taskId, submission: data.submission_count },
+    details: { title: submittedTitle, taskId, submission: data.submission_count, ...(directReview ? { directReview: true } : {}) },
     actorId: auth.caller.userId, actorEmail: auth.caller.email ?? undefined,
   })
-  // The submission is committed above. The review can take up to a minute,
-  // so it runs after the response is sent; the member's page refreshes until
-  // the result lands. A failed review leaves it 'review_failed' for staff to
-  // retry, and one cut off mid-call stays 'pending_review' until staff retry it.
+
   const contributionId: string = data.id
-  after(async () => {
-    try {
-      const outcome = await reviewContribution(contributionId)
-      if (outcome.kind === 'reviewed') await notifyReviewResult(contributionId, outcome.status)
-    } catch (err) {
-      console.error('[review] background review failed:', err instanceof Error ? err.message : err)
-    }
-    // Whatever the review did, tell the task's creator if the work now waits on them.
-    await alertTeamSubmission(liveAlertDeps(), contributionId, auth.caller.email)
-  })
+  if (directReview) {
+    // Direct team review: skip the AI service completely (zero tokens) and alert the reviewer right away.
+    after(() => alertTeamSubmission(liveAlertDeps(), contributionId, auth.caller.email))
+  } else {
+    // The submission is committed above. The review can take up to a minute,
+    // so it runs after the response is sent; the member's page refreshes until
+    // the result lands. A failed review leaves it 'review_failed' for staff to
+    // retry, and one cut off mid-call stays 'pending_review' until staff retry it.
+    after(async () => {
+      try {
+        const outcome = await reviewContribution(contributionId)
+        if (outcome.kind === 'reviewed') await notifyReviewResult(contributionId, outcome.status)
+      } catch (err) {
+        console.error('[review] background review failed:', err instanceof Error ? err.message : err)
+      }
+      // Whatever the review did, tell the task's creator if the work now waits on them.
+      await alertTeamSubmission(liveAlertDeps(), contributionId, auth.caller.email)
+    })
+  }
 
   revalidatePath('/my-tasks')
   revalidatePath(`/my-tasks/${taskId}`)
+  revalidatePath('/reviews')
   return { ok: true, contributionId, status: data.status, submissionCount: data.submission_count }
 }
 

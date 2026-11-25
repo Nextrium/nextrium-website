@@ -3,12 +3,19 @@
 export const SUBMISSION_TITLE_MAX = 200
 export const SUBMISSION_DESCRIPTION_MAX = 10_000
 export const SUBMISSION_MIN_WORDS = 50
+export const DIRECT_SUBMISSION_MIN_WORDS = 10
 export const EVIDENCE_URL_MAX = 2_048
 
 export interface SubmissionInput {
   title: string
   description: string
   evidenceUrl: string
+}
+
+export interface DirectSubmissionInput {
+  title: string
+  description: string
+  evidenceUrl: string | null
 }
 
 export function wordCount(text: string): number {
@@ -34,6 +41,35 @@ export function parseSubmission(raw: unknown): { submission: SubmissionInput } |
   if (evidenceUrl.length > EVIDENCE_URL_MAX) return { error: 'That link is too long.' }
   let url: URL
   try { url = new URL(evidenceUrl) } catch { return { error: 'That link is not a valid URL.' } }
+  if (url.protocol !== 'https:') return { error: 'The link must start with https://' }
+
+  return { submission: { title, description, evidenceUrl: url.toString() } }
+}
+
+/**
+ * Lighter validation for direct team-review tasks (e.g. weekly calls, team
+ * coordination, operational check-ins) where the automated reviewer is skipped:
+ * requires at least 10 words and makes the https:// evidence link optional.
+ */
+export function parseDirectSubmission(raw: unknown): { submission: DirectSubmissionInput } | { error: string } {
+  if (!raw || typeof raw !== 'object') return { error: 'Invalid submission.' }
+  const r = raw as Record<string, unknown>
+
+  const title = typeof r.title === 'string' ? r.title.trim() : ''
+  if (!title) return { error: 'Give your submission a title.' }
+  if (title.length > SUBMISSION_TITLE_MAX) return { error: `Keep the title under ${SUBMISSION_TITLE_MAX} characters.` }
+
+  const description = typeof r.description === 'string' ? r.description.trim() : ''
+  if (description.length > SUBMISSION_DESCRIPTION_MAX) return { error: `Keep the description under ${SUBMISSION_DESCRIPTION_MAX.toLocaleString()} characters.` }
+  if (wordCount(description) < DIRECT_SUBMISSION_MIN_WORDS) {
+    return { error: `Write a short summary of at least ${DIRECT_SUBMISSION_MIN_WORDS} words confirming what you completed or participated in.` }
+  }
+
+  const rawUrl = typeof r.evidenceUrl === 'string' ? r.evidenceUrl.trim() : ''
+  if (!rawUrl) return { submission: { title, description, evidenceUrl: null } }
+  if (rawUrl.length > EVIDENCE_URL_MAX) return { error: 'That link is too long.' }
+  let url: URL
+  try { url = new URL(rawUrl) } catch { return { error: 'That link is not a valid URL.' } }
   if (url.protocol !== 'https:') return { error: 'The link must start with https://' }
 
   return { submission: { title, description, evidenceUrl: url.toString() } }

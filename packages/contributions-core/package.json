@@ -10,6 +10,7 @@
     "./errors": "./src/errors.ts",
     "./leaderboard": "./src/leaderboard.ts",
     "./profile": "./src/profile.ts",
+    "./recurring": "./src/recurring.ts",
     "./reviewMapping": "./src/reviewMapping.ts",
     "./reviewSignature": "./src/reviewSignature.ts",
     "./sanitize": "./src/sanitize.ts",
