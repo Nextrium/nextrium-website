@@ -4,6 +4,7 @@ import { after } from 'next/server'
 import { brand } from '@nextrium/brand'
 import { sharedUnclaimMessage } from '@/lib/sharedTasks'
 import { parseSubmission } from '@nextrium/contributions-core/submission'
+import { canPostThreadMessage, parseMessageBody } from '@nextrium/contributions-core/thread'
 import { createCommunityServiceClient } from '@nextrium/supabase/community/server'
 import { getActiveContributor } from '@/lib/portal'
 import { isUuid } from '@/lib/publicData'
@@ -59,9 +60,9 @@ export async function submitWork(_prev: WorkState, formData: FormData): Promise<
     return { status: 'error', message: 'You can only submit work for a task you are currently working on.' }
   }
 
-  const { data: previous, error: prevError } = await db
+  const { data: previous, error: prevError } = await (db as any)
     .from('contributions')
-    .select('id, status, review_decision, notes, submission_count')
+    .select('*')
     .eq('task_id', task.id)
     .eq('contributor_id', me.id)
     .order('created_at', { ascending: false })
@@ -75,15 +76,26 @@ export async function submitWork(_prev: WorkState, formData: FormData): Promise<
     if (!state.canResubmit) {
       return { status: 'error', message: previous.status === 'rejected' ? 'This submission can no longer be resubmitted.' : 'You have already submitted work for this task.' }
     }
+    const staffRequestedRevision = previous.revision_requested === true
     // rejected → submitted: the database counts the attempt and refuses a fourth.
-    const { data: updated, error } = await db
+    // Clear notes + revision_requested on resubmission after staff revision request (the staff note stays preserved in contribution_messages).
+    const patch: Record<string, unknown> = {
+      title,
+      description,
+      evidence_url: evidenceUrl,
+      status: 'submitted',
+      review_decision: null,
+      review_score: null,
+      ...(staffRequestedRevision ? { notes: null, revision_requested: false } : {}),
+    }
+    let q = (db as any)
       .from('contributions')
-      .update({ title, description, evidence_url: evidenceUrl, status: 'submitted', review_decision: null, review_score: null })
+      .update(patch)
       .eq('id', previous.id)
       .eq('contributor_id', me.id)
       .eq('status', 'rejected')
-      .is('notes', null)
-      .select('id')
+    q = staffRequestedRevision ? q.eq('revision_requested', true) : q.is('notes', null)
+    const { data: updated, error } = await q.select('id')
     if (error) {
       if (/submission limit/i.test(error.message)) return { status: 'error', message: 'You have used all three attempts for this task.' }
       console.error('[contribute] resubmission failed:', error.code)
@@ -247,4 +259,65 @@ export async function updateProfile(_prev: WorkState, formData: FormData): Promi
     return GENERIC
   }
   return { status: 'done', message: 'Profile updated.' }
+}
+
+/** Posts a contributor reply on their own submission thread and alerts the core team reviewer. */
+export async function postPortalContributorReply(
+  contributionId: string,
+  body: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const me = await getActiveContributor()
+  if (!me) return { ok: false, error: 'Only approved contributors can do this. Reload the page and sign in again.' }
+  if (!isUuid(contributionId)) return { ok: false, error: 'That submission could not be found.' }
+
+  const parsed = parseMessageBody(body)
+  if ('error' in parsed) return { ok: false, error: parsed.error }
+
+  const db = createCommunityServiceClient() as any
+  const { data: sub } = await db
+    .from('contributions')
+    .select('*')
+    .eq('id', contributionId)
+    .eq('contributor_id', me.id)
+    .maybeSingle()
+  if (!sub) return { ok: false, error: 'That submission could not be found.' }
+
+  const { count } = await db
+    .from('contribution_messages')
+    .select('id', { count: 'exact', head: true })
+    .eq('contribution_id', sub.id)
+  const gate = canPostThreadMessage({
+    authorRole: 'contributor',
+    isOwner: true,
+    threadClosed: !!sub.thread_closed_at,
+    messageCount: count ?? 0,
+  })
+  if (!gate.ok) return { ok: false, error: gate.error }
+
+  const { data: profile } = await db
+    .from('contributors')
+    .select('name, contributor_type, team_name')
+    .eq('id', me.id)
+    .maybeSingle()
+  const authorName = ((profile?.contributor_type === 'team' && profile?.team_name?.trim()) || profile?.name?.trim() || me.name?.trim() || 'Contributor').slice(0, 120)
+  const { data: inserted, error } = await db
+    .from('contribution_messages')
+    .insert({
+      contribution_id: sub.id,
+      submission_number: sub.submission_count ?? 1,
+      author_role: 'contributor',
+      author_user_id: me.userId ?? null,
+      author_name: authorName,
+      kind: 'reply',
+      body: parsed.body,
+    })
+    .select('id')
+    .single()
+  if (error || !inserted) {
+    console.error('[contribute] postPortalContributorReply failed:', error?.code)
+    return { ok: false, error: 'Could not send your reply right now. Please try again.' }
+  }
+
+  after(() => alertStaff('reply', inserted.id))
+  return { ok: true }
 }

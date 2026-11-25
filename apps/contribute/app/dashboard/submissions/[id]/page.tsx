@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { COMPLEXITY_LABELS, type Complexity } from '@nextrium/contributions-core/constants'
+import { MAX_ATTEMPTS, latestStaffFeedbackNote } from '@nextrium/contributions-core/thread'
 import { getActiveContributor } from '@/lib/portal'
 import { getMyDashboard, getMySubmission } from '@/lib/contributorData'
 import { memberFeedback, submissionState } from '@/lib/submissionView'
@@ -9,6 +10,7 @@ import { C, F, categoryToken, tint } from '@/lib/theme'
 import { NeutralBadge } from '@/components/Badges'
 import StatusBadge from '@/components/dashboard/StatusBadge'
 import FeedbackPanel from '@/components/dashboard/FeedbackPanel'
+import SubmissionThread from '@/components/dashboard/SubmissionThread'
 import { RetryReviewButton } from '@/components/dashboard/TaskActions'
 
 export const metadata: Metadata = { title: 'Submission' }
@@ -32,11 +34,12 @@ export default async function SubmissionDetailPage({ params }: { params: Promise
   const held = !!sub.task_id && tasks.some((t) => t.id === sub.task_id)
   const state = raw.canResubmit && !held ? { ...raw, canResubmit: false, hint: 'Claim this task again to resubmit.' } : raw
   const feedback = sub.review_decision ? memberFeedback(sub.review_feedback) : null
+  const latestStaffNote = latestStaffFeedbackNote({ messages: sub.messages, fallbackStaffNotes: sub.notes })
   const token = categoryToken(sub.category)
   const verified = sub.status === 'verified'
 
   return (
-    <div className="max-w-3xl mx-auto px-6 sm:px-8 lg:px-14 py-12 lg:py-16">
+    <div className="max-w-3xl mx-auto px-4 sm:px-8 lg:px-14 py-10 lg:py-16">
       <nav aria-label="Breadcrumb" className="flex items-center gap-3 mb-6">
         <Link href="/dashboard?tab=submissions" className="nav-link">Submissions</Link>
         <span aria-hidden="true" style={{ color: C.dim }}>/</span>
@@ -50,7 +53,8 @@ export default async function SubmissionDetailPage({ params }: { params: Promise
             <span style={{ fontFamily: F.body, fontSize: 11, color: `var(${token})`, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{sub.category}</span>
             <span aria-hidden="true" style={{ color: C.dim }}>·</span>
             <span style={{ fontFamily: F.body, fontSize: 11, color: C.mute }}>{COMPLEXITY_LABELS[sub.complexity as Complexity] ?? sub.complexity}</span>
-            {(sub.submission_count ?? 1) > 1 && <><span aria-hidden="true" style={{ color: C.dim }}>·</span><span style={{ fontFamily: F.body, fontSize: 11, color: C.dim }}>Submission {sub.submission_count}</span></>}
+            <span aria-hidden="true" style={{ color: C.dim }}>·</span>
+            <span style={{ fontFamily: F.body, fontSize: 11, color: C.mute }}>Attempt {sub.submission_count ?? 1} of {MAX_ATTEMPTS}</span>
           </div>
         </div>
         <div className="flex items-center gap-4">
@@ -63,6 +67,17 @@ export default async function SubmissionDetailPage({ params }: { params: Promise
       </div>
 
       <div className="flex flex-col gap-5">
+        {sub.followUpSource && (
+          <div className="p-4 rounded-xl" style={{ background: C.depth, border: `1px solid ${C.border}` }}>
+            <p style={{ fontFamily: F.body, fontSize: 13, color: C.mist, lineHeight: 1.6 }}>
+              Follow-up task building on{' '}
+              {sub.followUpSource.ownSubmissionId
+                ? <Link href={`/dashboard/submissions/${sub.followUpSource.ownSubmissionId}`} style={{ color: C.accent, textDecoration: 'none' }}>{sub.followUpSource.title}</Link>
+                : <strong>{sub.followUpSource.title}</strong>}.
+            </p>
+          </div>
+        )}
+
         <div className="flex items-center justify-between gap-4 p-4 rounded-xl flex-wrap" style={{ background: tint('--orange', 5), border: `1px solid ${C.border}` }}>
           <p style={{ fontFamily: F.body, fontSize: 13, color: C.mist, lineHeight: 1.6, flex: 1, minWidth: 200 }}>{state.hint}</p>
           {state.canRetryReview && <RetryReviewButton contributionId={sub.id} />}
@@ -70,6 +85,23 @@ export default async function SubmissionDetailPage({ params }: { params: Promise
             <Link href={`/dashboard?tab=tasks#task-${sub.task_id}`} className="btn-primary" style={{ fontSize: 12, padding: '8px 18px' }}>Resubmit</Link>
           )}
         </div>
+
+        {state.canResubmit && latestStaffNote && (
+          <section
+            aria-label="Latest feedback from the core team"
+            style={{ background: tint('--orange', 8), border: `1px solid ${tint('--orange', 30)}`, borderRadius: 16, padding: 20 }}
+          >
+            <span style={{ ...label, color: C.accent }}>Feedback to address before resubmitting</span>
+            <p style={{ ...value, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{latestStaffNote}</p>
+          </section>
+        )}
+
+        <SubmissionThread
+          contributionId={sub.id}
+          attempts={sub.attempts}
+          messages={sub.messages}
+          threadClosed={!!sub.thread_closed_at}
+        />
 
         <section style={card}>
           <h2 style={cardTitle}>Submission</h2>

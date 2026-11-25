@@ -18,7 +18,7 @@ export default async function PortalReviewsPage({ searchParams }: { searchParams
 
   const db = community()
   const [{ data: subs, error: e1 }, { data: people, error: e2 }] = await Promise.all([
-    db.from('contributions').select('id, contributor_id, title, category, complexity, status, notes, submission_count, review_decision, review_score, base_points, final_points, created_at, updated_at').order('updated_at', { ascending: false }).limit(1000),
+    db.from('contributions').select('*').order('updated_at', { ascending: false }).limit(1000),
     db.from('contributors').select('id, name, contributor_type, team_name'),
   ])
   if (e1 || e2) throw new Error('Could not load the review queue')

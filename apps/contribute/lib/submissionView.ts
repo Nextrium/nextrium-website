@@ -12,6 +12,7 @@ export interface OwnSubmission {
   review_decision: string | null
   notes: string | null
   submission_count: number | null
+  revision_requested?: boolean | null
 }
 
 export type SubmissionTone = 'pending' | 'progress' | 'good' | 'action' | 'bad'
@@ -33,9 +34,18 @@ export function submissionState(s: OwnSubmission): SubmissionState {
     return { label: 'Passed review', hint: 'Passed the automated review. Awaiting final verification by the core team.', tone: 'progress', ...none }
   }
   if (s.status === 'rejected') {
-    // A reviewer's note makes a rejection final; the automated review's does not.
-    if (!s.notes && attempts < MAX_ATTEMPTS) {
-      return { label: 'Changes requested', hint: 'Address the review feedback and resubmit your work.', tone: 'action', canResubmit: true, canRetryReview: false }
+    // Staff can explicitly request changes with written feedback (revision_requested = true),
+    // and the automated review requests changes with no staff note — both allow resubmission until attempt 3.
+    if ((s.revision_requested === true || !s.notes) && attempts < MAX_ATTEMPTS) {
+      return {
+        label: 'Changes requested',
+        hint: s.revision_requested === true
+          ? 'The core team asked for changes. Read their feedback below, reply if you have questions, and resubmit your work.'
+          : 'Address the review feedback and resubmit your work.',
+        tone: 'action',
+        canResubmit: true,
+        canRetryReview: false,
+      }
     }
     return { label: 'Not accepted', hint: s.notes ? 'The core team has made a final decision on this submission.' : 'No attempts left on this task.', tone: 'bad', ...none }
   }

@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { verifyAlert } from '@nextrium/contributions-core/alertSignature'
 import { liveAlertDeps } from '@/lib/alerts/live'
-import { alertPortalExtension, alertPortalSubmission } from '@/lib/alerts/server'
+import { alertPortalExtension, alertPortalReplyByMessage, alertPortalSubmission } from '@/lib/alerts/server'
 
 // The contributor portal calls this when something on a portal task needs
 // staff. The request must be signed with PORTAL_ALERT_SECRET and at most five
@@ -21,6 +21,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   const deps = liveAlertDeps()
-  const result = check.event === 'submission' ? await alertPortalSubmission(deps, check.id) : await alertPortalExtension(deps, check.id)
+  const result =
+    check.event === 'submission' ? await alertPortalSubmission(deps, check.id)
+    : check.event === 'reply' ? await alertPortalReplyByMessage(deps, check.id)
+    : await alertPortalExtension(deps, check.id)
   return NextResponse.json({ result })
 }

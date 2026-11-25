@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { canDecideOnPortalSubmission, clampPoints, isDecidable, parseNote, queueTab } from './reviewRules'
 
-const s = (status: string, notes: string | null = null, submission_count = 1) => ({ status, notes, submission_count })
+const s = (status: string, notes: string | null = null, submission_count = 1, revision_requested = false) => ({ status, notes, submission_count, revision_requested })
 
 test('submissions land in the right queue tab', () => {
   assert.equal(queueTab(s('under_review')), 'team')
@@ -12,11 +12,15 @@ test('submissions land in the right queue tab', () => {
   assert.equal(queueTab(s('rejected')), 'changes')
   assert.equal(queueTab(s('rejected', null, 3)), 'rejected')
   assert.equal(queueTab(s('rejected', 'final')), 'rejected')
+  assert.equal(queueTab(s('rejected', 'Please add tests', 1, true)), 'changes')
+  assert.equal(queueTab(s('rejected', 'Please add tests', 2, true)), 'changes')
+  assert.equal(queueTab(s('rejected', 'Please add tests', 3, true)), 'rejected')
 })
 
 test('only unfinished submissions can be decided', () => {
   for (const st of ['under_review', 'ai_approved', 'submitted']) assert.equal(isDecidable(s(st)), true, st)
   assert.equal(isDecidable(s('rejected')), true) // overriding an automated rejection
+  assert.equal(isDecidable(s('rejected', 'Please add tests', 1, true)), true)
   assert.equal(isDecidable(s('rejected', 'final')), false)
   assert.equal(isDecidable(s('verified')), false)
 })
